@@ -29,7 +29,7 @@ The core never hardcodes stack facts. Two mechanisms keep it generic:
 ```sh
 # inside your project (or pass its path)
 sh install.sh
-# or:  curl -fsSL <raw-url>/install.sh | sh
+# or:  curl -fsSL https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.sh | sh
 ```
 
 Then, in Claude Code:

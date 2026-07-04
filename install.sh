@@ -17,7 +17,7 @@
 
 set -eu
 
-REPO_URL="${PIPELINE_REPO:-https://github.com/OWNER/claude-pipeline}"  # set after you push
+REPO_URL="${PIPELINE_REPO:-https://github.com/EnzoTheBidouille/thebidouille-agents}"
 
 mode="install"
 if [ "${1:-}" = "--update" ]; then mode="update"; shift; fi
