@@ -126,7 +126,7 @@ except Exception:
 if isinstance(data, dict) and "core_version" in data:
     data["core_version"] = newver
     with open(ptr, "w") as fh:
-        json.dump(data, fh, indent=2)
+        json.dump(data, fh, indent=2, ensure_ascii=False)
         fh.write("\n")
 PY
 }
