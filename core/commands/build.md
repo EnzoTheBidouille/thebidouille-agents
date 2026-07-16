@@ -20,6 +20,27 @@ You are the **lead**. Build feature **$ARGUMENTS** from its frozen spec.
   the file name(s) into `design_files`, then continue. Skip if the feature is backend-only / no UI.
 - If this is a fix loop (`## Remediation` has unchecked items), note them — they go to every agent.
 
+## 1.5 Reconcile surfaces — auto-grow / specialize agents
+
+Map every area the spec touches (§5 contract + each surface's tasks + touched paths) onto the
+`surfaces[]` in `PIPELINE.md`. Two triggers add an agent — handle them BEFORE authoring the contract:
+
+- **Unowned area → new agent.** If the spec introduces work in a tree that falls under NO existing
+  `surfaces[].path` (a genuinely new thing — a new service, a new app, a new top-level area), that work
+  has no owner. Auto-detect it and propose a new surface for it.
+- **Bottleneck area → specialize.** If one existing surface carries a large, cleanly-separable chunk of
+  this feature (e.g. a whole new feature-module) that would dominate build time, propose splitting that
+  chunk into its own specialized surface. Use the heuristic in SCHEMA.md §Specialization — only when the
+  boundary is clean; skip when tangled or tiny.
+
+For each surface to add: infer its `key`, `path`, `label`, `agent`, `tools`, `*_cmd`s, and `uses_design`
+(mirror a sibling surface), show the human a one-line proposal, and on go-ahead **render it now** per
+SCHEMA.md §"Rendering / reconciling a surface agent" — write the `surfaces[]` entry + §Conventions/§Testing
+stanza into `PIPELINE.md`, render `.claude/agents/<agent>.md` from the implementer template, applying the
+shared-code rule (shared trees get a single-owner surface; cross-slice shapes go through the contract).
+This is the automatic path: you don't send the human back to `/init-pipeline`. If nothing new is needed,
+say so and continue. Dispatch (§3) then covers the reconciled surface list.
+
 ## 2. Author the contract (lead-only — the single sync channel)
 
 _Only if `contract.enabled`._ From §5 of the spec, write/update the feature's contract file at
@@ -30,8 +51,9 @@ the sync channel — say so and skip.
 
 ## 3. Dispatch one implementer per surface — IN PARALLEL
 
-Spawn every surface's agent in a **single message** (one Task call each) so they run concurrently. Give
-EACH only what a stateless agent needs — re-supply everything every time. For each surface in `surfaces`:
+Spawn every surface's agent in a **single message** (one Task call each) so they run concurrently. Use
+the reconciled `surfaces` list from §1.5 (existing + any just-rendered). Give EACH only what a stateless
+agent needs — re-supply everything every time. For each surface in `surfaces`:
 
 > `subagent_type: <surface.agent>` — "Implement the **<surface.key>** surface for feature `$ARGUMENTS`.
 > Read `PIPELINE.md` first. Spec: `specs/$ARGUMENTS.md`. Contract: `<contract.path>/$ARGUMENTS.<ext>`

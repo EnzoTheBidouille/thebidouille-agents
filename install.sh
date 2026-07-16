@@ -110,6 +110,27 @@ print("ok" if not already else "present")
 PY
 }
 
+# Bump only the core_version in a repo's committed .claude/pipeline.json (bundled mode).
+# Leaves every other field intact; no-ops if the pointer is absent or has no core_version.
+bump_pointer_version() {
+  ptr="$1"; newver="$2"
+  [ -f "$ptr" ] || return 0
+  python3 - "$ptr" "$newver" <<'PY'
+import json, sys
+ptr, newver = sys.argv[1], sys.argv[2]
+try:
+    with open(ptr) as fh:
+        data = json.load(fh)
+except Exception:
+    sys.exit(0)
+if isinstance(data, dict) and "core_version" in data:
+    data["core_version"] = newver
+    with open(ptr, "w") as fh:
+        json.dump(data, fh, indent=2)
+        fh.write("\n")
+PY
+}
+
 if [ "$scope" = "global" ]; then
   if [ "$mode" = "install" ]; then
     echo "→ installing pipeline core GLOBALLY into $dest"
@@ -161,9 +182,10 @@ else
   echo "→ updating pipeline core in $dest (keeping your PIPELINE.md + rendered agents)"
   copy_core
   cp "$src/core/agents/review.md" "$src/core/agents/release.md" "$dest/agents/" 2>/dev/null || true
+  bump_pointer_version "$dest/pipeline.json" "$ver"
   cat <<EOF
 
-✓ core refreshed. Your PIPELINE.md, rendered surface agents, gate-config.json and
+✓ core refreshed to $ver. Your PIPELINE.md, rendered surface agents, gate-config.json and
   settings.json were left as-is. Re-run /init-pipeline if your stack changed.
 EOF
 fi

@@ -31,6 +31,12 @@ Gather evidence, then summarize what you found. Look for:
   `rails`, `.go`), frontend markers (`vite.config.*`, `next.config.*`, `@tanstack/react-router`,
   `angular.json`, `nuxt`, `svelte`), and its test runner (`@japa/*`, `vitest`, `jest`, `playwright`,
   `pytest`, `go test`), linter/formatter (`eslint`, `prettier`, `biome`, `ruff`).
+- **Split candidates (sub-surface boundaries):** inside each surface, look for a clean internal partition
+  — feature modules (`src/features/*`, `src/modules/*`, `app/(group)/*`), or independent services
+  (`services/*`, domain folders). Note the surface's rough size (module/file count) so a *large* surface
+  with a *clean* boundary can be proposed as several specialized surfaces in Phase 2. See SCHEMA.md
+  §"Specialization — when to split one surface into more agents" for the heuristic. Don't split yet — just
+  flag candidates + their would-be shared-code tree.
 - **Per-surface commands:** derive `test`/`lint`/`format`/`typecheck`/`build` from each surface's
   `package.json` scripts + the workspace filter syntax (e.g. `pnpm --filter <pkg> test`).
 - **Contract mechanism:** a shared types/schema package (`packages/shared-types`, Zod/`z.`),
@@ -53,6 +59,11 @@ Ask ONLY what you couldn't confidently detect. Batch related questions. Cover:
 - **Surfaces & ownership** — confirm the surface list and each one's path + owning agent name. (If a
   single-app repo, one surface.) Confirm the `tools` each agent needs (add `DesignSync` only to a
   surface with `uses_design: true`).
+- **Specialization (only if Phase 1 flagged a large + cleanly-separable surface)** — offer to split it
+  into specialized sub-surfaces (e.g. `web-checkout`, `web-billing`) so `/build` runs them in parallel,
+  per SCHEMA.md §Specialization. If the human accepts, apply the rules: **shared code (routing, global
+  state, DS kit/tokens) becomes its own single-owner surface**, and cross-slice shapes go through the
+  contract. Default to NOT splitting when boundaries are tangled or slices are tiny — coarse is fine.
 - **Contract** — mechanism (`shared-types-zod` / `openapi` / `protobuf` / `json-schema` / `none`) and
   where feature contracts are authored. If `none`, surfaces sync by the spec prose alone.
 - **UI language** — language of all user-facing copy.
@@ -79,8 +90,9 @@ block and get a go-ahead** before writing.
 2. **Wire it into `CLAUDE.md`:** if `CLAUDE.md` exists, ensure it references the profile (add a line
    near the top: `> Project profile & pipeline facts: **@PIPELINE.md**`). If not, create a minimal
    `CLAUDE.md` with that reference + a one-paragraph project intro.
-3. **Render one agent per surface** from the installer's `pipeline/implementer.template.md` →
-   this repo's `.claude/agents/<agent>.md`, substituting `<SURFACE_AGENT>`, `<SURFACE_LABEL>`, `<SURFACE_PATH>`,
+3. **Render one agent per surface** — for each surface, follow SCHEMA.md §"Rendering / reconciling a
+   surface agent" (steps 2–3): render `.claude/agents/<agent>.md` from the installer's
+   `pipeline/implementer.template.md`, substituting `<SURFACE_AGENT>`, `<SURFACE_LABEL>`, `<SURFACE_PATH>`,
    `<SURFACE_TOOLS>`, `<PROJECT_NAME>`, and the surface-specific blocks (`<SURFACE_EXTRA_NEVER>`,
    `<SURFACE_DESIGN_INPUT>`, `<SURFACE_TDD_STEP1>` — fill design-related ones only when `uses_design`).
    Leave `review.md` + `release.md` as-is (generic).

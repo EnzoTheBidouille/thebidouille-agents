@@ -33,6 +33,10 @@ repo:
 # One entry per independently-implemented code area. /build dispatches ONE
 # implementer agent per surface, in parallel. Each surface is rendered by
 # /init-pipeline into its own agent file (agent field) with the tools listed.
+# This list GROWS automatically: /build §1.5 adds a surface (and renders its
+# agent) when a spec touches a tree no surface owns, or splits a bottleneck
+# surface into specialized sub-surfaces. Keep one owner per tree; shared code
+# (routing/state/DS) is its own single-owner surface. See SCHEMA.md §Specialization.
 surfaces:
   - key: backend                              # short id, used as agent name + scope
     path: apps/api                            # the ONLY tree this surface's agent may touch

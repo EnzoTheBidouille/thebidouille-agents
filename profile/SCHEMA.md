@@ -18,9 +18,10 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
 | `vcs.feature_branch_prefix`          | string       | ship, isolation script            | `feature/` → branch `feature/<id>`.                           |
 | `repo.layout`                        | enum         | build, audit                      | `monorepo` (many surfaces) or `single`.                       |
 | `repo.workspace_tool`                | enum         | audit                             | `turborepo`/`nx`/`none`.                                      |
-| **`surfaces[]`**                     | list         | **build, review, refactor, init** | One per independently-built area.                             |
+| **`surfaces[]`**                     | list         | **build, review, refactor, init** | One per independently-built area. Grows via reconcile (below). |
 | `surfaces[].key`                     | string       | build                             | Short id + review scope.                                      |
 | `surfaces[].path`                    | string       | implementer                       | The ONLY tree that surface's agent may touch.                 |
+| `surfaces[].label`                   | string       | build, init (`<SURFACE_LABEL>`)   | Human label + framework, e.g. `frontend (React)`.            |
 | `surfaces[].agent`                   | string       | build (`subagent_type`)           | Rendered agent file name.                                     |
 | `surfaces[].tools`                   | list         | init                              | Frontmatter `tools:` for the rendered agent.                  |
 | `surfaces[].*_cmd`                   | string       | implementer                       | test/lint/format/typecheck/build commands.                    |
@@ -61,3 +62,52 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
   many surfaces to dispatch, the contract mechanism, the commands, and the capability flags.
 - **Hook** (`gate.py`) reads `gate.deny`/`gate.ask` from a generated `.claude/gate-config.json`.
 - **Scripts** (`new-feature.sh`) read the `isolation` block (rendered in at init).
+
+## Specialization — when to split one surface into more agents
+
+`/build` dispatches ONE agent per surface, in parallel, so build wall-clock ≈ the **slowest single
+surface**. More agents only build faster when they let the *slowest* surface's work run concurrently —
+and only if the split is safe. The invariant that keeps parallelism safe is **one owner per tree, and
+the frozen contract as the only cross-surface channel**. So specialization means carving a surface into
+**smaller non-overlapping surfaces**, never pointing two agents at the same tree.
+
+**Split a surface into specialized sub-surfaces only when BOTH hold:**
+
+1. **It's a bottleneck** — the surface is large (many modules / high LOC) and dominates build time.
+2. **The boundary is clean** — its work partitions into trees that don't share files, e.g. feature
+   modules (`src/features/*`, `src/modules/*`), route groups, or independent services (`services/*`).
+
+**Rules when splitting (non-negotiable — they preserve the invariant):**
+
+- **Shared code gets its own surface with a single owner.** Anything two slices both touch — routing,
+  global state/store, the design-system kit + tokens, shared utils — becomes its OWN surface (e.g.
+  `web-shared`), owned by exactly one agent. Never let two feature-slice agents both edit shared trees.
+- **Cross-slice references go through the contract**, not direct imports between slice trees. If
+  `web-checkout` needs a shape produced by `api-billing`, that shape lives in the frozen contract.
+- **Don't over-split.** A slice too small to hold ≥1 real task, or one with tangled boundaries, is worse
+  than not splitting — the coordination + token cost (each stateless agent re-reads `PIPELINE.md` + spec)
+  outweighs the parallelism. When boundaries aren't clean, keep one surface.
+
+Coarse first, specialize on evidence: start with one `frontend` / `backend` surface each; split only a
+surface that's proven slow and cleanly separable.
+
+## Rendering / reconciling a surface agent (shared procedure)
+
+Both `/init-pipeline` (initial render) and `/build` (auto-reconcile when a spec needs a new agent) use
+this exact procedure so a surface is always defined the same way. To add surface `S`:
+
+1. **Add the `surfaces[]` entry** to `PIPELINE.md`: `key`, `path` (the disjoint tree it exclusively
+   owns), `label`, `agent` (rendered file name), `tools` (add `DesignSync` only if `uses_design: true`),
+   the five `*_cmd`s (derive from the surface's `package.json` / workspace filter, mirroring a sibling
+   surface), and `uses_design`.
+2. **Render the agent file** `.claude/agents/<agent>.md` from `pipeline/implementer.template.md`
+   (resolve bundled `.claude/` vs global `~/.claude/`), substituting `<SURFACE_AGENT>`, `<SURFACE_LABEL>`,
+   `<SURFACE_PATH>`, `<SURFACE_TOOLS>`, `<PROJECT_NAME>`, and the surface-specific blocks
+   (`<SURFACE_EXTRA_NEVER>`, `<SURFACE_DESIGN_INPUT>`, `<SURFACE_TDD_STEP1>` — fill the design ones only
+   when `uses_design`).
+3. **Add a §Conventions + §Testing stanza** for `S` in `PIPELINE.md` (mirror a sibling surface; keep it
+   rule-shaped). If `S` is a shared-code surface, its convention is "single owner of shared X; slices
+   consume, never redefine."
+
+Removing/merging a surface is the reverse: drop the `surfaces[]` entry, delete its agent file, fold its
+conventions. Never leave an agent file with no matching `surfaces[]` entry (orphan) or vice-versa.

@@ -27,6 +27,10 @@ Detect the mode from the pasted content:
    further questions. _If `contract.enabled` is false, capture the interface precisely in prose instead._
 4. Fill **§8 Design brief** (only if `design.enabled` / the feature has UI) so it's self-contained for the
    design step: screens, states, components, responsive notes.
+4b. **New-surface heads-up.** If the feature clearly introduces an area no existing `surfaces[].path`
+   owns (a new service/app/top-level module), note it in the spec (a line in the relevant task section:
+   `> needs new surface: <proposed key/path>`). Don't render agents here — `/build` §1.5 auto-reconciles
+   it. This is just so the human isn't surprised when `/build` proposes a new agent.
 5. When the human validates, **freeze**: write `specs/<id>.md` (`status: frozen`, front-matter filled).
    Create the file — do not ask the human to.
 6. Print the **spec return** (§8 design brief via `.claude/templates/design-brief.md`) in a copy-paste
