@@ -3,9 +3,17 @@ description: Detect this project's stack, interview the gaps, and generate PIPEL
 argument-hint: (none) — run once per project, re-run to refresh the profile
 ---
 
-You are the **pipeline installer**. Your job: turn the generic pipeline that was just copied into
-`.claude/` into one tailored to **this** repo, by producing `PIPELINE.md` (the profile the whole
-pipeline reads) and rendering the per-surface agents. Interactive — confirm inferences with the human.
+You are the **pipeline installer**. Your job: turn the generic pipeline into one tailored to **this**
+repo, by producing `PIPELINE.md` (the profile the whole pipeline reads) and rendering the per-surface
+agents. Interactive — confirm inferences with the human.
+
+> **Where the core lives (bundled vs global).** The stack-agnostic source files (`pipeline/`,
+> `templates/`) live in EITHER this repo's `.claude/` (per-project install) OR `~/.claude/`
+> (global install). **Resolve every source path below as: prefer `.claude/<path>`; if it isn't
+> there, use `~/.claude/<path>`.** Detect the mode once at the start (`.claude/pipeline/VERSION`
+> present ⇒ `bundled`; else `~/.claude/pipeline/VERSION` ⇒ `global`) and remember it — Phase 4
+> branches on it. **Everything you GENERATE is always written into THIS repo** (`PIPELINE.md` at the
+> root, agents/config under this repo's `.claude/`), never into `~/.claude/`.
 
 Work in phases. Do not write any file until Phase 4.
 
@@ -60,37 +68,52 @@ Prefer sensible defaults from Phase 1 as the first (Recommended) option in each 
 
 ## Phase 3 — Draft the profile (show, don't write yet)
 
-Assemble the full `PIPELINE.md` from `.claude/../profile/PIPELINE.template.md` (or the copy the
-installer placed at `.claude/pipeline/PIPELINE.template.md`), filling the `yaml pipeline-profile`
+Assemble the full `PIPELINE.md` from the installer's `pipeline/PIPELINE.template.md` (resolve
+bundled-vs-global per the note above), filling the `yaml pipeline-profile`
 block and every prose section from Phases 1–2. **Show the human the drafted `PIPELINE.md` in a fenced
 block and get a go-ahead** before writing.
 
 ## Phase 4 — Write & render (after go-ahead)
 
-1. **Write `PIPELINE.md`** at the repo root (source: `.claude/pipeline/PIPELINE.template.md`).
+1. **Write `PIPELINE.md`** at the repo root (source: the installer's `pipeline/PIPELINE.template.md`).
 2. **Wire it into `CLAUDE.md`:** if `CLAUDE.md` exists, ensure it references the profile (add a line
    near the top: `> Project profile & pipeline facts: **@PIPELINE.md**`). If not, create a minimal
    `CLAUDE.md` with that reference + a one-paragraph project intro.
-3. **Render one agent per surface** from `.claude/pipeline/implementer.template.md` →
-   `.claude/agents/<agent>.md`, substituting `<SURFACE_AGENT>`, `<SURFACE_LABEL>`, `<SURFACE_PATH>`,
+3. **Render one agent per surface** from the installer's `pipeline/implementer.template.md` →
+   this repo's `.claude/agents/<agent>.md`, substituting `<SURFACE_AGENT>`, `<SURFACE_LABEL>`, `<SURFACE_PATH>`,
    `<SURFACE_TOOLS>`, `<PROJECT_NAME>`, and the surface-specific blocks (`<SURFACE_EXTRA_NEVER>`,
    `<SURFACE_DESIGN_INPUT>`, `<SURFACE_TDD_STEP1>` — fill design-related ones only when `uses_design`).
    Leave `review.md` + `release.md` as-is (generic).
 4. **Generate `.claude/gate-config.json`** from the `gate` block: `{"deny": [...], "ask": [...]}`.
-5. **Write `.claude/settings.json`** permissions (`ask`/`deny` lists mirroring the gate) + the two hooks
-   (PreToolUse `gate.py`, PostToolUse formatter using the detected formatter). Preserve any existing
-   custom keys.
-6. **Render the isolation scripts** (if `isolation.enabled`) from `.claude/pipeline/scripts/*.template`
-   to `scripts/new-feature.sh` and `scripts/remove-feature.sh`, substituting the `__TOKENS__` (project
+5. **Write `.claude/settings.json`** permissions (`ask`/`deny` lists mirroring the gate) + the hooks,
+   **conditioned on the install mode:**
+   - **bundled:** register both hooks — PreToolUse `.claude/hooks/gate.py` and the PostToolUse formatter
+     (detected formatter).
+   - **global:** the PreToolUse gate hook is already registered once in `~/.claude/settings.json` and
+     reads this repo's `gate-config.json` — do **not** re-register it here (double-registration
+     double-prompts). Still write the PostToolUse formatter hook + the permissions.
+   Preserve any existing custom keys.
+6. **Render the isolation scripts** (if `isolation.enabled`) from the installer's
+   `pipeline/scripts/*.template` to this repo's `scripts/new-feature.sh` and `scripts/remove-feature.sh`,
+   substituting the `__TOKENS__` (project
    slug, DB pattern, port bases, compose file, branch prefix, install/dev/migrate commands, per-surface
    env stanzas). `chmod +x` them. If isolation is disabled, skip and note features build in the main checkout.
-7. **Ensure `specs/_template.md`** exists (copy from `.claude/templates/spec.template.md` if missing).
-8. **Design system:** if `design.enabled` with a snapshot dir, note that `/align-ds` is active; else the
+7. **Ensure `specs/_template.md`** exists (copy from the installer's `templates/spec.template.md` if missing).
+8. **Write the pointer** `.claude/pipeline.json` (committed — this is how a teammate who clones the repo
+   knows which core to install):
+   `{ "pipeline": "thebidouille-agents", "mode": "<bundled|global>", "core_version": "<contents of the
+   installer's pipeline/VERSION>", "install": "<per mode: bundled ⇒ \"sh install.sh\" note that the core
+   is committed under .claude/; global ⇒ \"curl -fsSL https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.sh | sh -s -- --global\"> " }`.
+   In **global** mode also add, near the top of `CLAUDE.md`, a one-liner:
+   `> Pipeline: global core — run the installer above if /brainstorm etc. are missing.`
+9. **Design system:** if `design.enabled` with a snapshot dir, note that `/align-ds` is active; else the
    `/align-ds` command will no-op with a clear message.
 
 ## Phase 5 — Report
 
-Print: the files written/rendered, the surface→agent mapping, and the tailored workflow line, e.g.
+Print: the install mode (bundled core under `.claude/` vs global core in `~/.claude/` + the committed
+`.claude/pipeline.json` pointer), the files written/rendered, the surface→agent mapping, and the
+tailored workflow line, e.g.
 `/brainstorm → /spec → (design) → /build <id> → test → /review → /ship`. Tell the human to sanity-check
 `PIPELINE.md`, commit it, and run `/brainstorm` to start a feature. Note they can re-run `/init-pipeline`
 any time to refresh the profile after a stack change.

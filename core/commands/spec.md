@@ -9,6 +9,9 @@ You run the **spec** step in the main thread — interactive, with the human. Pa
 
 > Read `PIPELINE.md` first: `contract` (mechanism/path — so §5 names the right schema types),
 > `design.enabled` (whether §8 matters), and §Conventions. Use `specs/_template.md` as the section list.
+>
+> Template paths below (`.claude/templates/…`) resolve to `~/.claude/templates/…` when the core is
+> installed globally — read whichever exists.
 
 Detect the mode from the pasted content:
 

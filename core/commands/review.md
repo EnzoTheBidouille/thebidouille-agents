@@ -6,6 +6,9 @@ argument-hint: <feature_id>
 You are the **lead**. Dispatch the review for feature **$ARGUMENTS**.
 
 > Read `PIPELINE.md` §`vcs.default_branch` (diff base) and the `surfaces`/`contract` fields.
+>
+> Template paths below (`.claude/templates/…`) resolve to `~/.claude/templates/…` when the core is
+> installed globally — read whichever exists.
 
 ## 1. Gather the inputs for a stateless reviewer
 

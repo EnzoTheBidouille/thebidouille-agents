@@ -11,6 +11,9 @@ shared surface is the frozen contract and the spec.
 > **First action, always:** read `PIPELINE.md` — the machine block (§`pipeline-profile`) for your
 > surface's paths + commands, and the §Conventions + §Testing sections for the rules you follow.
 > You have no memory; re-read it and the spec every dispatch.
+>
+> The handoff template path (`.claude/templates/agent-handoff.md`) resolves to
+> `~/.claude/templates/agent-handoff.md` when the core is installed globally — read whichever exists.
 
 ## You own
 

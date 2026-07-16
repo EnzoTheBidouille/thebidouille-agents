@@ -1,27 +1,43 @@
 #!/bin/sh
 #
-# install.sh — install the portable multi-agent pipeline into a project.
+# install.sh — install the portable multi-agent pipeline.
 # POSIX sh (works with dash/bash/zsh).
 #
-#   Fresh install (run inside the target project, or pass its path):
+#   Per-project install (default — bundles the core into <target>/.claude, committable):
 #     sh install.sh [target_dir]
 #     curl -fsSL <raw-url>/install.sh | sh
 #
-#   Update the generic core in place (keeps your PIPELINE.md + rendered agents):
-#     sh install.sh --update [target_dir]
+#   Global install (one core in ~/.claude, shared by every repo on this machine):
+#     sh install.sh --global
+#     curl -fsSL <raw-url>/install.sh | sh -s -- --global
 #
-# Fresh install copies the generic core into <target>/.claude, then you run
-# `/init-pipeline` in Claude Code to generate PIPELINE.md + render the agents.
-# Update refreshes ONLY the stack-agnostic files; your generated profile,
-# rendered agents, gate-config.json and settings.json are left untouched.
+#   Update the generic core in place (keeps any generated PIPELINE.md + rendered agents):
+#     sh install.sh --update [target_dir]
+#     sh install.sh --update --global
+#
+# Per-project install copies the core into <target>/.claude; global install copies it once
+# into ~/.claude and registers the gate hook there. Either way you then run `/init-pipeline`
+# in each repo to generate PIPELINE.md + render the surface agents. Update refreshes ONLY the
+# stack-agnostic files; generated profiles, rendered agents, gate-config.json and any project
+# settings.json are left untouched.
 
 set -eu
 
 REPO_URL="${PIPELINE_REPO:-https://github.com/EnzoTheBidouille/thebidouille-agents}"
 
 mode="install"
-if [ "${1:-}" = "--update" ]; then mode="update"; shift; fi
-target="${1:-$PWD}"
+scope="project"
+positional=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --update) mode="update"; shift ;;
+    --global) scope="global"; shift ;;
+    --)       shift; break ;;
+    -*)       echo "error: unknown flag: $1" >&2; exit 2 ;;
+    *)        positional="$1"; shift ;;
+  esac
+done
+target="${positional:-$PWD}"
 
 # --- locate the source (this checkout, or clone if piped via curl) ----------
 src=""
@@ -41,41 +57,110 @@ else
 fi
 [ -d "$src/core" ] || { echo "error: pipeline source not found (no core/ in $src)" >&2; exit 1; }
 
-mkdir -p "$target/.claude"
+# --- resolve the destination .claude dir ------------------------------------
+if [ "$scope" = "global" ]; then
+  dest="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+else
+  dest="$target/.claude"
+fi
+mkdir -p "$dest"
+
+# version stamp so a per-repo pointer can record which core it expects
+ver=$(git -C "$src" rev-parse --short HEAD 2>/dev/null || echo unknown)
 
 copy_core() {
-  cp -R "$src/core/commands"  "$target/.claude/"
-  cp -R "$src/core/hooks"     "$target/.claude/"
-  cp -R "$src/core/templates" "$target/.claude/"
-  mkdir -p "$target/.claude/pipeline/scripts"
-  cp "$src/profile/PIPELINE.template.md" "$target/.claude/pipeline/"
-  cp "$src/profile/SCHEMA.md"            "$target/.claude/pipeline/"
-  cp "$src"/scripts/*.template           "$target/.claude/pipeline/scripts/"
-  cp "$src/core/agents/implementer.template.md" "$target/.claude/pipeline/"
-  chmod +x "$target/.claude/hooks/gate.py" 2>/dev/null || true
+  cp -R "$src/core/commands"  "$dest/"
+  cp -R "$src/core/hooks"     "$dest/"
+  cp -R "$src/core/templates" "$dest/"
+  mkdir -p "$dest/pipeline/scripts"
+  cp "$src/profile/PIPELINE.template.md" "$dest/pipeline/"
+  cp "$src/profile/SCHEMA.md"            "$dest/pipeline/"
+  cp "$src"/scripts/*.template           "$dest/pipeline/scripts/"
+  cp "$src/core/agents/implementer.template.md" "$dest/pipeline/"
+  printf '%s\n' "$ver" > "$dest/pipeline/VERSION"
+  chmod +x "$dest/hooks/gate.py" 2>/dev/null || true
 }
 
+# Register the profile-driven gate hook in the GLOBAL settings.json. Idempotent:
+# the hook reads each repo's own .claude/gate-config.json (and no-ops where absent),
+# so one registration serves every project.
+register_global_hook() {
+  python3 - "$dest/settings.json" "$dest/hooks/gate.py" <<'PY'
+import json, sys
+settings, gate = sys.argv[1], sys.argv[2]
+cmd = "python3 " + gate
+try:
+    with open(settings) as fh:
+        data = json.load(fh)
+    if not isinstance(data, dict):
+        data = {}
+except Exception:
+    data = {}
+pre = data.setdefault("hooks", {}).setdefault("PreToolUse", [])
+already = any(
+    (h.get("command", "").strip().endswith("gate.py"))
+    for entry in pre for h in entry.get("hooks", [])
+)
+if not already:
+    pre.append({"matcher": "Bash", "hooks": [{"type": "command", "command": cmd}]})
+with open(settings, "w") as fh:
+    json.dump(data, fh, indent=2)
+    fh.write("\n")
+print("ok" if not already else "present")
+PY
+}
+
+if [ "$scope" = "global" ]; then
+  if [ "$mode" = "install" ]; then
+    echo "→ installing pipeline core GLOBALLY into $dest"
+  else
+    echo "→ updating pipeline core GLOBALLY in $dest (keeping global settings.json)"
+  fi
+  mkdir -p "$dest/agents"
+  cp "$src/core/agents/review.md" "$src/core/agents/release.md" "$dest/agents/"
+  copy_core
+  hook_state=$(register_global_hook || echo "skipped")
+  cat <<EOF
+
+✓ pipeline core installed globally into $dest  (version $ver)
+  gate hook: $hook_state  (reads each repo's .claude/gate-config.json; silent where absent)
+
+The commands (/init-pipeline, /brainstorm, /build …) and the review/release agents are now
+available in EVERY project on this machine — nothing is copied per repo.
+
+Per repo:
+  1. Open the project in Claude Code.
+  2. Run  /init-pipeline  — it generates PIPELINE.md, renders the surface agents, writes
+     .claude/gate-config.json, and drops a committed .claude/pipeline.json pointer so
+     teammates know to install the global core ($REPO_URL).
+  3. Commit PIPELINE.md + .claude/, then  /brainstorm  to start a feature.
+EOF
+  exit 0
+fi
+
 if [ "$mode" = "install" ]; then
-  echo "→ installing pipeline core into $target/.claude"
-  mkdir -p "$target/.claude/agents"
-  cp "$src/core/agents/review.md" "$src/core/agents/release.md" "$target/.claude/agents/"
+  echo "→ installing pipeline core into $dest"
+  mkdir -p "$dest/agents"
+  cp "$src/core/agents/review.md" "$src/core/agents/release.md" "$dest/agents/"
   copy_core
   mkdir -p "$target/specs"
   [ -f "$target/specs/_template.md" ] || cp "$src/core/templates/spec.template.md" "$target/specs/_template.md"
   cat <<EOF
 
-✓ pipeline core installed into $target/.claude
+✓ pipeline core installed into $dest  (version $ver)
 
 Next:
   1. Open the project in Claude Code.
   2. Run  /init-pipeline   — it detects your stack, asks the gaps, and generates
      PIPELINE.md + renders one implementer agent per surface.
   3. Commit PIPELINE.md, then  /brainstorm  to start a feature.
+
+Prefer one shared core across all your repos?  Re-run with  --global.
 EOF
 else
-  echo "→ updating pipeline core in $target/.claude (keeping your PIPELINE.md + rendered agents)"
+  echo "→ updating pipeline core in $dest (keeping your PIPELINE.md + rendered agents)"
   copy_core
-  cp "$src/core/agents/review.md" "$src/core/agents/release.md" "$target/.claude/agents/" 2>/dev/null || true
+  cp "$src/core/agents/review.md" "$src/core/agents/release.md" "$dest/agents/" 2>/dev/null || true
   cat <<EOF
 
 ✓ core refreshed. Your PIPELINE.md, rendered surface agents, gate-config.json and

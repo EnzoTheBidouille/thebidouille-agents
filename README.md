@@ -26,13 +26,31 @@ The core never hardcodes stack facts. Two mechanisms keep it generic:
 
 ## Install
 
+Two ways to place the portable core. Both end at the same `/init-pipeline`.
+
+**Per-project** (default) — bundles the core into `<project>/.claude`, so it's committed and your
+teammates get it with the repo:
+
 ```sh
 # inside your project (or pass its path)
 sh install.sh
 # or:  curl -fsSL https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.sh | sh
 ```
 
-Then, in Claude Code:
+**Global** — one core in `~/.claude`, shared by every repo on your machine (nothing copied per repo;
+the gate hook is registered once and reads each repo's own `gate-config.json`):
+
+```sh
+sh install.sh --global
+# or:  curl -fsSL https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.sh | sh -s -- --global
+```
+
+Trade-off: global is leanest for a solo dev across many repos and updates everywhere at once, but all
+projects share one core version and teammates must install it themselves. In global mode `/init-pipeline`
+writes a committed **`.claude/pipeline.json` pointer** recording the core version + install command, so a
+teammate who clones the repo knows to run the global installer.
+
+Then, in Claude Code (from any repo, once the core is installed either way):
 
 ```
 /init-pipeline
@@ -52,7 +70,8 @@ Sanity-check `PIPELINE.md`, commit it, and run `/brainstorm`.
 ## Update
 
 ```sh
-sh install.sh --update
+sh install.sh --update            # per-project core in <project>/.claude
+sh install.sh --update --global   # the shared core in ~/.claude
 ```
 
 Refreshes the generic core (commands, hook, templates) **without** touching your `PIPELINE.md`,

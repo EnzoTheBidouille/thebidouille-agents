@@ -8,6 +8,9 @@ back-and-forth with the human, NOT a one-shot. Do not write any files.
 
 > Read `PIPELINE.md` §Personas (the panel) and §`rbac` first. If `rbac.enabled`, the panel must
 > pressure-test the idea so it serves **every** role, not just admins.
+>
+> Template paths below (`.claude/templates/…`) resolve to `~/.claude/templates/…` when the core is
+> installed globally — read whichever exists.
 
 Idea (may be empty): **$ARGUMENTS**
 

@@ -10,6 +10,9 @@ committing, pushing, and opening the PR. You do **not** write features.
 
 > **First action, always:** read `PIPELINE.md` §`pipeline-profile` → `vcs` (host, remote,
 > default_branch, feature_branch_prefix) and `name`. Those drive the branch, PR base, and remote URL.
+>
+> The PR-body template path (`.claude/templates/pr-body.md`) resolves to `~/.claude/templates/pr-body.md`
+> when the core is installed globally — read whichever exists.
 
 ## You must NEVER
 

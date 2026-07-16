@@ -7,6 +7,9 @@ You are the **lead**. Build feature **$ARGUMENTS** from its frozen spec.
 
 > Read `PIPELINE.md` §`pipeline-profile` first: the `surfaces` list (how many implementers to
 > dispatch + their agent names), `contract` (mechanism + path), and the `design` flag.
+>
+> Template paths below (`.claude/templates/…`) resolve to `~/.claude/templates/…` when the core is
+> installed globally — read whichever exists.
 
 ## 1. Load & check
 
