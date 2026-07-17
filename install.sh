@@ -78,17 +78,18 @@ copy_core() {
   cp "$src"/scripts/*.template           "$dest/pipeline/scripts/"
   cp "$src/core/agents/implementer.template.md" "$dest/pipeline/"
   printf '%s\n' "$ver" > "$dest/pipeline/VERSION"
-  chmod +x "$dest/hooks/gate.py" 2>/dev/null || true
+  chmod +x "$dest/hooks/gate.py" "$dest/hooks/tdd_gate.py" 2>/dev/null || true
 }
 
-# Register the profile-driven gate hook in the GLOBAL settings.json. Idempotent:
-# the hook reads each repo's own .claude/gate-config.json (and no-ops where absent),
-# so one registration serves every project.
+# Register the profile-driven hooks in the GLOBAL settings.json. Idempotent: each
+# hook reads each repo's own .claude/gate-config.json (and no-ops where absent /
+# where tdd.enforce is off), so one registration serves every project.
 register_global_hook() {
-  python3 - "$dest/settings.json" "$dest/hooks/gate.py" <<'PY'
+  python3 - "$dest/settings.json" "$dest/hooks/gate.py" "$dest/hooks/tdd_gate.py" <<'PY'
 import json, sys
-settings, gate = sys.argv[1], sys.argv[2]
-cmd = "python3 " + gate
+settings, gate, tdd = sys.argv[1], sys.argv[2], sys.argv[3]
+# (hook path, PreToolUse matcher)
+hooks = [(gate, "Bash"), (tdd, "Write|Edit|MultiEdit")]
 try:
     with open(settings) as fh:
         data = json.load(fh)
@@ -97,16 +98,19 @@ try:
 except Exception:
     data = {}
 pre = data.setdefault("hooks", {}).setdefault("PreToolUse", [])
-already = any(
-    (h.get("command", "").strip().endswith("gate.py"))
-    for entry in pre for h in entry.get("hooks", [])
-)
-if not already:
-    pre.append({"matcher": "Bash", "hooks": [{"type": "command", "command": cmd}]})
+for path, matcher in hooks:
+    base = path.rsplit("/", 1)[-1]
+    already = any(
+        h.get("command", "").strip().endswith(base)
+        for entry in pre for h in entry.get("hooks", [])
+    )
+    if not already:
+        pre.append({"matcher": matcher,
+                    "hooks": [{"type": "command", "command": "python3 " + path}]})
 with open(settings, "w") as fh:
     json.dump(data, fh, indent=2)
     fh.write("\n")
-print("ok" if not already else "present")
+print("ok")
 PY
 }
 

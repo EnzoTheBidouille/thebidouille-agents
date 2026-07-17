@@ -46,6 +46,10 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
 | `isolation.compose_file` `.registry` | path         | new-feature script                | Docker stack + slot registry.                                 |
 | `gate.deny[]`                        | list         | hooks/gate.py, settings           | Command substrings hard-denied.                               |
 | `gate.ask[]`                         | list         | hooks/gate.py, settings           | Command substrings that require confirm.                      |
+| `tdd.enforce`                        | bool         | hooks/tdd_gate.py                 | Opt-in TDD gate; `false` ⇒ hook is silent. Default `false`.   |
+| `tdd.prod_exts[]`                    | list         | hooks/tdd_gate.py                 | File extensions treated as production code to gate.           |
+| `tdd.test_roots[]`                   | list         | hooks/tdd_gate.py                 | Dirs searched for an existing test (surface paths); [] ⇒ repo.|
+| `tdd.skip_globs[]`                   | list         | hooks/tdd_gate.py                 | Globs never gated (`*.d.ts`, migrations, config, generated).  |
 
 ## Prose sections
 
@@ -61,6 +65,9 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
 - **Commands** (`/build`, `/review`, …) parse the `yaml pipeline-profile` block to know how
   many surfaces to dispatch, the contract mechanism, the commands, and the capability flags.
 - **Hook** (`gate.py`) reads `gate.deny`/`gate.ask` from a generated `.claude/gate-config.json`.
+- **Hook** (`tdd_gate.py`, opt-in) reads the `tdd` block from the same `.claude/gate-config.json`:
+  on Write/Edit of a `prod_exts` file with no discoverable test, it emits a confirm (`ask`), never a
+  hard deny. Silent unless `tdd.enforce: true`.
 - **Scripts** (`new-feature.sh`) read the `isolation` block (rendered in at init).
 
 ## Specialization — when to split one surface into more agents

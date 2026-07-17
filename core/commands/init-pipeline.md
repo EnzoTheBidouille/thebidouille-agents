@@ -73,6 +73,10 @@ Ask ONLY what you couldn't confidently detect. Batch related questions. Cover:
   main checkout? If worktrees: DB-per-worktree? port bases? compose file?
 - **Gate** — confirm the destructive commands to hard-deny and the ones to confirm-first (seed from the
   detected DB/migration tooling + always git commit/push/merge/rebase/reset).
+- **TDD gate (optional, default off)** — arm the tool-call TDD gate (`tdd.enforce`)? If yes, it asks the
+  human to confirm whenever an agent writes production code with no discoverable test. Seed `prod_exts`
+  from the detected surface languages and `test_roots` from the surface paths. Default **off** — the
+  review agent already flags untested surface; only enable when the team wants test-first enforced live.
 - **Personas** — keep the default `/brainstorm` panel, or customize members for this domain?
 
 Prefer sensible defaults from Phase 1 as the first (Recommended) option in each question.
@@ -96,14 +100,19 @@ block and get a go-ahead** before writing.
    `<SURFACE_TOOLS>`, `<PROJECT_NAME>`, and the surface-specific blocks (`<SURFACE_EXTRA_NEVER>`,
    `<SURFACE_DESIGN_INPUT>`, `<SURFACE_TDD_STEP1>` — fill design-related ones only when `uses_design`).
    Leave `review.md` + `release.md` as-is (generic).
-4. **Generate `.claude/gate-config.json`** from the `gate` block: `{"deny": [...], "ask": [...]}`.
+4. **Generate `.claude/gate-config.json`** from the `gate` block: `{"deny": [...], "ask": [...]}`. If the
+   profile's `tdd` block has `enforce: true`, add a `"tdd"` key mirroring it (`enforce`, `prod_exts`,
+   `test_roots`, `skip_globs`); omit the key entirely when TDD enforcement is off.
 5. **Write `.claude/settings.json`** permissions (`ask`/`deny` lists mirroring the gate) + the hooks,
    **conditioned on the install mode:**
-   - **bundled:** register both hooks — PreToolUse `.claude/hooks/gate.py` and the PostToolUse formatter
-     (detected formatter).
-   - **global:** the PreToolUse gate hook is already registered once in `~/.claude/settings.json` and
-     reads this repo's `gate-config.json` — do **not** re-register it here (double-registration
-     double-prompts). Still write the PostToolUse formatter hook + the permissions.
+   - **bundled:** register the PreToolUse `Bash` hook `.claude/hooks/gate.py`, the PostToolUse formatter
+     (detected formatter), and — only if `tdd.enforce` — the PreToolUse `Write|Edit|MultiEdit` hook
+     `.claude/hooks/tdd_gate.py`.
+   - **global:** the PreToolUse gate hook (and, if the global installer registered it, `tdd_gate.py`) is
+     already in `~/.claude/settings.json` and reads this repo's `gate-config.json` — do **not** re-register
+     either here (double-registration double-prompts). Both no-op where their config is absent, so one
+     registration serves every repo; you only supply this repo's `gate-config.json`. Still write the
+     PostToolUse formatter hook + the permissions.
    Preserve any existing custom keys.
 6. **Render the isolation scripts** (if `isolation.enabled`) from the installer's
    `pipeline/scripts/*.template` to this repo's `scripts/new-feature.sh` and `scripts/remove-feature.sh`,

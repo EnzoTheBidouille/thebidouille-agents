@@ -128,6 +128,20 @@ gate:
     - "node ace db:"
     - "psql"
     - "docker compose"
+
+# ── tdd gate (optional — drives .claude/hooks/tdd_gate.py) ───────────────────
+# Opt-in enforcement of the §Testing red→green contract at tool-call time: when an
+# agent Writes/Edits production code with no discoverable test, the hook asks the
+# human to confirm (never a hard block). enforce:false ⇒ hook stays silent.
+tdd:
+  enforce: false                              # flip to true to arm the gate
+  prod_exts: [ts, tsx, py, go, rs]            # extensions counted as production code
+  test_roots: [apps/api, apps/web/src]        # surface trees to search for a matching test; [] ⇒ whole repo
+  skip_globs:                                 # files never gated
+    - "**/*.d.ts"
+    - "**/*.config.*"
+    - "**/migrations/**"
+    - "**/*.gen.*"
 ```
 
 ---

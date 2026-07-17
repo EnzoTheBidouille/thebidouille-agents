@@ -32,6 +32,23 @@ be precise and self-contained.
 7. **TDD coverage.** Each surface's tests cover its slice of the contract (statuses, validation, auth,
    behavior). Flag untested contract surface.
 
+## Language checks (apply only those matching the surfaces under review)
+
+Concrete, high-signal traps to grep for per language. A surface's language comes from its
+`PIPELINE.md` `label` / commands — apply the matching block, skip the rest.
+
+- **TypeScript/JS** — every `any` needs a typed alternative or a justified suppression; floating
+  promises (un-awaited, no `.catch`); null/undefined reached before a guard on a critical path;
+  `strict` off in tsconfig.
+- **Python** — mutable default args (`def f(x=[])`); bare `except:` (require `except Exception`);
+  `eval`/`exec` on any user input; missing type hints on public signatures.
+- **Rust** — `.unwrap()`/`.expect()` outside tests (want `?` or explicit match); `unsafe` block with
+  no `// SAFETY:` invariant; missing lifetimes on public APIs returning references.
+- **Go** — errors discarded with `_` on non-trivial paths; goroutines with no cancellation/`ctx`
+  path; `defer` inside a loop (runs only at function return).
+- **SQL / migrations** — `UPDATE`/`DELETE` with no `WHERE`; N+1 (a query inside a loop that a JOIN
+  would collapse); foreign-key columns joined/filtered without an index.
+
 ## Audit mode (no feature spec — codebase refactor, dispatched by `/audit`)
 
 When given a **path/domain instead of a feature spec**, skip step 1 and audit the target against
