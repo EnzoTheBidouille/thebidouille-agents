@@ -37,12 +37,23 @@ sh install.sh
 # or:  curl -fsSL https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.sh | sh
 ```
 
+```powershell
+# Windows (PowerShell 5.1+)
+.\install.ps1
+# or:  irm https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.ps1 | iex
+```
+
 **Global** — one core in `~/.claude`, shared by every repo on your machine (nothing copied per repo;
 the gate hook is registered once and reads each repo's own `gate-config.json`):
 
 ```sh
 sh install.sh --global
 # or:  curl -fsSL https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.sh | sh -s -- --global
+```
+
+```powershell
+.\install.ps1 -Global
+# or:  & ([scriptblock]::Create((irm https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.ps1))) -Global
 ```
 
 Trade-off: global is leanest for a solo dev across many repos and updates everywhere at once, but all
@@ -74,6 +85,11 @@ sh install.sh --update            # per-project core in <project>/.claude
 sh install.sh --update --global   # the shared core in ~/.claude
 ```
 
+```powershell
+.\install.ps1 -Update             # Windows equivalents
+.\install.ps1 -Update -Global
+```
+
 Refreshes the generic core (commands, hook, templates) **without** touching your `PIPELINE.md`,
 rendered agents, `gate-config.json`, or `settings.json`. Re-run `/init-pipeline` if your stack changed.
 
@@ -99,6 +115,7 @@ See `profile/SCHEMA.md` for every field in `PIPELINE.md` and how the pipeline us
 
 ```
 install.sh              # installer (fresh + --update)
+install.ps1             # same installer for Windows PowerShell (fresh + -Update)
 core/                   # copied verbatim into <project>/.claude
   agents/               # implementer.template.md (rendered per surface) + review.md + release.md
   commands/             # init-pipeline + the workflow commands
