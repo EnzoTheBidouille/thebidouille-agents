@@ -78,6 +78,10 @@ projects share one core version and teammates must install it themselves. In glo
 writes a committed **`.claude/pipeline.json` pointer** recording the core version + install command, so a
 teammate who clones the repo knows to run the global installer.
 
+> **After installing (or updating): restart Claude Code / start a new session.** Slash commands and
+> agents are scanned at session start — in an already-open session the new `/init-pipeline`,
+> `/research`, etc. won't appear until you reload. This is the #1 "the install didn't work" trap.
+
 Then, in Claude Code (from any repo, once the core is installed either way):
 
 ```
