@@ -48,10 +48,12 @@ Spawn one agent (`subagent_type: questionnaire-researcher`): "MODE: research. Re
 run `<run-id>`. domain_brief (inline): <the full brief JSON>. Source PDF: <path-or-url> — **local path ⇒
 Read tool (`pages` parameter, ~15 pages per call, as many calls as needed); URL ⇒ WebFetch** (if
 unreachable, flag it and reconstruct from secondary sources). Return EXACTLY one tagged block
-`===REPORT.MD===` — a genuine research report (Sujet & périmètre · Synthèse · Cadres de référence &
-état de l'art · Analyse du domaine · Débats & controverses · Paysage pratique & licences · Questions
-ouvertes · Sources), NOT questionnaire-shaped. Never draft items, never reproduce instrument text, flag
-every licence."
+`===REPORT.MD===` — an academic-register research report (Sujet & périmètre · Méthodologie · Synthèse ·
+Cadres & état de l'art · Analyse du domaine · Débats & controverses · Paysage pratique & licences ·
+Questions ouvertes · Sources), per your agent spec: **argued prose, precise citations
+(chapter/page + author–date), explicit epistemic status (established/debated/hypothesis), numbers with
+references, 2 500–5 000 words** — NOT an executive summary, NOT questionnaire-shaped. Never draft
+items, never reproduce instrument text, flag every licence."
 
 ## 4. Archive to Notion — CONFIRM FIRST (this IS the storage)
 

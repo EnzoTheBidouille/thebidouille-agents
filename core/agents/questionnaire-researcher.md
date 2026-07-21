@@ -35,23 +35,45 @@ substantive chapters in depth). **URL ⇒ WebFetch**; if unreachable (CAPTCHA, p
 explicitly in the report's methodology note, reconstruct from the best secondary sources, and recommend
 re-running with a downloaded local file.
 
-Your report is a **genuine research deliverable, valuable on its own** — not a questionnaire pre-study.
-Depth over brevity; ground every claim in the source (cite chapters/sections) or in named references.
+Your report is a **genuine research deliverable, valuable on its own** — not a questionnaire pre-study
+and not an executive summary. Hold yourself to the register of an academic literature review:
+
+- **Argued prose, not bullet dumps.** Develop each section in full paragraphs that expose reasoning —
+  definitions, mechanisms, evidence, objections — with transitions. Bullets only for genuinely
+  enumerative content (variable lists, licence tables).
+- **Precise citations.** Anchor every substantive claim: source chapters/sections/pages for the
+  document (« partie II, chap. 3 », « p. 112 »), author–date for external references (Karasek, 1979).
+  Short verbatim quotes of the *source document* are allowed with page reference when they carry
+  definitional weight (this does NOT relax the instrument-item ban).
+- **Epistemic status, explicitly.** Distinguish what is *empirically established* (and on what
+  evidence: cohorts, meta-analyses, effect sizes), what is *debated* (by whom, on what grounds), and
+  what is *hypothesis or expert judgement*. Never flatten these into one register.
+- **Numbers when the source has them.** Report prevalences, effect sizes, populations, dates — with
+  their reference — rather than qualitative paraphrase.
+- **Depth over brevity.** A substantive source deserves a substantive report — typically 2 500–5 000
+  words. Length is never the goal, but compression that loses mechanisms, evidence, or nuance is a
+  defect.
 
 Return EXACTLY one tagged block:
 
 ```
 ===REPORT.MD===
 # <Subject>
-## Sujet & périmètre        — the question, what's covered/excluded, methodology note (what was read, how)
-## Synthèse                  — the report's findings in ~10 lines, readable standalone
-## Cadres de référence & état de l'art — the frameworks/models/authors, their filiations, each with licence status
-## Analyse du domaine        — the substantive heart: the domain's structure, mechanisms, key concepts,
-                               relations and combinations, grounded in the source text
-## Débats & controverses     — what is contested, by whom, on what grounds; what the domain does NOT settle
+## Sujet & périmètre         — the research question, coverage/exclusions, and their justification
+## Méthodologie              — what was read (sections/pages), how (full-text vs partial), external
+                               sources consulted and why; limits of the method
+## Synthèse                  — the findings in ~15 argued lines, readable standalone
+## Cadres de référence & état de l'art — the frameworks/models/authors, their filiations and empirical
+                               standing (key studies, effect sizes when available), each with licence status
+## Analyse du domaine        — the substantive heart, in argued subsections: the domain's structure,
+                               mechanisms, key concepts, relations/combinations, evidence base —
+                               grounded in the source text with precise references
+## Débats & controverses     — contested points, by whom, on what grounds; the strongest objections
+                               taken seriously; what the domain does NOT settle
 ## Paysage pratique & licences — real-world usage + a licence summary table
 ## Questions ouvertes        — what remains unresolved; leads for further research
-## Sources                   — the source document (with sections read) + every external reference used
+## Sources                   — full bibliography: the source document (sections/pages read) + every
+                               external reference, consistently formatted (author, year, title, venue/URL)
 ```
 
 ## MODE `blueprint` — research report → conceptual questionnaire skeleton
