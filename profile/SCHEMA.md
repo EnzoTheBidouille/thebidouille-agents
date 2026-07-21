@@ -40,7 +40,7 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
 | `design.snapshot_dir`                | path         | align-ds                          | Committed DS snapshot for diffing.                            |
 | `design.ui_kit_path` `.tokens_path`  | path         | align-ds, frontend                | Where the kit + tokens live in code.                          |
 | `isolation.enabled`                  | bool         | new-feature script                | `false` ⇒ build in main checkout.                             |
-| `isolation.db_per_worktree`          | bool         | new-feature script                | Create `samo_<id>` per worktree.                              |
+| `isolation.db_per_worktree`          | bool         | new-feature script                | Create `<name>_<id>` DB per worktree.                         |
 | `isolation.db_name_pattern`          | string       | new-feature script                | `<name>_<id>`.                                                |
 | `isolation.port_base`                | map          | new-feature script                | `api`/`web` base ports; +slot per worktree.                   |
 | `isolation.compose_file` `.registry` | path         | new-feature script                | Docker stack + slot registry.                                 |
@@ -131,7 +131,7 @@ entirely as a page in the Notion database**, which is **auto-created on the firs
 | `enabled`               | /research, /questionnaire | `false`/absent ⇒ both commands refuse cleanly.                  |
 | `notion_database_id`    | /research, /questionnaire | The archive database. Empty ⇒ auto-created on first run, id written back. |
 | `notion_parent_page_id` | /research (setup)         | Optional parent page for the auto-created database.             |
-| `engine_format`         | writer, validator         | Label of the target survey-engine format (e.g. `samo-surveys`). |
+| `engine_format`         | writer, validator         | Label of the user's target survey-engine format.                |
 | `ui_language`           | researcher, writer        | Language of the reports + all questionnaire labels.             |
 
 - `/research <pdf-url-or-path> [subject]` → dispatches `questionnaire-researcher` (**mode research**,

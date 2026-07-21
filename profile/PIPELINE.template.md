@@ -20,7 +20,7 @@ package_manager: <pnpm | npm | yarn | bun | pip | cargo | go>
 # ── vcs ─────────────────────────────────────────────────────────────────────
 vcs:
   host: <github | gitlab | none>
-  remote: <owner/repo>                        # e.g. TheBidouilleAgency/samo
+  remote: <owner/repo>                        # e.g. acme/webapp
   default_branch: <main>
   feature_branch_prefix: feature/            # branch = <prefix><feature_id>
 
@@ -104,7 +104,7 @@ isolation:
   enabled: <true | false>                     # false ⇒ features run in the main checkout
   unit: git-worktree
   db_per_worktree: <true | false>
-  db_name_pattern: "<name>_<id>"              # e.g. samo_<id>
+  db_name_pattern: "<name>_<id>"              # e.g. myapp_<id>
   port_base: { api: 3333, web: 5173 }         # each worktree gets base+slot
   compose_file: docker-compose.yml
   registry: .worktrees/slots.tsv

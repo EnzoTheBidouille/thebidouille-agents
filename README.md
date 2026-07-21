@@ -210,7 +210,7 @@ enabled: true          # that's all — the Notion database is auto-created on t
 
 (`notion_database_id` is filled back automatically; set `notion_parent_page_id` beforehand if you want
 the database created under a specific page. `engine_format` and `ui_language` default to
-`samo-surveys` / `French`.)
+`generic` / `French`.)
 
 With `enabled: false` (or the file absent), `/research` and `/questionnaire` refuse cleanly and change
 nothing. The capability requires the Notion MCP (it is the storage):

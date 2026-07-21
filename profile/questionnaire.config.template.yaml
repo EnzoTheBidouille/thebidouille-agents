@@ -18,8 +18,8 @@ notion_database_id: ""
 # Empty ⇒ created as a workspace-level private page (you can move it afterwards).
 notion_parent_page_id: ""
 
-# Label of the target survey-engine format the writer emits.
-engine_format: samo-surveys
+# Label of YOUR target survey-engine format (passed to the writer/validator as context).
+engine_format: generic
 
 # Language of the research reports and every questionnaire label.
 ui_language: French
