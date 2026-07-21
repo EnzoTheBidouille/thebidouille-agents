@@ -1,4 +1,4 @@
-# claude-pipeline
+# thebidouille-agents
 
 [![npm version](https://img.shields.io/npm/v/thebidouille-agents?logo=npm&color=cb3837)](https://www.npmjs.com/package/thebidouille-agents)
 [![npm downloads](https://img.shields.io/npm/dm/thebidouille-agents?logo=npm)](https://www.npmjs.com/package/thebidouille-agents)
@@ -6,27 +6,35 @@
 [![node >=18](https://img.shields.io/node/v/thebidouille-agents?logo=node.js&logoColor=white)](https://nodejs.org)
 [![license: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
-A **portable, stack-agnostic multi-agent development pipeline** for Claude Code. Push it once,
-pull it into any project, run one command, and it adapts itself to that project's stack.
+A **portable, stack-agnostic multi-agent pipeline** for Claude Code. Install it once globally,
+then one command per project (`/init-pipeline`) adapts it to that project's stack.
 
-It's the generalized form of a working pipeline: a human **lead** drives feature work through
-gated commands, dispatching **stateless agents** that only communicate through a frozen contract.
+Two independent tracks ship with it:
 
-```
-/brainstorm → /spec → (design) → /build <id> → test → /review → /ship
-```
+- **The dev pipeline** — a human **lead** drives feature work through gated commands, dispatching
+  **stateless agents** that only communicate through a frozen contract:
 
-## How it works — two layers
+  ```
+  /brainstorm → /spec → (design) → /build <id> → test → /review → /ship
+  ```
 
-| Layer                                                                        | Lives in                                  | Varies per project?         |
-| ---------------------------------------------------------------------------- | ----------------------------------------- | --------------------------- |
-| **Portable core** — the workflow doctrine: agents, commands, templates, hook | `~/.claude` (global) or repo `.claude/`   | No — identical everywhere   |
-| **Project profile** — stack, paths, commands, conventions, capability flags  | `PIPELINE.md` + rendered agents, committed | Yes — generated per project |
+- **The research capability** (optional, user-scoped) — `/research` turns a source PDF into an
+  academic-register report archived in Notion; `/questionnaire` optionally derives an original
+  survey from it. See [Global capability](#global-capability--research--optional-questionnaire).
+
+## How it works — three layers
+
+| Layer | What it holds | Lives in | Scope |
+| --- | --- | --- | --- |
+| **Generic core** | the workflow doctrine: commands, fixed agents, templates, hooks — zero project facts | `~/.claude` (global) — or vendored in a repo's `.claude/` (bundled) | identical everywhere, installed once |
+| **Project profile** | stack, surfaces, commands, conventions, gates | `PIPELINE.md` + rendered surface agents + `gate-config.json`, **committed in each repo** | generated per project by `/init-pipeline` |
+| **User config** | the research capability's facts (Notion DB, language, engine format) | `~/.claude/questionnaire.config.yaml` | personal, project-independent |
 
 The core never hardcodes stack facts. Two mechanisms keep it generic:
 
-1. **Runtime indirection** — agents/commands read all project facts from `PIPELINE.md` at run time
-   (agents' _first action_ is to read it).
+1. **Runtime indirection** — commands/agents read project facts from `PIPELINE.md` (dev pipeline) or
+   `~/.claude/questionnaire.config.yaml` (research capability) at run time — an agent's _first
+   action_ is to read its config.
 2. **Render-at-init** — things that must be in agent frontmatter (name, `tools:`, surface ownership)
    are rendered per **surface** by `/init-pipeline` from `implementer.template.md`.
 
@@ -183,7 +191,7 @@ it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.
 | `/audit [path]`      | Prioritized refactor backlog for existing code.                                       |
 | `/refactor <domain>` | Apply the backlog for one surface, TDD-first.                                         |
 | `/align-ds`          | Align the code UI kit to the design system (no-op if none configured).                |
-| `/update-pipeline`   | Refresh the installed core (global or bundled) from the repo's latest `main`.         |
+| `/update-pipeline`   | Refresh the installed core (global or bundled) to the latest published version.       |
 | `/research <pdf>`    | _Global capability._ Deep-research a PDF (URL or local file) into a standalone report, archived in Notion. |
 | `/questionnaire <id>`| _Global capability._ Optional: derive + write + validate a survey from a research run's Notion page. |
 
@@ -246,11 +254,11 @@ package.json            # npm package (thebidouille-agents) — semver source of
 bin/cli.js              # the npm CLI: install / update / version (cross-platform, no deps)
 install.sh              # script installer (fresh + --update) for no-Node environments
 install.ps1             # same installer for Windows PowerShell (fresh + -Update)
-core/                   # copied verbatim into <project>/.claude (or ~/.claude with --global)
+core/                   # copied verbatim into ~/.claude (global) or <project>/.claude (bundled)
   agents/               # implementer.template.md (rendered per surface) + review.md + release.md
                         #   + questionnaire-{researcher,writer,validator}.md (fixed capability agents)
   commands/             # init-pipeline + the workflow commands + /update-pipeline, /research, /questionnaire
-  hooks/gate.py         # profile-driven destructive-command gate
+  hooks/                # gate.py (destructive-command gate) + tdd_gate.py (opt-in TDD gate)
   templates/            # handoff / brainstorm-return / design-brief / review-feedback / pr-body / spec
                         #   + questionnaire-{domain-brief,blueprint,declaration,verdict} (frozen contracts)
 profile/
