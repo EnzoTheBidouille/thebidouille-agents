@@ -113,16 +113,28 @@ update invocation for your install scope and reports `old → new` from the VERS
 
 ## Releasing (maintainers)
 
-Versions are tracked with npm semver — the published package is the release artifact:
+Versions are tracked with npm semver — the published package is the release artifact.
+Publishing is automated: [`publish.yml`](.github/workflows/publish.yml) runs on every push to
+`main`, and when `package.json`'s version isn't on the registry yet it publishes to npm (with
+provenance) and tags a GitHub release. Pushes without a version bump just run the sanity checks.
 
 ```sh
 npm version patch          # or minor / major — bumps package.json + creates the git tag
-git push --follow-tags
-npm publish
+git push --follow-tags     # CI publishes + creates the GitHub release
 ```
 
 `npx thebidouille-agents@latest …` then serves the new version everywhere; installed cores record
 it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.json` pointer.
+
+## Roadmap
+
+- [ ] **Wire npm auth into CI** — the publish job has no npm credentials yet, so the next version
+      bump will fail at `npm publish` until one of these is done (either works):
+  - _Trusted publishing (recommended, token-less)_: npmjs.com → package `thebidouille-agents` →
+    Settings → Trusted Publisher → GitHub Actions, repo `EnzoTheBidouille/thebidouille-agents`,
+    workflow `publish.yml`, environment `npm-publish`.
+  - _Granular access token_: npmjs.com → Access Tokens → Granular (publish permission on this
+    package — bypasses 2FA) → add as the `NPM_TOKEN` repo secret on GitHub.
 
 ## The commands
 
