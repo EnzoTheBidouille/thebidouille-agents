@@ -147,13 +147,9 @@ it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.
 
 ## Roadmap
 
-- [ ] **Wire npm auth into CI** — the publish job has no npm credentials yet, so the next version
-      bump will fail at `npm publish` until one of these is done (either works):
-  - _Trusted publishing (recommended, token-less)_: npmjs.com → package `thebidouille-agents` →
-    Settings → Trusted Publisher → GitHub Actions, repo `EnzoTheBidouille/thebidouille-agents`,
-    workflow `publish.yml`, environment `npm-publish`.
-  - _Granular access token_: npmjs.com → Access Tokens → Granular (publish permission on this
-    package — bypasses 2FA) → add as the `NPM_TOKEN` repo secret on GitHub.
+- [x] **Wire npm auth into CI** — done via **trusted publishing** (token-less OIDC): npmjs.com →
+      package Settings → Trusted Publisher → GitHub Actions (`publish.yml`, environment
+      `npm-publish`). Verified with the v0.1.4 publish. No `NPM_TOKEN` secret needed.
 - [ ] **Opt-in code-retrieval tooling at `/init-pipeline` / `/update-pipeline`** — agents spend
       most of their wall-clock reading the repo; semantic retrieval cuts that. During the init
       interview, offer to wire one of these as a capability flag in the project profile
