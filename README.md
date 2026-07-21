@@ -133,14 +133,14 @@ update invocation for your install scope and reports `old → new` from the VERS
 ## Releasing (maintainers)
 
 Versions are tracked with npm semver — the published package is the release artifact.
-Publishing is automated: [`publish.yml`](.github/workflows/publish.yml) runs on every push to
-`main`, and when `package.json`'s version isn't on the registry yet it publishes to npm (with
-provenance) and tags a GitHub release. Pushes without a version bump just run the sanity checks.
+Publishing is fully automated: [`publish.yml`](.github/workflows/publish.yml) runs on every push
+to `main`; when `package.json`'s version isn't on the registry yet it publishes to npm (trusted
+publishing / provenance), pushes the `vX.Y.Z` tag, and creates the GitHub release. Pushes without
+a version bump just run the sanity checks.
 
-```sh
-npm version patch          # or minor / major — bumps package.json + creates the git tag
-git push --follow-tags     # CI publishes + creates the GitHub release
-```
+**Releasing = editing one line.** Bump `"version"` in `package.json` (by hand, or
+`npm version patch --no-git-tag-version`), commit, push — CI does the rest (publish + tag +
+release). No local tagging needed.
 
 `npx thebidouille-agents@latest …` then serves the new version everywhere; installed cores record
 it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.json` pointer.

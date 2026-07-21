@@ -74,8 +74,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.check.outputs.version }}
         run: |
-          git tag "v$VERSION" || true
-          git push origin "v$VERSION" || true
-          gh release create "v$VERSION" \
-            --title "v$VERSION" \
-            --generate-notes || true
+          git fetch --tags --quiet
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "tag v$VERSION already exists"
+          else
+            git tag "v$VERSION"
+            git push origin "v$VERSION"
+          fi
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "release v$VERSION already exists"
+          else
+            gh release create "v$VERSION" --title "v$VERSION" --generate-notes
+          fi
