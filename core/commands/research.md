@@ -1,79 +1,70 @@
 ---
-description: (Global capability) From a source PDF — a URL or a LOCAL FILE — produce a comprehension report + a conceptual questionnaire blueprint under a named run, and archive the report to Notion for review. Reads ~/.claude/questionnaire.config.yaml — works in any directory.
+description: (Global capability) Deep-research a source PDF — URL or LOCAL FILE — into a standalone research report, archived as a Notion page. Nothing is stored locally; the Notion database is auto-created on first run. A questionnaire can OPTIONALLY be derived later with /questionnaire.
 argument-hint: <pdf-url-or-path> [subject]
 ---
 
-You are the **orchestrator** for the questionnaire capability's first half: turning a source PDF into a
-readable report + a conceptual blueprint. This is a **global, user-scoped** command — it has no dependency
-on any project's `PIPELINE.md` and behaves identically in every directory. You write the files and dispatch
-the stateless researcher — the agent reads, you persist.
+You are the **orchestrator** of a research run: turning a source PDF into a genuine, standalone
+**research report** — valuable on its own, not questionnaire-shaped. A questionnaire is an OPTIONAL
+later step (`/questionnaire <run-id>`), derived from the report only if the human wants one. This is a
+**global, user-scoped** command; it behaves identically in every directory. **Nothing is written to
+local disk** — the Notion page IS the run's storage; you only hold artifacts in conversation memory.
 
-> **First action, always:** read **`~/.claude/questionnaire.config.yaml`** (the global capability config).
-> If it's missing or `enabled` is not `true`, **stop**: tell the human to enable the capability by editing
-> that file (`enabled: true`) — created by the installer; if absent, they should re-run it. Do nothing
-> else. Otherwise note `runs_path` (default `~/.claude/questionnaire-runs`, expand `~` to `$HOME`),
-> `notion_database_id`, `engine_format`, and `ui_language`.
+> **First action, always:** read **`~/.claude/questionnaire.config.yaml`** (the global capability
+> config). If it's missing or `enabled` is not `true`, **stop**: tell the human to set `enabled: true`
+> in that file. Otherwise note `notion_database_id`, `notion_parent_page_id`, `engine_format`, `ui_language`.
 
-Parse `$ARGUMENTS`: the first token is the **source PDF** — either a URL **or a local file path**; the
-rest (optional) is the **subject**.
+## 0. Notion auto-setup (first run only)
 
-## 1. Name the run & create it
+If `notion_database_id` is empty: create the archive database **automatically** via the Notion MCP —
+title « Questionnaires », schema `Sujet` TITLE · `Cadre` RICH_TEXT · `Statut`
+SELECT('Recherche':blue, 'À relire':yellow, 'Bloqué':red, 'Approuvé':green) · `Date` DATE · `Run ID`
+RICH_TEXT — under `notion_parent_page_id` if set, else as a workspace-level private page. Then **write
+the new database id back into `~/.claude/questionnaire.config.yaml`** and tell the human where it lives.
+If no Notion MCP tool is connected, **stop**: print
+`claude mcp add --transport http notion https://mcp.notion.com/mcp` (the whole capability stores to
+Notion; without it there is nothing to write to).
 
-- Derive a **run-id** (kebab-case): from the subject if given, else from the source's last path segment
-  (e.g. `.../big-five-inventory.pdf` → `big-five-inventory`). Confirm the run-id with the human if it's
-  ambiguous. This is the handle they'll later type into `/questionnaire <run-id>`.
-- Create the run directory `<runs_path>/<run-id>/`. If it already exists, ask before reusing it.
+Parse `$ARGUMENTS`: first token = the **source PDF** (URL or local file path); the rest (optional) = the
+**subject**.
 
-## 2. Stage the source (local files remove the internet-accessibility problem)
+## 1. Name the run
 
-- **Local file** (the path exists on disk): copy it into the run dir as `<runs_path>/<run-id>/source.pdf`
-  so the run is self-contained, and use THAT path as the source reference. This is the reliable path —
-  no CAPTCHA, no paywall, no dead link.
-- **URL**: keep it as-is. If the researcher later reports the URL unreachable (CAPTCHA/paywall), relay
-  that to the human and suggest re-running with a downloaded local file.
+Derive a **run-id** (kebab-case) from the subject (else from the source's last path segment). Confirm it
+if ambiguous. Check the database for an existing page with this Run ID: if one exists, ask — update that
+page (supersede) or pick a new run-id.
 
-## 3. Write `domain_brief.json` (you author it — the researcher's input)
+## 2. Frame the research (in memory — no file)
 
-Write `<runs_path>/<run-id>/domain_brief.json` per `~/.claude/templates/questionnaire-domain-brief.md`:
-`subject` (the arg, or `null` to let the researcher deduce it), `goal`, `scope`, `audience`, `constraints`
-(seed `ui_language` + a licence-caution note), and `reference_frameworks` starting with the source PDF
-(`role: "source-pdf"`, its URL **or the staged local path**). Ask the human for `goal`/`audience`/`scope`
-only if they're not obvious.
+Compose the domain brief per the schema in `~/.claude/templates/questionnaire-domain-brief.md`
+(`subject`, `goal`, `scope`, `audience`, `constraints` — seed `ui_language` + a licence-caution note —
+and `reference_frameworks` starting with the source, `role: "source-pdf"`). Ask the human for
+`goal`/`audience`/`scope` only if they're not obvious. You will inline this brief into the dispatch and
+into the Notion page — never onto disk.
 
-## 4. Dispatch `questionnaire-researcher` (read-only)
+## 3. Dispatch `questionnaire-researcher` in RESEARCH mode (read-only)
 
-Spawn one agent (`subagent_type: questionnaire-researcher`): "Read `~/.claude/questionnaire.config.yaml`
-first for `ui_language` + `engine_format`. Structure the domain for run `<run-id>`. domain_brief:
-`<runs_path>/<run-id>/domain_brief.json`. Read the source PDF — **local path ⇒ use the Read tool (its
-`pages` parameter, ~15 pages per call, as many calls as needed); URL ⇒ WebFetch**. Return EXACTLY the two
-tagged blocks `===REPORT.MD===` and `===BLUEPRINT.JSON===` per your agent spec — a readable report and a
-conceptual blueprint. Structure only: never draft items, never reproduce instrument text, no
-interpretation, flag every licence." The agent has `WebFetch, WebSearch, Read` only.
+Spawn one agent (`subagent_type: questionnaire-researcher`): "MODE: research. Read
+`~/.claude/questionnaire.config.yaml` first for `ui_language`. Produce a standalone research report for
+run `<run-id>`. domain_brief (inline): <the full brief JSON>. Source PDF: <path-or-url> — **local path ⇒
+Read tool (`pages` parameter, ~15 pages per call, as many calls as needed); URL ⇒ WebFetch** (if
+unreachable, flag it and reconstruct from secondary sources). Return EXACTLY one tagged block
+`===REPORT.MD===` — a genuine research report (Sujet & périmètre · Synthèse · Cadres de référence &
+état de l'art · Analyse du domaine · Débats & controverses · Paysage pratique & licences · Questions
+ouvertes · Sources), NOT questionnaire-shaped. Never draft items, never reproduce instrument text, flag
+every licence."
 
-## 5. Persist the researcher's output (you write the files)
+## 4. Archive to Notion — CONFIRM FIRST (this IS the storage)
 
-Split the returned message on the two tags and write:
+Show the human a short summary and **ask to confirm** the Notion write. On yes, create the page in
+`notion_database_id`: properties **Sujet** · **Cadre** (the main framework identified) · **Statut** =
+`« Recherche »` · **Date** = today · **Run ID** = `<run-id>`; body = the report, plus the domain brief
+in a fenced JSON block at the end. If the source was a **local file**, also attach it to the page
+(`notion-create-attachment`) so the run keeps its provenance — best effort, skip gracefully if
+unavailable. If the human declines the write, print the report in the conversation instead and stop —
+there is deliberately no local fallback.
 
-- `<runs_path>/<run-id>/report.md` — the `===REPORT.MD===` body.
-- `<runs_path>/<run-id>/blueprint.json` — the `===BLUEPRINT.JSON===` body (validate it parses as JSON;
-  if not, re-dispatch once asking the agent to fix the JSON).
+## 5. Report
 
-## 6. Archive the report to Notion (MCP) — CONFIRM FIRST
-
-Writing to Notion is outward-facing: **ask the human to confirm** before creating the page; if they
-decline, skip (they can still archive at `/questionnaire` time).
-
-On confirmation, create one page in the database `notion_database_id` (via the Notion MCP; if no Notion
-tool is connected, say so, print `claude mcp add --transport http notion https://mcp.notion.com/mcp`, and
-skip). Properties: **Sujet** — the blueprint `subject` · **Cadre** — `framework` · **Statut** —
-`« Recherche »` · **Date** — today · **Run ID** — `<run-id>`. Body: the readable `report.md`, then
-`domain_brief.json` and `blueprint.json` as fenced code blocks.
-
-Then write `<runs_path>/<run-id>/notion.json`: `{ "page_id": "…", "url": "…" }` — `/questionnaire` will
-**update this same page** (append the questionnaire + verdict, flip the Statut) instead of creating a new one.
-
-## 7. Report
-
-Print: run-id, subject, framework + licence summary, dimension count, the Notion page link (or the skip
-reason), and the local paths. Tell the human to review `report.md` (locally or in Notion), then run
-**`/questionnaire <run-id>`** to generate + validate the questionnaire and complete the Notion page.
+Print: run-id, subject, main framework + licence summary, and the **Notion page link**. Tell the human:
+review the research in Notion; if — and only if — they want a survey derived from it, run
+**`/questionnaire <run-id>`**.

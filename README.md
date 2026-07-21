@@ -1,5 +1,11 @@
 # claude-pipeline
 
+[![npm version](https://img.shields.io/npm/v/thebidouille-agents?logo=npm&color=cb3837)](https://www.npmjs.com/package/thebidouille-agents)
+[![npm downloads](https://img.shields.io/npm/dm/thebidouille-agents?logo=npm)](https://www.npmjs.com/package/thebidouille-agents)
+[![Publish to npm](https://github.com/EnzoTheBidouille/thebidouille-agents/actions/workflows/publish.yml/badge.svg)](https://github.com/EnzoTheBidouille/thebidouille-agents/actions/workflows/publish.yml)
+[![node >=18](https://img.shields.io/node/v/thebidouille-agents?logo=node.js&logoColor=white)](https://nodejs.org)
+[![license: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+
 A **portable, stack-agnostic multi-agent development pipeline** for Claude Code. Push it once,
 pull it into any project, run one command, and it adapts itself to that project's stack.
 
@@ -132,44 +138,47 @@ it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.
 | `/refactor <domain>` | Apply the backlog for one surface, TDD-first.                                         |
 | `/align-ds`          | Align the code UI kit to the design system (no-op if none configured).                |
 | `/update-pipeline`   | Refresh the installed core (global or bundled) from the repo's latest `main`.         |
-| `/research <pdf>`    | _Global capability._ Structure a PDF (URL or local file) into a report + blueprint, archived to Notion. |
-| `/questionnaire <id>`| _Global capability._ Write + validate the questionnaire, complete the Notion page.     |
+| `/research <pdf>`    | _Global capability._ Deep-research a PDF (URL or local file) into a standalone report, archived in Notion. |
+| `/questionnaire <id>`| _Global capability._ Optional: derive + write + validate a survey from a research run's Notion page. |
 
-## Global capability — questionnaire pipeline (PDF → survey)
+## Global capability — research → (optional) questionnaire
 
-A **user-scoped** content-generation capability, separate from the dev flow (`/brainstorm…/ship`) and
-independent of any project's `PIPELINE.md` — its config lives in **`~/.claude/questionnaire.config.yaml`**
-(seeded by the installer, never clobbered on update) and it behaves the same in every directory. It turns
-a source PDF into a review-ready survey — never straight to production.
+A **user-scoped** capability, separate from the dev flow (`/brainstorm…/ship`) and independent of any
+project's `PIPELINE.md` — its config lives in **`~/.claude/questionnaire.config.yaml`** (seeded by the
+installer, never clobbered on update) and it behaves the same in every directory. **Nothing is stored
+locally: the Notion page IS the run.**
 
 ```
-/research <pdf-url-or-path> [subject]      →   /questionnaire <run-id>
-   report.md + blueprint.json                    questionnaire.json + verdict.json
-   → Notion page (Statut « Recherche »)          → same Notion page (« À relire » / « Bloqué »)
+/research <pdf-url-or-path> [subject]        →   (optional)  /questionnaire <run-id>
+   standalone research report                       blueprint + ORIGINAL Likert-5 survey + verdict
+   → Notion page (Statut « Recherche »)             → same Notion page (« À relire » / « Bloqué »)
 ```
 
-- **`/research`** dispatches the read-only **researcher**: it reads the PDF — **a URL, or a local file**
-  (pass a path to skip CAPTCHAs/paywalls entirely; the file is staged into the run dir) — and structures
-  the domain into a readable `report.md` + a conceptual `blueprint.json`. It **structures, never drafts
-  items**, and never reproduces licensed instrument text. The report is archived to Notion (under your
-  confirmation) as a page with Statut « Recherche », so you review it there.
-- **`/questionnaire`** dispatches the **writer** (writes *original* Likert-5 items — it has no tools, so it
-  never sees the source) then the **validator** (checks format + blueprint match, loops up to 3×), and
-  **updates the same Notion page** (questionnaire + verdict appended, Statut flipped) **under your
-  confirmation**. Nothing enters the survey engine until you review the Notion page and mark it approved.
+- **`/research`** is genuine research, valuable on its own: the read-only **researcher** reads the PDF —
+  **a URL, or a local file** (pass a path to skip CAPTCHAs/paywalls entirely) — and produces a standalone
+  research report (state of the art, domain analysis, debates, licences, open questions, sources). It
+  **never drafts items** and never reproduces licensed instrument text. The report lands in Notion
+  (under your confirmation) as a page with Statut « Recherche »; a local source file is attached to the
+  page for provenance.
+- **`/questionnaire`** exists only if you want a survey out of a research run: it derives a conceptual
+  **blueprint** from the report (researcher, blueprint mode), dispatches the **writer** (*original*
+  Likert-5 items — no tools, so it never sees the source or the report) then the **validator** (loops up
+  to 3×), and **completes the same Notion page** (blueprint + questionnaire + verdict, Statut flipped)
+  **under your confirmation**. Nothing enters the survey engine until you review the page and mark it
+  « Approuvé ».
 
-**Enable it** by editing `~/.claude/questionnaire.config.yaml`:
+**Enable it** — one line in `~/.claude/questionnaire.config.yaml`:
 
 ```yaml
-enabled: true
-notion_database_id: "<your Notion database id/URL>"
-runs_path: ~/.claude/questionnaire-runs      # runs are written here, project-independent
-engine_format: samo-surveys
-ui_language: French
+enabled: true          # that's all — the Notion database is auto-created on the first /research
 ```
 
+(`notion_database_id` is filled back automatically; set `notion_parent_page_id` beforehand if you want
+the database created under a specific page. `engine_format` and `ui_language` default to
+`samo-surveys` / `French`.)
+
 With `enabled: false` (or the file absent), `/research` and `/questionnaire` refuse cleanly and change
-nothing. Archiving needs the Notion MCP connected:
+nothing. The capability requires the Notion MCP (it is the storage):
 
 ```sh
 claude mcp add --transport http notion https://mcp.notion.com/mcp

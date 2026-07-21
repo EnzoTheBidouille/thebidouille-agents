@@ -119,34 +119,36 @@ this exact procedure so a surface is always defined the same way. To add surface
 Removing/merging a surface is the reverse: drop the `surfaces[]` entry, delete its agent file, fold its
 conventions. Never leave an agent file with no matching `surfaces[]` entry (orphan) or vice-versa.
 
-## Global capability — questionnaire pipeline (PDF → survey)
+## Global capability — research → (optional) questionnaire
 
-A **user-scoped** content-generation track, separate from the dev flow and NOT configured in
-`PIPELINE.md`. Its facts live in **`~/.claude/questionnaire.config.yaml`** (template:
-`profile/questionnaire.config.template.yaml`, seeded by the installer, never clobbered on update), read
-at runtime by both commands:
+A **user-scoped** track, separate from the dev flow and NOT configured in `PIPELINE.md`. Its facts live
+in **`~/.claude/questionnaire.config.yaml`** (template: `profile/questionnaire.config.template.yaml`,
+seeded by the installer, never clobbered on update). **Nothing is stored locally: each run lives
+entirely as a page in the Notion database**, which is **auto-created on the first `/research`**.
 
-| Field                 | Used by                   | Meaning                                                         |
-| --------------------- | ------------------------- | --------------------------------------------------------------- |
-| `enabled`             | /research, /questionnaire | `false`/absent ⇒ both commands refuse cleanly.                  |
-| `notion_database_id`  | /questionnaire            | Notion base id/URL archiving each run (required to archive).    |
-| `runs_path`           | /research, /questionnaire | Where each run dir is written; default `~/.claude/questionnaire-runs`. |
-| `engine_format`       | writer, validator         | Label of the target survey-engine format (e.g. `samo-surveys`). |
-| `ui_language`         | researcher, writer        | Language of the report + all questionnaire labels.              |
+| Field                   | Used by                   | Meaning                                                         |
+| ----------------------- | ------------------------- | --------------------------------------------------------------- |
+| `enabled`               | /research, /questionnaire | `false`/absent ⇒ both commands refuse cleanly.                  |
+| `notion_database_id`    | /research, /questionnaire | The archive database. Empty ⇒ auto-created on first run, id written back. |
+| `notion_parent_page_id` | /research (setup)         | Optional parent page for the auto-created database.             |
+| `engine_format`         | writer, validator         | Label of the target survey-engine format (e.g. `samo-surveys`). |
+| `ui_language`           | researcher, writer        | Language of the reports + all questionnaire labels.             |
 
-- `/research <pdf-url-or-path> [subject]` → dispatches `questionnaire-researcher` (read-only): writes
-  `domain_brief.json`, `report.md`, `blueprint.json` under `<runs_path>/<run-id>/`. A **local file** source
-  is staged as `source.pdf` in the run dir (read via the Read tool — no internet dependency); a URL goes
-  through WebFetch. The report is archived to Notion (Statut « Recherche ») **under human confirmation**;
-  the page ref is saved as `notion.json` in the run dir.
-- `/questionnaire <run-id>` → dispatches `questionnaire-writer` then `questionnaire-validator` (both
-  stateless, no tools; the orchestrator inlines the JSON so the writer never sees the source): writes
-  `questionnaire.json` + `verdict.json` (writer↔validator loop, max 3), then **updates the run's Notion
-  page** (`notion.json` — questionnaire + verdict appended, Statut → « À relire »/« Bloqué »; creates the
-  page if `/research` skipped it) **under human confirmation**. Frozen contracts:
+- `/research <pdf-url-or-path> [subject]` → dispatches `questionnaire-researcher` (**mode research**,
+  read-only): produces a **standalone research report** (state of the art, domain analysis, debates,
+  licences, open questions, sources) — genuine research, not questionnaire-shaped. A **local file**
+  source is read via the Read tool (no internet dependency) and attached to the page for provenance; a
+  URL goes through WebFetch. The report becomes a Notion page (Statut « Recherche ») **under human
+  confirmation**. No local artifact.
+- `/questionnaire <run-id-or-url>` → the OPTIONAL derivation, only if the human wants a survey: loads
+  the research from its Notion page, dispatches `questionnaire-researcher` (**mode blueprint** — derives
+  the conceptual skeleton from the report), then `questionnaire-writer` and `questionnaire-validator`
+  (both stateless, no tools; JSON inlined so the writer never sees the source or the report), loops
+  max 3, and **completes the same Notion page** (blueprint + questionnaire + verdict appended, Statut →
+  « À relire »/« Bloqué ») **under human confirmation**. Frozen contracts:
   `templates/questionnaire-{domain-brief,blueprint,declaration,verdict}.md`.
 
-Guarantees the workflow preserves: researcher structures but never drafts items; writer drafts original
-Likert-5 items but never sees the source; nothing is interpreted (no thresholds/levels); agents are
-read-only, the orchestrator does all disk + Notion writes, Notion write is confirmation-gated; nothing
-enters the survey engine until the human approves the Notion page.
+Guarantees the workflow preserves: researcher analyses/structures but never drafts items; writer drafts
+original Likert-5 items but never sees the source; nothing is interpreted (no thresholds/levels); agents
+are read-only, the orchestrator does all Notion writes, each write is confirmation-gated; nothing enters
+the survey engine until the human flips the page's Statut to « Approuvé ».

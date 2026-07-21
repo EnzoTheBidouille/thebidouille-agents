@@ -1,9 +1,9 @@
 # CONTRACT — blueprint · `<run-id>`
 
-> Frozen contract between `questionnaire-researcher` (author) and `questionnaire-writer` +
+> Frozen contract between `questionnaire-researcher` (mode blueprint, author) and `questionnaire-writer` +
 > `questionnaire-validator` (consumers). The **conceptual skeleton** of the questionnaire — constructs and
-> guidance, **never items**. Written by `/research` to `<runs_path>/<run-id>/blueprint.json` (`runs_path`
-> from `~/.claude/questionnaire.config.yaml`) from the researcher's `===BLUEPRINT.JSON===` block. JSON, not prose.
+> guidance, **never items**. Derived by `/questionnaire` from the run's research report (the researcher's
+> `===BLUEPRINT.JSON===` block), held in memory and archived in the run's Notion page. JSON, not prose.
 
 ```json
 {

@@ -1,9 +1,8 @@
 # CONTRACT — questionnaire (engine declaration) · `<run-id>`
 
 > Frozen contract: `questionnaire-writer`'s output, the questionnaire in the survey engine's format
-> (`engine_format`, e.g. `samo-surveys`). Written by `/questionnaire` to
-> `<runs_path>/<run-id>/questionnaire.json` (`runs_path`/`engine_format` from
-> `~/.claude/questionnaire.config.yaml`). Consumed by `questionnaire-validator`. JSON.
+> (`engine_format` from `~/.claude/questionnaire.config.yaml`, e.g. `samo-surveys`). Held in memory by
+> `/questionnaire` and archived in the run's Notion page. Consumed by `questionnaire-validator`. JSON.
 
 ```json
 {

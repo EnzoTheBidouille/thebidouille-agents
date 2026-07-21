@@ -1,8 +1,7 @@
 # CONTRACT — verdict · `<run-id>`
 
-> Frozen contract: `questionnaire-validator`'s output. Written by `/questionnaire` to
-> `<runs_path>/<run-id>/verdict.json` (`runs_path` from `~/.claude/questionnaire.config.yaml`). Drives the
-> writer↔validator fix loop (max 3 rounds) and the Notion status. JSON.
+> Frozen contract: `questionnaire-validator`'s output. Held in memory by `/questionnaire` and archived
+> in the run's Notion page. Drives the writer↔validator fix loop (max 3 rounds) and the Notion Statut. JSON.
 
 ```json
 {
