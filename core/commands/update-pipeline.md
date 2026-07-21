@@ -1,5 +1,5 @@
 ---
-description: Refresh the pipeline core (global ~/.claude, or a repo's bundled .claude) from the thebidouille-agents repo's latest main. Keeps your questionnaire.config.yaml and every generated file.
+description: Refresh the pipeline core (global ~/.claude, or a repo's bundled .claude) to the latest published thebidouille-agents version. Keeps your questionnaire.config.yaml and every generated file.
 argument-hint: [path-to-local-checkout]
 ---
 
