@@ -18,10 +18,10 @@ gated commands, dispatching **stateless agents** that only communicate through a
 
 ## How it works — two layers
 
-| Layer                                                                        | Lives in      | Varies per project?         |
-| ---------------------------------------------------------------------------- | ------------- | --------------------------- |
-| **Portable core** — the workflow doctrine: agents, commands, templates, hook | `.claude/`    | No — identical everywhere   |
-| **Project profile** — stack, paths, commands, conventions, capability flags  | `PIPELINE.md` | Yes — generated per project |
+| Layer                                                                        | Lives in                                  | Varies per project?         |
+| ---------------------------------------------------------------------------- | ----------------------------------------- | --------------------------- |
+| **Portable core** — the workflow doctrine: agents, commands, templates, hook | `~/.claude` (global) or repo `.claude/`   | No — identical everywhere   |
+| **Project profile** — stack, paths, commands, conventions, capability flags  | `PIPELINE.md` + rendered agents, committed | Yes — generated per project |
 
 The core never hardcodes stack facts. Two mechanisms keep it generic:
 
@@ -34,49 +34,56 @@ The core never hardcodes stack facts. Two mechanisms keep it generic:
 
 The pipeline ships as an npm package (`thebidouille-agents`), so releases are semver-tagged and
 `npx` always fetches the latest published version — no clone needed, works on macOS/Linux/Windows.
-Two ways to place the portable core; both end at the same `/init-pipeline`.
 
-**Per-project** (default) — bundles the core into `<project>/.claude`, so it's committed and your
-teammates get it with the repo:
+**Global (recommended)** — install the generic core ONCE into `~/.claude`; it serves every repo on
+your machine. Nothing is copied per project; the gate hook is registered once and reads each repo's
+own `gate-config.json`:
+
+```sh
+npx thebidouille-agents install --global
+```
+
+The per-project part is NOT the core — it's the **profile** `/init-pipeline` generates and you
+commit: `PIPELINE.md`, the rendered surface agents, `gate-config.json`, `settings.json`, `specs/`.
+**That's what makes team work possible in global mode**: everything project-specific travels with the
+repo; each teammate just runs the same global one-liner once, guided by the committed
+`.claude/pipeline.json` pointer (core version + install command) that `/init-pipeline` writes.
+
+<details>
+<summary><strong>Alternative: per-project (bundled)</strong> — vendor the core into the repo itself.</summary>
 
 ```sh
 # inside your project (or pass its path as an argument)
 npx thebidouille-agents install
 ```
 
-**Global** — one core in `~/.claude`, shared by every repo on your machine (nothing copied per repo;
-the gate hook is registered once and reads each repo's own `gate-config.json`):
+Copies the core into `<project>/.claude`, committed with the repo. Choose this when you want
+**zero-setup onboarding** (teammates get the core with `git clone`, no install step at all) and a
+core version **pinned per repo** (no drift between projects or teammates). Cost: the core is
+duplicated in every repo and each repo updates separately.
 
-```sh
-npx thebidouille-agents install --global
-```
+</details>
 
 <details>
 <summary><strong>No Node/npm?</strong> The original script installers still work.</summary>
 
 ```sh
-# per-project                             # global
-sh install.sh                             sh install.sh --global
+# global (recommended)                    # per-project (bundled)
+sh install.sh --global                    sh install.sh
 # or piped:
-curl -fsSL https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.sh | sh
 curl -fsSL https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.sh | sh -s -- --global
 ```
 
 ```powershell
 # Windows (PowerShell 5.1+)
-.\install.ps1              # or  -Global
-# or:  irm https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.ps1 | iex
+.\install.ps1 -Global         # or without -Global for per-project
+# or:  & ([scriptblock]::Create((irm https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.ps1))) -Global
 ```
 
 Script installs from a git checkout stamp the version as `<semver> (<sha>)`; the npm CLI stamps the
 published semver. Both land in `.claude/pipeline/VERSION` and the `pipeline.json` pointer.
 
 </details>
-
-Trade-off: global is leanest for a solo dev across many repos and updates everywhere at once, but all
-projects share one core version and teammates must install it themselves. In global mode `/init-pipeline`
-writes a committed **`.claude/pipeline.json` pointer** recording the core version + install command, so a
-teammate who clones the repo knows to run the global installer.
 
 > **After installing (or updating): restart Claude Code / start a new session.** Slash commands and
 > agents are scanned at session start — in an already-open session the new `/init-pipeline`,
@@ -102,8 +109,8 @@ Sanity-check `PIPELINE.md`, commit it, and run `/brainstorm`.
 ## Update
 
 ```sh
-npx thebidouille-agents@latest update             # per-project core in <project>/.claude
-npx thebidouille-agents@latest update --global    # the shared core in ~/.claude
+npx thebidouille-agents@latest update --global    # the shared core in ~/.claude (recommended setup)
+npx thebidouille-agents@latest update             # a repo's bundled core in <project>/.claude
 ```
 
 (Script equivalents: `sh install.sh --update [--global]` / `.\install.ps1 -Update [-Global]`.)
