@@ -19,9 +19,17 @@ You are **read-only and stateless** — you write no files and touch no external
    `{ subject, goal, reference_frameworks, scope, audience, constraints }`.
 2. `~/.claude/questionnaire.config.yaml` (`ui_language` + `engine_format`).
 
-Read the brief, then **fetch and read the source PDF** (its link is in the brief's `reference_frameworks`
-or supplied in the dispatch). Use WebSearch only to identify frameworks and their **licensing status** —
-not to collect item wording.
+Read the brief, then **read the source PDF** (its reference is in the brief's `reference_frameworks` or
+supplied in the dispatch). Two source kinds:
+
+- **Local file path** (e.g. `<runs_path>/<run-id>/source.pdf`) — read it with the **Read tool**, using its
+  `pages` parameter to page through large PDFs (~15 pages per call, as many calls as you need). This is
+  the preferred, always-accessible path.
+- **URL** — fetch with WebFetch. If it is unreachable (CAPTCHA, paywall, dead link), say so explicitly in
+  the report's methodology note, reconstruct from the best available secondary sources, and recommend
+  re-running with a downloaded local file.
+
+Use WebSearch only to identify frameworks and their **licensing status** — not to collect item wording.
 
 ## Hard rules (content must stay licence-free downstream)
 

@@ -49,17 +49,20 @@ still `fail` after 3 rounds, keep the last `questionnaire.json` + `verdict.json`
 
 ## 4. Archive to Notion (MCP) — CONFIRM FIRST
 
-Writing to Notion is outward-facing (like the gate's spirit). **Ask the human to confirm** before creating
-the page; if they decline, stop after reporting the local paths.
+Writing to Notion is outward-facing (like the gate's spirit). **Ask the human to confirm** before writing;
+if they decline, stop after reporting the local paths.
 
-On confirmation, create one page in the database `notion_database_id` (via the Notion MCP — e.g.
-`notion-create-pages`; if no Notion MCP tool is connected, say so and print the connection command
-`claude mcp add --transport http notion https://mcp.notion.com/mcp`, then stop). Set properties:
+On confirmation (via the Notion MCP; if no Notion tool is connected, say so and print the connection
+command `claude mcp add --transport http notion https://mcp.notion.com/mcp`, then stop):
 
-- **Sujet** — the blueprint `subject` · **Cadre** — `framework` · **Statut** — `« À relire »` (pass) or
-  `« Bloqué »` (fail after 3) · **Date** — today · **Run ID** — `$ARGUMENTS`.
-- **Body** — the readable `report.md`, then the three artifacts as fenced code blocks: `blueprint.json`,
-  `questionnaire.json`, `verdict.json`.
+- **If `<runs_path>/$ARGUMENTS/notion.json` exists** (page created by `/research`): **update that page** —
+  flip **Statut** to `« À relire »` (pass) or `« Bloqué »` (fail after 3), and append the questionnaire
+  stage to the body: `questionnaire.json` + `verdict.json` as fenced code blocks. Do not create a duplicate.
+- **Otherwise**: create one page in the database `notion_database_id` with properties **Sujet** — the
+  blueprint `subject` · **Cadre** — `framework` · **Statut** — `« À relire »` (pass) or `« Bloqué »`
+  (fail after 3) · **Date** — today · **Run ID** — `$ARGUMENTS`; body: the readable `report.md`, then the
+  three artifacts as fenced code blocks: `blueprint.json`, `questionnaire.json`, `verdict.json`. Then
+  write `<runs_path>/$ARGUMENTS/notion.json` (`{ "page_id", "url" }`).
 
 ## 5. Report
 
