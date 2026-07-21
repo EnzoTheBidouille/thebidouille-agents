@@ -190,10 +190,11 @@ Per repo:
      teammates know to install the global core ($REPO_URL).
   3. Commit PIPELINE.md + .claude/, then  /brainstorm  to start a feature.
 
-Questionnaire capability (global, works anywhere — optional):
+Research / questionnaire capability (global, works anywhere — optional):
   1. Connect Notion:  claude mcp add --transport http notion https://mcp.notion.com/mcp
-  2. Edit ~/.claude/questionnaire.config.yaml (set enabled: true + notion_database_id).
-  3. Run  /research <pdf-url> [subject]  then  /questionnaire <run-id>.
+  2. Set  enabled: true  in ~/.claude/questionnaire.config.yaml — that's all: the Notion
+     database is CREATED AUTOMATICALLY on the first run (nothing is stored locally).
+  3. Run  /research <pdf-url-or-file> [subject]  — then optionally  /questionnaire <run-id>.
 EOF
   exit 0
 fi

@@ -1,24 +1,25 @@
-# ~/.claude/questionnaire.config.yaml — GLOBAL config for the questionnaire capability.
+# ~/.claude/questionnaire.config.yaml — GLOBAL config for the research/questionnaire capability.
 #
-# Installed once by `sh install.sh` (copied here only if absent — your filled copy is
-# never overwritten on --update). Read at runtime by the GLOBAL commands /research and
-# /questionnaire. It has NO dependency on any project's PIPELINE.md — the capability works
-# the same in every directory.
+# Installed once by the installer (copied here only if absent — your filled copy is never
+# overwritten on update). Read at runtime by the GLOBAL commands /research and /questionnaire.
+# No dependency on any project's PIPELINE.md — works the same in every directory.
 #
-# Fill it in, then run /research <pdf-url> [subject] anywhere.
+# NOTHING IS STORED LOCALLY: each run lives entirely as a page in the Notion database.
+# Connect Notion first:  claude mcp add --transport http notion https://mcp.notion.com/mcp
 
 enabled: false                              # flip to true to activate /research + /questionnaire
 
-# Notion base that archives each run for human review. Required before /questionnaire can archive.
-# Connect the Notion MCP first: claude mcp add --transport http notion https://mcp.notion.com/mcp
-notion_database_id: ""                       # database id or share URL
+# The Notion database archiving each run. LEAVE EMPTY: it is CREATED AUTOMATICALLY on the
+# first /research (schema: Sujet · Cadre · Statut Recherche/À relire/Bloqué/Approuvé · Date ·
+# Run ID) and its id is written back here. Only fill it to reuse an existing database.
+notion_database_id: ""
 
-# Where each run dir is written: <runs_path>/<run-id>/ with domain_brief.json, report.md,
-# blueprint.json, questionnaire.json, verdict.json. Global by default (project-independent).
-runs_path: ~/.claude/questionnaire-runs
+# Optional: the Notion page under which the auto-created database is placed.
+# Empty ⇒ created as a workspace-level private page (you can move it afterwards).
+notion_parent_page_id: ""
 
 # Label of the target survey-engine format the writer emits.
 engine_format: samo-surveys
 
-# Language of the comprehension report and every questionnaire label.
+# Language of the research reports and every questionnaire label.
 ui_language: French

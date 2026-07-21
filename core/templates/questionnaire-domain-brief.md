@@ -1,9 +1,8 @@
 # CONTRACT — domain_brief · `<run-id>`
 
-> Frozen contract: the **input** to `questionnaire-researcher`. Authored by `/research` from the command
-> args (URL + optional subject) — the agents read it, never edit it. One file per run at
-> `<runs_path>/<run-id>/domain_brief.json` (`runs_path` from `~/.claude/questionnaire.config.yaml`, default
-> `~/.claude/questionnaire-runs`). Fields below; JSON, not prose.
+> Frozen contract: the **input** to `questionnaire-researcher` (mode research). Authored by `/research`
+> from the command args (source + optional subject) — held in memory, inlined into the dispatch, and
+> archived in the run's Notion page (nothing is stored locally). Fields below; JSON, not prose.
 
 ```json
 {
