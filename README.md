@@ -132,8 +132,8 @@ it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.
 | `/refactor <domain>` | Apply the backlog for one surface, TDD-first.                                         |
 | `/align-ds`          | Align the code UI kit to the design system (no-op if none configured).                |
 | `/update-pipeline`   | Refresh the installed core (global or bundled) from the repo's latest `main`.         |
-| `/research <pdf>`    | _Global capability._ Structure a PDF into a report + questionnaire blueprint.          |
-| `/questionnaire <id>`| _Global capability._ Write + validate the questionnaire, archive to Notion.            |
+| `/research <pdf>`    | _Global capability._ Structure a PDF (URL or local file) into a report + blueprint, archived to Notion. |
+| `/questionnaire <id>`| _Global capability._ Write + validate the questionnaire, complete the Notion page.     |
 
 ## Global capability — questionnaire pipeline (PDF → survey)
 
@@ -143,17 +143,20 @@ independent of any project's `PIPELINE.md` — its config lives in **`~/.claude/
 a source PDF into a review-ready survey — never straight to production.
 
 ```
-/research <pdf-url> [subject]   →   /questionnaire <run-id>
-   report.md + blueprint.json         questionnaire.json + verdict.json  →  Notion (for review)
+/research <pdf-url-or-path> [subject]      →   /questionnaire <run-id>
+   report.md + blueprint.json                    questionnaire.json + verdict.json
+   → Notion page (Statut « Recherche »)          → same Notion page (« À relire » / « Bloqué »)
 ```
 
-- **`/research`** dispatches the read-only **researcher**: it reads the PDF and structures the domain into a
-  readable `report.md` + a conceptual `blueprint.json` — it **structures, never drafts items**, and never
-  reproduces licensed instrument text.
+- **`/research`** dispatches the read-only **researcher**: it reads the PDF — **a URL, or a local file**
+  (pass a path to skip CAPTCHAs/paywalls entirely; the file is staged into the run dir) — and structures
+  the domain into a readable `report.md` + a conceptual `blueprint.json`. It **structures, never drafts
+  items**, and never reproduces licensed instrument text. The report is archived to Notion (under your
+  confirmation) as a page with Statut « Recherche », so you review it there.
 - **`/questionnaire`** dispatches the **writer** (writes *original* Likert-5 items — it has no tools, so it
   never sees the source) then the **validator** (checks format + blueprint match, loops up to 3×), and
-  archives the run to Notion **under your confirmation**. Nothing enters the survey engine until you review
-  the Notion page and mark it approved.
+  **updates the same Notion page** (questionnaire + verdict appended, Statut flipped) **under your
+  confirmation**. Nothing enters the survey engine until you review the Notion page and mark it approved.
 
 **Enable it** by editing `~/.claude/questionnaire.config.yaml`:
 
