@@ -147,9 +147,6 @@ it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.
 
 ## Roadmap
 
-- [x] **Wire npm auth into CI** — done via **trusted publishing** (token-less OIDC): npmjs.com →
-      package Settings → Trusted Publisher → GitHub Actions (`publish.yml`, environment
-      `npm-publish`). Verified with the v0.1.4 publish. No `NPM_TOKEN` secret needed.
 - [ ] **Opt-in code-retrieval tooling at `/init-pipeline` / `/update-pipeline`** — agents spend
       most of their wall-clock reading the repo; semantic retrieval cuts that. During the init
       interview, offer to wire one of these as a capability flag in the project profile
