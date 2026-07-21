@@ -24,7 +24,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Syntax-check CLI
         run: node --check bin/cli.js
@@ -58,22 +58,21 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           registry-url: https://registry.npmjs.org
 
-      # Token-less "trusted publishing" via OIDC needs npm >= 11.5.1;
-      # Node 20 ships npm 10.x, so upgrade npm first. The trusted publisher
-      # for this repo/workflow is configured on npmjs.com (package Settings).
-      # NPM_TOKEN is a fallback if ever needed; unset is fine with OIDC.
-      - name: Upgrade npm for OIDC trusted publishing
+      # Token-less "trusted publishing" via OIDC needs npm >= 11.5.1.
+      # Node 24 bundles npm 11+; upgrade to latest for good measure (npm 12
+      # requires Node >= 22, hence node-version: 24 above). The trusted
+      # publisher for this repo/workflow (publish.yml, environment
+      # npm-publish) is configured on npmjs.com — no token, no secret.
+      - name: Ensure npm >= 11.5 for OIDC
         run: |
           npm install -g npm@latest
           npm --version
 
       - name: Publish to npm
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Tag and create GitHub release
         env:
