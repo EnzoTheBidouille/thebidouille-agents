@@ -134,12 +134,16 @@ at runtime by both commands:
 | `engine_format`       | writer, validator         | Label of the target survey-engine format (e.g. `samo-surveys`). |
 | `ui_language`         | researcher, writer        | Language of the report + all questionnaire labels.              |
 
-- `/research <pdf-url> [subject]` → dispatches `questionnaire-researcher` (read-only): writes
-  `domain_brief.json`, `report.md`, `blueprint.json` under `<runs_path>/<run-id>/`.
+- `/research <pdf-url-or-path> [subject]` → dispatches `questionnaire-researcher` (read-only): writes
+  `domain_brief.json`, `report.md`, `blueprint.json` under `<runs_path>/<run-id>/`. A **local file** source
+  is staged as `source.pdf` in the run dir (read via the Read tool — no internet dependency); a URL goes
+  through WebFetch. The report is archived to Notion (Statut « Recherche ») **under human confirmation**;
+  the page ref is saved as `notion.json` in the run dir.
 - `/questionnaire <run-id>` → dispatches `questionnaire-writer` then `questionnaire-validator` (both
   stateless, no tools; the orchestrator inlines the JSON so the writer never sees the source): writes
-  `questionnaire.json` + `verdict.json` (writer↔validator loop, max 3), then archives the run to Notion
-  (`notion_database_id`) **under human confirmation**. Frozen contracts:
+  `questionnaire.json` + `verdict.json` (writer↔validator loop, max 3), then **updates the run's Notion
+  page** (`notion.json` — questionnaire + verdict appended, Statut → « À relire »/« Bloqué »; creates the
+  page if `/research` skipped it) **under human confirmation**. Frozen contracts:
   `templates/questionnaire-{domain-brief,blueprint,declaration,verdict}.md`.
 
 Guarantees the workflow preserves: researcher structures but never drafts items; writer drafts original
