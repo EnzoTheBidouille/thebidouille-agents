@@ -81,6 +81,9 @@ Ask ONLY what you couldn't confidently detect. Batch related questions. Cover:
 
 Prefer sensible defaults from Phase 1 as the first (Recommended) option in each question.
 
+> The **questionnaire capability** (`/research`, `/questionnaire`) is user-scoped and configured
+> separately in `~/.claude/questionnaire.config.yaml` — it is NOT part of this project interview.
+
 ## Phase 3 — Draft the profile (show, don't write yet)
 
 Assemble the full `PIPELINE.md` from the installer's `pipeline/PIPELINE.template.md` (resolve

@@ -1,0 +1,24 @@
+# ~/.claude/questionnaire.config.yaml — GLOBAL config for the questionnaire capability.
+#
+# Installed once by `sh install.sh` (copied here only if absent — your filled copy is
+# never overwritten on --update). Read at runtime by the GLOBAL commands /research and
+# /questionnaire. It has NO dependency on any project's PIPELINE.md — the capability works
+# the same in every directory.
+#
+# Fill it in, then run /research <pdf-url> [subject] anywhere.
+
+enabled: false                              # flip to true to activate /research + /questionnaire
+
+# Notion base that archives each run for human review. Required before /questionnaire can archive.
+# Connect the Notion MCP first: claude mcp add --transport http notion https://mcp.notion.com/mcp
+notion_database_id: ""                       # database id or share URL
+
+# Where each run dir is written: <runs_path>/<run-id>/ with domain_brief.json, report.md,
+# blueprint.json, questionnaire.json, verdict.json. Global by default (project-independent).
+runs_path: ~/.claude/questionnaire-runs
+
+# Label of the target survey-engine format the writer emits.
+engine_format: samo-surveys
+
+# Language of the comprehension report and every questionnaire label.
+ui_language: French
