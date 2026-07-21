@@ -118,3 +118,31 @@ this exact procedure so a surface is always defined the same way. To add surface
 
 Removing/merging a surface is the reverse: drop the `surfaces[]` entry, delete its agent file, fold its
 conventions. Never leave an agent file with no matching `surfaces[]` entry (orphan) or vice-versa.
+
+## Global capability — questionnaire pipeline (PDF → survey)
+
+A **user-scoped** content-generation track, separate from the dev flow and NOT configured in
+`PIPELINE.md`. Its facts live in **`~/.claude/questionnaire.config.yaml`** (template:
+`profile/questionnaire.config.template.yaml`, seeded by the installer, never clobbered on update), read
+at runtime by both commands:
+
+| Field                 | Used by                   | Meaning                                                         |
+| --------------------- | ------------------------- | --------------------------------------------------------------- |
+| `enabled`             | /research, /questionnaire | `false`/absent ⇒ both commands refuse cleanly.                  |
+| `notion_database_id`  | /questionnaire            | Notion base id/URL archiving each run (required to archive).    |
+| `runs_path`           | /research, /questionnaire | Where each run dir is written; default `~/.claude/questionnaire-runs`. |
+| `engine_format`       | writer, validator         | Label of the target survey-engine format (e.g. `samo-surveys`). |
+| `ui_language`         | researcher, writer        | Language of the report + all questionnaire labels.              |
+
+- `/research <pdf-url> [subject]` → dispatches `questionnaire-researcher` (read-only): writes
+  `domain_brief.json`, `report.md`, `blueprint.json` under `<runs_path>/<run-id>/`.
+- `/questionnaire <run-id>` → dispatches `questionnaire-writer` then `questionnaire-validator` (both
+  stateless, no tools; the orchestrator inlines the JSON so the writer never sees the source): writes
+  `questionnaire.json` + `verdict.json` (writer↔validator loop, max 3), then archives the run to Notion
+  (`notion_database_id`) **under human confirmation**. Frozen contracts:
+  `templates/questionnaire-{domain-brief,blueprint,declaration,verdict}.md`.
+
+Guarantees the workflow preserves: researcher structures but never drafts items; writer drafts original
+Likert-5 items but never sees the source; nothing is interpreted (no thresholds/levels); agents are
+read-only, the orchestrator does all disk + Notion writes, Notion write is confirmation-gated; nothing
+enters the survey engine until the human approves the Notion page.

@@ -75,10 +75,34 @@ copy_core() {
   mkdir -p "$dest/pipeline/scripts"
   cp "$src/profile/PIPELINE.template.md" "$dest/pipeline/"
   cp "$src/profile/SCHEMA.md"            "$dest/pipeline/"
+  cp "$src/profile/questionnaire.config.template.yaml" "$dest/pipeline/"
   cp "$src"/scripts/*.template           "$dest/pipeline/scripts/"
   cp "$src/core/agents/implementer.template.md" "$dest/pipeline/"
   printf '%s\n' "$ver" > "$dest/pipeline/VERSION"
   chmod +x "$dest/hooks/gate.py" "$dest/hooks/tdd_gate.py" 2>/dev/null || true
+}
+
+# the fixed (non-rendered) agents: dev review/release + the questionnaire capability's three
+copy_fixed_agents() {
+  mkdir -p "$dest/agents"
+  cp "$src/core/agents/review.md" "$src/core/agents/release.md" \
+     "$src/core/agents/questionnaire-researcher.md" \
+     "$src/core/agents/questionnaire-writer.md" \
+     "$src/core/agents/questionnaire-validator.md" \
+     "$dest/agents/"
+}
+
+# questionnaire capability config is USER-level (Notion DB, runs path) — it lives in
+# ~/.claude regardless of install scope. Seed it only if the user has no filled copy.
+seed_questionnaire_config() {
+  qcfg="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/questionnaire.config.yaml"
+  if [ ! -f "$qcfg" ]; then
+    mkdir -p "$(dirname "$qcfg")"
+    cp "$src/profile/questionnaire.config.template.yaml" "$qcfg"
+    echo "  · seeded $qcfg (fill it in to enable /research + /questionnaire)"
+  else
+    echo "  · kept your existing $qcfg"
+  fi
 }
 
 # Register the profile-driven hooks in the GLOBAL settings.json. Idempotent: each
@@ -141,10 +165,10 @@ if [ "$scope" = "global" ]; then
   else
     echo "→ updating pipeline core GLOBALLY in $dest (keeping global settings.json)"
   fi
-  mkdir -p "$dest/agents"
-  cp "$src/core/agents/review.md" "$src/core/agents/release.md" "$dest/agents/"
+  copy_fixed_agents
   copy_core
   hook_state=$(register_global_hook || echo "skipped")
+  seed_questionnaire_config
   cat <<EOF
 
 ✓ pipeline core installed globally into $dest  (version $ver)
@@ -159,15 +183,20 @@ Per repo:
      .claude/gate-config.json, and drops a committed .claude/pipeline.json pointer so
      teammates know to install the global core ($REPO_URL).
   3. Commit PIPELINE.md + .claude/, then  /brainstorm  to start a feature.
+
+Questionnaire capability (global, works anywhere — optional):
+  1. Connect Notion:  claude mcp add --transport http notion https://mcp.notion.com/mcp
+  2. Edit ~/.claude/questionnaire.config.yaml (set enabled: true + notion_database_id).
+  3. Run  /research <pdf-url> [subject]  then  /questionnaire <run-id>.
 EOF
   exit 0
 fi
 
 if [ "$mode" = "install" ]; then
   echo "→ installing pipeline core into $dest"
-  mkdir -p "$dest/agents"
-  cp "$src/core/agents/review.md" "$src/core/agents/release.md" "$dest/agents/"
+  copy_fixed_agents
   copy_core
+  seed_questionnaire_config
   mkdir -p "$target/specs"
   [ -f "$target/specs/_template.md" ] || cp "$src/core/templates/spec.template.md" "$target/specs/_template.md"
   cat <<EOF
@@ -185,7 +214,8 @@ EOF
 else
   echo "→ updating pipeline core in $dest (keeping your PIPELINE.md + rendered agents)"
   copy_core
-  cp "$src/core/agents/review.md" "$src/core/agents/release.md" "$dest/agents/" 2>/dev/null || true
+  copy_fixed_agents 2>/dev/null || true
+  seed_questionnaire_config
   bump_pointer_version "$dest/pipeline.json" "$ver"
   cat <<EOF
 

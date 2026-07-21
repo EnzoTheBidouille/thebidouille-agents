@@ -126,9 +126,34 @@ try {
         New-Item -ItemType Directory -Force -Path (Join-Path $dest 'pipeline\scripts') | Out-Null
         Copy-Item (Join-Path $src 'profile\PIPELINE.template.md') (Join-Path $dest 'pipeline') -Force
         Copy-Item (Join-Path $src 'profile\SCHEMA.md')            (Join-Path $dest 'pipeline') -Force
+        Copy-Item (Join-Path $src 'profile\questionnaire.config.template.yaml') (Join-Path $dest 'pipeline') -Force
         Copy-Item (Join-Path $src 'scripts\*.template')           (Join-Path $dest 'pipeline\scripts') -Force
         Copy-Item (Join-Path $src 'core\agents\implementer.template.md') (Join-Path $dest 'pipeline') -Force
         [System.IO.File]::WriteAllText((Join-Path $dest 'pipeline\VERSION'), "$ver`n", [System.Text.UTF8Encoding]::new($false))
+    }
+
+    # the fixed (non-rendered) agents: dev review/release + the questionnaire capability's three
+    function Copy-FixedAgents {
+        New-Item -ItemType Directory -Force -Path (Join-Path $dest 'agents') | Out-Null
+        Copy-Item (Join-Path $src 'core\agents\review.md'),
+                  (Join-Path $src 'core\agents\release.md'),
+                  (Join-Path $src 'core\agents\questionnaire-researcher.md'),
+                  (Join-Path $src 'core\agents\questionnaire-writer.md'),
+                  (Join-Path $src 'core\agents\questionnaire-validator.md') (Join-Path $dest 'agents') -Force
+    }
+
+    # questionnaire capability config is USER-level (Notion DB, runs path) — it lives in
+    # the user's .claude regardless of install scope. Seed only if no filled copy exists.
+    function Initialize-QuestionnaireConfig {
+        $userClaude = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $HOME '.claude' }
+        $qcfg = Join-Path $userClaude 'questionnaire.config.yaml'
+        if (-not (Test-Path -LiteralPath $qcfg)) {
+            New-Item -ItemType Directory -Force -Path $userClaude | Out-Null
+            Copy-Item (Join-Path $src 'profile\questionnaire.config.template.yaml') $qcfg
+            Write-Host "  - seeded $qcfg (fill it in to enable /research + /questionnaire)"
+        } else {
+            Write-Host "  - kept your existing $qcfg"
+        }
     }
 
     # Register the profile-driven gate hook in the GLOBAL settings.json. Idempotent:
@@ -187,10 +212,10 @@ try {
         } else {
             Write-Host "-> updating pipeline core GLOBALLY in $dest (keeping global settings.json)"
         }
-        New-Item -ItemType Directory -Force -Path (Join-Path $dest 'agents') | Out-Null
-        Copy-Item (Join-Path $src 'core\agents\review.md'), (Join-Path $src 'core\agents\release.md') (Join-Path $dest 'agents') -Force
+        Copy-FixedAgents
         Copy-Core
         $hookState = Register-GlobalHook
+        Initialize-QuestionnaireConfig
         Write-Host @"
 
 OK pipeline core installed globally into $dest  (version $ver)
@@ -205,15 +230,20 @@ Per repo:
      .claude/gate-config.json, and drops a committed .claude/pipeline.json pointer so
      teammates know to install the global core ($repoUrl).
   3. Commit PIPELINE.md + .claude/, then  /brainstorm  to start a feature.
+
+Questionnaire capability (global, works anywhere — optional):
+  1. Connect Notion:  claude mcp add --transport http notion https://mcp.notion.com/mcp
+  2. Edit ~/.claude/questionnaire.config.yaml (set enabled: true + notion_database_id).
+  3. Run  /research <pdf-url> [subject]  then  /questionnaire <run-id>.
 "@
         return
     }
 
     if (-not $Update) {
         Write-Host "-> installing pipeline core into $dest"
-        New-Item -ItemType Directory -Force -Path (Join-Path $dest 'agents') | Out-Null
-        Copy-Item (Join-Path $src 'core\agents\review.md'), (Join-Path $src 'core\agents\release.md') (Join-Path $dest 'agents') -Force
+        Copy-FixedAgents
         Copy-Core
+        Initialize-QuestionnaireConfig
         New-Item -ItemType Directory -Force -Path (Join-Path $Target 'specs') | Out-Null
         if (-not (Test-Path -LiteralPath (Join-Path $Target 'specs\_template.md'))) {
             Copy-Item (Join-Path $src 'core\templates\spec.template.md') (Join-Path $Target 'specs\_template.md')
@@ -234,8 +264,9 @@ Prefer one shared core across all your repos?  Re-run with  -Global.
         Write-Host "-> updating pipeline core in $dest (keeping your PIPELINE.md + rendered agents)"
         Copy-Core
         if (Test-Path -LiteralPath (Join-Path $dest 'agents')) {
-            Copy-Item (Join-Path $src 'core\agents\review.md'), (Join-Path $src 'core\agents\release.md') (Join-Path $dest 'agents') -Force
+            Copy-FixedAgents
         }
+        Initialize-QuestionnaireConfig
         Update-PointerVersion (Join-Path $dest 'pipeline.json') $ver
         Write-Host @"
 

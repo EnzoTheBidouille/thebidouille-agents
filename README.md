@@ -91,7 +91,11 @@ sh install.sh --update --global   # the shared core in ~/.claude
 ```
 
 Refreshes the generic core (commands, hook, templates) **without** touching your `PIPELINE.md`,
-rendered agents, `gate-config.json`, or `settings.json`. Re-run `/init-pipeline` if your stack changed.
+rendered agents, `gate-config.json`, `settings.json`, or your filled
+`~/.claude/questionnaire.config.yaml`. Re-run `/init-pipeline` if your stack changed.
+
+From inside Claude Code you can also just run **`/update-pipeline`** — it runs the right
+`--update` invocation for your install scope and reports `old → new` from the VERSION stamp.
 
 ## The commands
 
@@ -106,6 +110,46 @@ rendered agents, `gate-config.json`, or `settings.json`. Re-run `/init-pipeline`
 | `/audit [path]`      | Prioritized refactor backlog for existing code.                                       |
 | `/refactor <domain>` | Apply the backlog for one surface, TDD-first.                                         |
 | `/align-ds`          | Align the code UI kit to the design system (no-op if none configured).                |
+| `/update-pipeline`   | Refresh the installed core (global or bundled) from the repo's latest `main`.         |
+| `/research <pdf>`    | _Global capability._ Structure a PDF into a report + questionnaire blueprint.          |
+| `/questionnaire <id>`| _Global capability._ Write + validate the questionnaire, archive to Notion.            |
+
+## Global capability — questionnaire pipeline (PDF → survey)
+
+A **user-scoped** content-generation capability, separate from the dev flow (`/brainstorm…/ship`) and
+independent of any project's `PIPELINE.md` — its config lives in **`~/.claude/questionnaire.config.yaml`**
+(seeded by the installer, never clobbered on update) and it behaves the same in every directory. It turns
+a source PDF into a review-ready survey — never straight to production.
+
+```
+/research <pdf-url> [subject]   →   /questionnaire <run-id>
+   report.md + blueprint.json         questionnaire.json + verdict.json  →  Notion (for review)
+```
+
+- **`/research`** dispatches the read-only **researcher**: it reads the PDF and structures the domain into a
+  readable `report.md` + a conceptual `blueprint.json` — it **structures, never drafts items**, and never
+  reproduces licensed instrument text.
+- **`/questionnaire`** dispatches the **writer** (writes *original* Likert-5 items — it has no tools, so it
+  never sees the source) then the **validator** (checks format + blueprint match, loops up to 3×), and
+  archives the run to Notion **under your confirmation**. Nothing enters the survey engine until you review
+  the Notion page and mark it approved.
+
+**Enable it** by editing `~/.claude/questionnaire.config.yaml`:
+
+```yaml
+enabled: true
+notion_database_id: "<your Notion database id/URL>"
+runs_path: ~/.claude/questionnaire-runs      # runs are written here, project-independent
+engine_format: samo-surveys
+ui_language: French
+```
+
+With `enabled: false` (or the file absent), `/research` and `/questionnaire` refuse cleanly and change
+nothing. Archiving needs the Notion MCP connected:
+
+```sh
+claude mcp add --transport http notion https://mcp.notion.com/mcp
+```
 
 ## Profile reference
 
@@ -116,13 +160,16 @@ See `profile/SCHEMA.md` for every field in `PIPELINE.md` and how the pipeline us
 ```
 install.sh              # installer (fresh + --update)
 install.ps1             # same installer for Windows PowerShell (fresh + -Update)
-core/                   # copied verbatim into <project>/.claude
+core/                   # copied verbatim into <project>/.claude (or ~/.claude with --global)
   agents/               # implementer.template.md (rendered per surface) + review.md + release.md
-  commands/             # init-pipeline + the workflow commands
+                        #   + questionnaire-{researcher,writer,validator}.md (fixed capability agents)
+  commands/             # init-pipeline + the workflow commands + /update-pipeline, /research, /questionnaire
   hooks/gate.py         # profile-driven destructive-command gate
   templates/            # handoff / brainstorm-return / design-brief / review-feedback / pr-body / spec
+                        #   + questionnaire-{domain-brief,blueprint,declaration,verdict} (frozen contracts)
 profile/
   PIPELINE.template.md  # the profile skeleton /init-pipeline fills
   SCHEMA.md             # field reference
+  questionnaire.config.template.yaml  # seeds ~/.claude/questionnaire.config.yaml (global capability)
 scripts/                # new-feature / remove-feature worktree-isolation templates
 ```

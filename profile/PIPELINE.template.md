@@ -144,6 +144,10 @@ tdd:
     - "**/*.gen.*"
 ```
 
+> **Note.** The **questionnaire capability** (`/research` + `/questionnaire`) is **user-scoped** — it is
+> NOT configured here. Its facts live in `~/.claude/questionnaire.config.yaml`, read at runtime. This
+> project profile only governs the dev pipeline (`/brainstorm…/ship`).
+
 ---
 
 ## Conventions
