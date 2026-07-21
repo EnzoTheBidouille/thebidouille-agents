@@ -135,6 +135,16 @@ it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.
     workflow `publish.yml`, environment `npm-publish`.
   - _Granular access token_: npmjs.com → Access Tokens → Granular (publish permission on this
     package — bypasses 2FA) → add as the `NPM_TOKEN` repo secret on GitHub.
+- [ ] **Opt-in code-retrieval tooling at `/init-pipeline` / `/update-pipeline`** — agents spend
+      most of their wall-clock reading the repo; semantic retrieval cuts that. During the init
+      interview, offer to wire one of these as a capability flag in the project profile
+      (`/update-pipeline` asks retroactively when the flag is absent):
+  - _[Serena](https://github.com/oraios/serena)_ — LSP-based MCP server, symbol-level navigation
+    instead of whole-file reads. Light setup, good default for most repos.
+  - _[Graphify](https://graphify.net/)_ — persistent knowledge graph over code + docs, queried via
+    MCP. Heavier (indexing step); worth it on large or mixed code+docs corpora.
+  - Init would register the chosen MCP server and set the flag so agents/commands know to prefer
+    graph/symbol queries over grep-and-read.
 
 ## The commands
 
