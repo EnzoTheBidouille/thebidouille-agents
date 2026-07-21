@@ -175,6 +175,11 @@ nothing. Archiving needs the Notion MCP connected:
 claude mcp add --transport http notion https://mcp.notion.com/mcp
 ```
 
+## License
+
+[AGPL-3.0](LICENSE). Free to use, including commercially — but if you modify it and distribute it
+or offer it as a network service, you must publish your modifications under the same license.
+
 ## Profile reference
 
 See `profile/SCHEMA.md` for every field in `PIPELINE.md` and how the pipeline uses it.
