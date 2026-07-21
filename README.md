@@ -26,35 +26,46 @@ The core never hardcodes stack facts. Two mechanisms keep it generic:
 
 ## Install
 
-Two ways to place the portable core. Both end at the same `/init-pipeline`.
+The pipeline ships as an npm package (`thebidouille-agents`), so releases are semver-tagged and
+`npx` always fetches the latest published version — no clone needed, works on macOS/Linux/Windows.
+Two ways to place the portable core; both end at the same `/init-pipeline`.
 
 **Per-project** (default) — bundles the core into `<project>/.claude`, so it's committed and your
 teammates get it with the repo:
 
 ```sh
-# inside your project (or pass its path)
-sh install.sh
-# or:  curl -fsSL https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.sh | sh
-```
-
-```powershell
-# Windows (PowerShell 5.1+)
-.\install.ps1
-# or:  irm https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.ps1 | iex
+# inside your project (or pass its path as an argument)
+npx thebidouille-agents install
 ```
 
 **Global** — one core in `~/.claude`, shared by every repo on your machine (nothing copied per repo;
 the gate hook is registered once and reads each repo's own `gate-config.json`):
 
 ```sh
-sh install.sh --global
-# or:  curl -fsSL https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.sh | sh -s -- --global
+npx thebidouille-agents install --global
+```
+
+<details>
+<summary><strong>No Node/npm?</strong> The original script installers still work.</summary>
+
+```sh
+# per-project                             # global
+sh install.sh                             sh install.sh --global
+# or piped:
+curl -fsSL https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.sh | sh -s -- --global
 ```
 
 ```powershell
-.\install.ps1 -Global
-# or:  & ([scriptblock]::Create((irm https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.ps1))) -Global
+# Windows (PowerShell 5.1+)
+.\install.ps1              # or  -Global
+# or:  irm https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.ps1 | iex
 ```
+
+Script installs from a git checkout stamp the version as `<semver> (<sha>)`; the npm CLI stamps the
+published semver. Both land in `.claude/pipeline/VERSION` and the `pipeline.json` pointer.
+
+</details>
 
 Trade-off: global is leanest for a solo dev across many repos and updates everywhere at once, but all
 projects share one core version and teammates must install it themselves. In global mode `/init-pipeline`
@@ -81,21 +92,31 @@ Sanity-check `PIPELINE.md`, commit it, and run `/brainstorm`.
 ## Update
 
 ```sh
-sh install.sh --update            # per-project core in <project>/.claude
-sh install.sh --update --global   # the shared core in ~/.claude
+npx thebidouille-agents@latest update             # per-project core in <project>/.claude
+npx thebidouille-agents@latest update --global    # the shared core in ~/.claude
 ```
 
-```powershell
-.\install.ps1 -Update             # Windows equivalents
-.\install.ps1 -Update -Global
-```
+(Script equivalents: `sh install.sh --update [--global]` / `.\install.ps1 -Update [-Global]`.)
 
 Refreshes the generic core (commands, hook, templates) **without** touching your `PIPELINE.md`,
 rendered agents, `gate-config.json`, `settings.json`, or your filled
 `~/.claude/questionnaire.config.yaml`. Re-run `/init-pipeline` if your stack changed.
 
 From inside Claude Code you can also just run **`/update-pipeline`** — it runs the right
-`--update` invocation for your install scope and reports `old → new` from the VERSION stamp.
+update invocation for your install scope and reports `old → new` from the VERSION stamp.
+
+## Releasing (maintainers)
+
+Versions are tracked with npm semver — the published package is the release artifact:
+
+```sh
+npm version patch          # or minor / major — bumps package.json + creates the git tag
+git push --follow-tags
+npm publish
+```
+
+`npx thebidouille-agents@latest …` then serves the new version everywhere; installed cores record
+it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.json` pointer.
 
 ## The commands
 
@@ -158,7 +179,9 @@ See `profile/SCHEMA.md` for every field in `PIPELINE.md` and how the pipeline us
 ## Layout of this repo
 
 ```
-install.sh              # installer (fresh + --update)
+package.json            # npm package (thebidouille-agents) — semver source of truth
+bin/cli.js              # the npm CLI: install / update / version (cross-platform, no deps)
+install.sh              # script installer (fresh + --update) for no-Node environments
 install.ps1             # same installer for Windows PowerShell (fresh + -Update)
 core/                   # copied verbatim into <project>/.claude (or ~/.claude with --global)
   agents/               # implementer.template.md (rendered per surface) + review.md + release.md

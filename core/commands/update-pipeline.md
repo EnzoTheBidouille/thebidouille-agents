@@ -12,7 +12,8 @@ repo. The installer's `--update` mode never touches generated files: `PIPELINE.m
 - **Global** install ⇒ `~/.claude/pipeline/VERSION` exists. **Bundled** ⇒ this repo's
   `.claude/pipeline/VERSION` exists. (Both can exist; prefer the bundled one when running inside such a
   repo, and update both if the human wants.)
-- Read the VERSION file(s) (a short commit hash). If missing, note "unknown (pre-versioning)".
+- Read the VERSION file(s) — a semver like `0.1.0`, possibly suffixed `(abc1234)` for from-main
+  installs, or a bare commit hash on old cores. If missing, note "unknown (pre-versioning)".
 
 ## 2. Run the update
 
@@ -24,7 +25,14 @@ repo. The installer's `--update` mode never touches generated files: `PIPELINE.m
   sh <path>/install.sh --update              # bundled core of the current repo
   ```
 
-- Otherwise pull latest `main` from the published repo:
+- Otherwise use the published npm package (preferred — installs the latest tagged release):
+
+  ```sh
+  npx thebidouille-agents@latest update --global   # global core
+  npx thebidouille-agents@latest update            # bundled core of the current repo
+  ```
+
+- If npm/npx is unavailable, fall back to piping the installer from the repo's latest `main`:
 
   ```sh
   curl -fsSL https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.sh | sh -s -- --update --global

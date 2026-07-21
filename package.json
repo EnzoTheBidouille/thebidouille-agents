@@ -1,0 +1,32 @@
+{
+  "name": "thebidouille-agents",
+  "version": "0.1.0",
+  "description": "Portable, stack-agnostic multi-agent development pipeline for Claude Code — install the core, run /init-pipeline, and it adapts to your project's stack.",
+  "bin": {
+    "thebidouille-agents": "bin/cli.js"
+  },
+  "files": [
+    "bin",
+    "core",
+    "profile",
+    "scripts",
+    "install.sh",
+    "install.ps1"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EnzoTheBidouille/thebidouille-agents.git"
+  },
+  "homepage": "https://github.com/EnzoTheBidouille/thebidouille-agents#readme",
+  "author": "Enzo Viry",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "agents",
+    "pipeline",
+    "multi-agent"
+  ]
+}

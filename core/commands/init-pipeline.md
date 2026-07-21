@@ -126,9 +126,10 @@ block and get a go-ahead** before writing.
 8. **Write the pointer** `.claude/pipeline.json` (committed — this is how a teammate who clones the repo
    knows which core to install):
    `{ "pipeline": "thebidouille-agents", "mode": "<bundled|global>", "core_version": "<contents of the
-   installer's pipeline/VERSION>", "install": "<per mode: bundled ⇒ \"sh install.sh\" note that the core
-   is committed under .claude/; global ⇒ \"curl -fsSL https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.sh | sh -s -- --global\"
-   (Windows: install.ps1 -Global from the same repo)> " }`.
+   installer's pipeline/VERSION>", "install": "<per mode: bundled ⇒ \"npx thebidouille-agents install\"
+   note that the core is committed under .claude/; global ⇒ \"npx thebidouille-agents install --global\"
+   (or, without npm: curl -fsSL https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.sh | sh -s -- --global;
+   Windows: install.ps1 -Global from the same repo)> " }`.
    In **global** mode also add, near the top of `CLAUDE.md`, a one-liner:
    `> Pipeline: global core — run the installer above if /brainstorm etc. are missing.`
 9. **Design system:** if `design.enabled` with a snapshot dir, note that `/align-ds` is active; else the
