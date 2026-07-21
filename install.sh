@@ -65,8 +65,14 @@ else
 fi
 mkdir -p "$dest"
 
-# version stamp so a per-repo pointer can record which core it expects
-ver=$(git -C "$src" rev-parse --short HEAD 2>/dev/null || echo unknown)
+# version stamp so a per-repo pointer can record which core it expects:
+# the package.json semver, with the git sha for traceability on from-main installs
+semver=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$src/package.json" 2>/dev/null | head -n 1)
+sha=$(git -C "$src" rev-parse --short HEAD 2>/dev/null || true)
+if [ -n "$semver" ] && [ -n "$sha" ]; then ver="$semver ($sha)"
+elif [ -n "$semver" ]; then ver="$semver"
+else ver="${sha:-unknown}"
+fi
 
 copy_core() {
   cp -R "$src/core/commands"  "$dest/"

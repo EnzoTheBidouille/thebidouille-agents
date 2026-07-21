@@ -112,12 +112,25 @@ try {
     }
     New-Item -ItemType Directory -Force -Path $dest | Out-Null
 
-    # version stamp so a per-repo pointer can record which core it expects
-    $ver = 'unknown'
+    # version stamp so a per-repo pointer can record which core it expects:
+    # the package.json semver, with the git sha for traceability on from-main installs
+    $semver = ''
+    try {
+        $pkgPath = Join-Path $src 'package.json'
+        if (Test-Path $pkgPath) {
+            $pkgData = Get-Content -Raw $pkgPath | ConvertFrom-Json
+            if ($pkgData.version) { $semver = "$($pkgData.version)".Trim() }
+        }
+    } catch { }
+    $sha = ''
     try {
         $v = git -C $src rev-parse --short HEAD 2>$null
-        if ($LASTEXITCODE -eq 0 -and $v) { $ver = "$v".Trim() }
+        if ($LASTEXITCODE -eq 0 -and $v) { $sha = "$v".Trim() }
     } catch { }
+    if ($semver -and $sha)  { $ver = "$semver ($sha)" }
+    elseif ($semver)        { $ver = $semver }
+    elseif ($sha)           { $ver = $sha }
+    else                    { $ver = 'unknown' }
 
     function Copy-Core {
         Copy-Tree (Join-Path $src 'core\commands')  (Join-Path $dest 'commands')
