@@ -1,0 +1,81 @@
+name: Publish to npm
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+permissions:
+  contents: write # create the vX.Y.Z tag + GitHub release
+  id-token: write # npm provenance / trusted publishing (OIDC)
+
+jobs:
+  check:
+    name: Sanity check
+    runs-on: ubuntu-latest
+    outputs:
+      should-publish: ${{ steps.version.outputs.changed }}
+      version: ${{ steps.version.outputs.local }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Syntax-check CLI
+        run: node --check bin/cli.js
+
+      - name: Verify package contents
+        run: npm pack --dry-run
+
+      - name: Compare local vs published version
+        id: version
+        run: |
+          LOCAL=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm view "$(node -p "require('./package.json').name")" version 2>/dev/null || echo "none")
+          echo "local=$LOCAL" >> "$GITHUB_OUTPUT"
+          echo "published=$PUBLISHED" >> "$GITHUB_OUTPUT"
+          if [ "$LOCAL" != "$PUBLISHED" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Version $LOCAL not yet published (registry has $PUBLISHED) — will publish."
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Version $LOCAL already published — skipping."
+          fi
+
+  publish:
+    name: Publish v${{ needs.check.outputs.version }}
+    needs: check
+    if: needs.check.outputs.should-publish == 'true'
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      # npm >= 11.5.1 supports token-less "trusted publishing" via OIDC.
+      # If NPM_TOKEN is not set as a repo secret, configure a trusted
+      # publisher for this repo/workflow on npmjs.com instead.
+      - name: Publish to npm
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Tag and create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          git tag "v$VERSION" || true
+          git push origin "v$VERSION" || true
+          gh release create "v$VERSION" \
+            --title "v$VERSION" \
+            --generate-notes || true
