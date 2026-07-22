@@ -146,7 +146,11 @@ the frozen contract as the only cross-surface channel**. So specialization means
   outweighs the parallelism. When boundaries aren't clean, keep one surface.
 
 Coarse first, specialize on evidence: start with one `frontend` / `backend` surface each; split only a
-surface that's proven slow and cleanly separable.
+surface that's proven slow and cleanly separable. The evidence lives in
+`.claude/pipeline-metrics.jsonl` (gitignored) — one JSONL line per dispatched agent
+(`ts`/`feature`/`phase`/`surface`/`seconds`/`result`), appended by `/build`, `/review`, `/fix` and
+`/smoke`. Read it before proposing a split: split the surface that actually dominates wall-clock,
+not the one that feels big.
 
 ## Rendering / reconciling a surface agent (shared procedure)
 

@@ -33,3 +33,12 @@ never run migrations."
 
 Print the release agent's report: commit SHA(s), pushed branch, PR URL (or compare URL + drafted body).
 Confirm `specs/$ARGUMENTS.md` was committed as `status: shipped` (part of the release commit).
+
+## 5. After the PR — CI gate + teardown
+
+- If `host: github` and `gh` is available, watch the PR's checks (`gh pr checks <url> --watch`) and
+  report the result — the human merges only on green. A red check ⇒ back to `/fix $ARGUMENTS`.
+- Once the human confirms the PR is **merged**: if `isolation.enabled`, propose the teardown —
+  `scripts/remove-feature.sh $ARGUMENTS` (add `--drop-db` to also drop the feature db; kept by
+  default). It removes the worktree, deletes the merged branch, frees the slot. Never run it before
+  the merge is confirmed, and only with the human's go-ahead (the gate will ask anyway).

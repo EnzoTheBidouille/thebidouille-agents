@@ -52,6 +52,10 @@ the human's choices — so `/init-pipeline` never needs re-running for an upgrad
 Re-read the VERSION file(s) and print `old → new`. If unchanged, say the core was already up to date.
 For a bundled repo, note that `.claude/pipeline.json`'s `core_version` was bumped and should be committed.
 
+Then print **What's new**: read the installed `<core>/pipeline/CHANGELOG.md` and show the entries
+between the old and new versions (most recent first). File absent ⇒ the old core predates 0.1.14 —
+skip silently.
+
 ## 3.5 Reconcile this repo's generated files
 
 Only when the current repo has a `PIPELINE.md`: run the **Reconcile procedure** from the installed

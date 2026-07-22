@@ -33,12 +33,18 @@ slowest surface, not the sum. A diff touching a single surface ⇒ a single revi
 > the REVIEW REPORT per `.claude/templates/review-feedback.md` — every finding self-sufficient
 > (`file:line` · severity · type · concrete fix)."
 
+Note the epoch (`date +%s`) just before dispatching — §3's metrics lines need the wall-clock.
+
 ## 3. Merge & relay the verdict
 
 Merge the returned reports into **one** REVIEW REPORT (same template): findings concatenated and
 re-ordered by severity, counts summed, duplicates collapsed, verdict = the worst returned
-(`BLOCK` > `REVISE` > `SHIP`). Print it. Then:
+(`BLOCK` > `REVISE` > `SHIP`). Append one line per reviewer to `.claude/pipeline-metrics.jsonl`
+(gitignored): `{"ts":"<ISO>","feature":"$ARGUMENTS","phase":"review","surface":"<key>","seconds":<wall-clock>,"result":"<verdict>:<finding count>"}`.
+Print the report. Then:
 
 - **SHIP** → tell the human they can `/ship`.
-- **REVISE / BLOCK**, or any finding of any severity → tell the human to paste the report into `/spec`
-  (it appends to `## Remediation`), then `/build $ARGUMENTS` to re-dispatch fresh agents.
+- **REVISE / BLOCK**, or any finding of any severity → tell the human to run **`/fix $ARGUMENTS`** —
+  it appends the report to the spec's `## Remediation` and re-dispatches ONLY the surfaces with
+  findings. The full path (`/spec` Mode B then `/build`) remains for findings that change the
+  contract in ways that ripple into clean surfaces.

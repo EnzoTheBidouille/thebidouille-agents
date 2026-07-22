@@ -15,7 +15,7 @@ Two independent tracks ship with it:
   **stateless agents** that only communicate through a frozen contract:
 
   ```
-  /brainstorm → /spec → (design) → /build <id> → test → /review → /ship
+  /brainstorm → /spec → (design) → /build <id> → /smoke → /review → (/fix) → /ship
   ```
 
 - **The research capability** (optional, user-scoped) — `/research` turns a source PDF into an
@@ -163,12 +163,15 @@ it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.
 | `/brainstorm`        | Interactive persona panel that pressure-tests a feature idea.                         |
 | `/spec`              | Freeze the feature spec + contract into `specs/<id>.md`. Also applies review returns. |
 | `/build <id>`        | Lead authors the contract, then dispatches one implementer per surface in parallel.   |
-| `/review <id>`       | Read-only review agent audits the diff against the frozen spec.                       |
-| `/ship <id>`         | Release agent commits, pushes, opens the PR (with your confirmation).                 |
+| `/smoke <id>`        | Run the feature for real: infra up, contract endpoints, UI flows, design conformance. |
+| `/review <id>`       | Read-only review agents (one per touched surface, parallel) audit the diff vs the spec. |
+| `/fix <id>`          | Apply a review/smoke report: remediation into the spec, re-dispatch only the surfaces with findings. |
+| `/ship <id>`         | Release agent commits, pushes, opens the PR; watches CI; proposes worktree teardown.  |
 | `/audit [path]`      | Prioritized refactor backlog for existing code.                                       |
 | `/refactor <domain>` | Apply the backlog for one surface, TDD-first.                                         |
 | `/align-ds`          | Align the code UI kit to the design system (no-op if none configured).                |
 | `/update-pipeline`   | Refresh the installed core (global or bundled) to the latest published version.       |
+| `/doctor`            | Diagnose the installation (core, agents↔surfaces, hooks, gate, retrieval, worktrees). |
 | `/research <pdf>`    | _Global capability._ Deep-research a PDF (URL or local file) into a standalone report, archived in Notion. |
 | `/questionnaire <id>`| _Global capability._ Optional: derive + write + validate a survey from a research run's Notion page. |
 

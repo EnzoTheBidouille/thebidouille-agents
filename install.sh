@@ -84,6 +84,7 @@ copy_core() {
   cp "$src/profile/questionnaire.config.template.yaml" "$dest/pipeline/"
   cp "$src"/scripts/*.template           "$dest/pipeline/scripts/"
   cp "$src/core/agents/implementer.template.md" "$dest/pipeline/"
+  [ -f "$src/CHANGELOG.md" ] && cp "$src/CHANGELOG.md" "$dest/pipeline/"
   printf '%s\n' "$ver" > "$dest/pipeline/VERSION"
   chmod +x "$dest/hooks/gate.py" 2>/dev/null || true
   scrub_tdd_gate
