@@ -4,11 +4,18 @@
 # overwritten on update). Read at runtime by the GLOBAL commands /research and /questionnaire.
 # No dependency on any project's PIPELINE.md — works the same in every directory.
 #
-# NOTHING IS STORED LOCALLY: each run lives entirely as a page in the Notion database.
-# Connect Notion first:  claude mcp add --transport http notion https://mcp.notion.com/mcp
+# Each run lives entirely as ONE page in the chosen store — nothing else is stored locally.
+#   store: notion   ⇒ a page in a Notion database. Connect Notion first:
+#                     claude mcp add --transport http notion https://mcp.notion.com/mcp
+#   store: obsidian ⇒ a markdown note in your local vault. No MCP, no service — just set
+#                     obsidian_vault_path below.
 
 enabled: false                              # flip to true to activate /research + /questionnaire
 
+# Where runs are archived: notion | obsidian. Missing/empty ⇒ notion (back-compat).
+store: notion
+
+# ── notion store ────────────────────────────────────────────────────────────
 # The Notion database archiving each run. LEAVE EMPTY: it is CREATED AUTOMATICALLY on the
 # first /research (schema: Sujet · Cadre · Statut Recherche/À relire/Bloqué/Approuvé · Date ·
 # Run ID) and its id is written back here. Only fill it to reuse an existing database.
@@ -17,6 +24,15 @@ notion_database_id: ""
 # Optional: the Notion page under which the auto-created database is placed.
 # Empty ⇒ created as a workspace-level private page (you can move it afterwards).
 notion_parent_page_id: ""
+
+# ── obsidian store ──────────────────────────────────────────────────────────
+# Absolute path to your vault (the folder you open in Obsidian). Asked once on the first
+# /research if empty, then written back here.
+obsidian_vault_path: ""
+
+# Folder inside the vault where run notes live (created if missing). Source PDFs are copied
+# to <folder>/_sources/ for provenance.
+obsidian_folder: "Questionnaires"
 
 # Label of YOUR target survey-engine format (passed to the writer/validator as context).
 engine_format: generic

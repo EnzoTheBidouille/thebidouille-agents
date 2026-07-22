@@ -3,6 +3,15 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 0.1.15 — 2026-07-22
+
+- **Obsidian store for research runs** — the research/questionnaire capability gains a `store:`
+  switch in `~/.claude/questionnaire.config.yaml`: `notion` (default, unchanged) or `obsidian` —
+  each run becomes a markdown note in `<vault>/<obsidian_folder>/` with frontmatter properties
+  (`run_id`, `sujet`, `cadre`, `statut`, `date`), source PDFs copied to `_sources/` for provenance.
+  No MCP needed; the vault path is asked once on first `/research`, then saved. Old Notion runs stay
+  readable — pass their URL to `/questionnaire`.
+
 ## 0.1.14 — 2026-07-22
 
 - **`/fix`** — scoped fix loop: appends a REVIEW REPORT (or `/smoke` failures) to the spec's
