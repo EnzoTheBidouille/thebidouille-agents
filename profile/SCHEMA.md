@@ -90,12 +90,15 @@ follow is provider-agnostic: _"prefer the retrieval MCP tools over Grep/Glob + w
   ENOENT and agents silently fall back to Grep/Read:
 
   ```sh
-  claude mcp add --scope project serena -- sh -c 'exec "$(command -v serena || echo "$HOME/.local/bin/serena")" start-mcp-server --context claude-code --project-from-cwd'
+  claude mcp add --scope project serena -- sh -c 'exec "$(command -v serena || echo "$HOME/.local/bin/serena")" start-mcp-server --context claude-code --project-from-cwd --open-web-dashboard False'
   ```
 
   (Windows-native teams: no `sh` — register the bare `serena` form instead and ensure the uv tools
-  dir is on PATH.) Gitignore `.serena/` (per-machine cache/config). Optionally pre-index large
-  repos once: `serena project index`.
+  dir is on PATH; keep the `--open-web-dashboard False` flag.) `--open-web-dashboard False` keeps the
+  dashboard available (reachable at `http://localhost:24282/dashboard/`) but stops it popping a browser
+  tab on every server start — the flag overrides the machine's `serena_config.yml`, so the behaviour is
+  the same for everyone on the repo. Gitignore `.serena/` (per-machine cache/config). Optionally
+  pre-index large repos once: `serena project index`.
 - `graphify` — requires `uv tool install graphify` + `graphify install`; build the initial graph
   (`/graphify .`) and rescan incrementally after big changes (`--update`). See graphify.net.
 - Rendered agents get the provider's MCP tools appended to their `tools:` list (e.g. `mcp__serena`
@@ -108,7 +111,8 @@ reconcile (wiring that worked once can rot: PATH changes, tool uninstalled, entr
    above; missing entirely ⇒ reinstall.
 2. **Registered:** this repo's `.mcp.json` has the `serena` entry ⇒ else re-run the `claude mcp add`.
    If the entry is the bare `serena` form on a POSIX machine, upgrade it to the PATH-proof launcher
-   above (immune to launch-environment PATH gaps).
+   above (immune to launch-environment PATH gaps). If a launcher entry predates the
+   `--open-web-dashboard False` flag, append it so the dashboard no longer auto-opens a browser tab.
 3. **Gitignored:** `.serena/` is in `.gitignore` ⇒ else append it.
 4. **Actually connected:** the `mcp__serena` tools are exposed in the session (or `claude mcp list`
    shows serena connected). If 1–3 pass but this fails, a session restart is needed — say so
