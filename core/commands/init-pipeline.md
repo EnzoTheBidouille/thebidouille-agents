@@ -164,7 +164,15 @@ conventions, no narration, no facts derivable from the code. **Show the human th
    Windows: install.ps1 -Global from the same repo)> " }`.
    In **global** mode also add, near the top of `CLAUDE.md`, a one-liner:
    `> Pipeline: global core — run the installer above if /brainstorm etc. are missing.`
-10. **Design system:** if `design.enabled` with a snapshot dir, note that `/align-ds` is active; else the
+10. **CI workflow** (if `vcs.host: github` and no existing workflow already runs the profile's
+    checks): with the human's go-ahead, generate `.github/workflows/pipeline-ci.yml` — on
+    `pull_request` to `<default_branch>`: checkout, set up the `package_manager` toolchain,
+    `commands.install`, then `commands.lint` · `commands.typecheck` · `commands.test` (+ per-surface
+    `build_cmd`s that are non-empty). Derive the setup steps from the detected stack — mirror what a
+    sibling workflow does if one exists. `/ship` watches these checks before the merge.
+11. **Metrics sink:** add `.claude/pipeline-metrics.jsonl` to `.gitignore` — `/build`, `/review`,
+    `/fix` and `/smoke` append per-dispatch evidence there (SCHEMA §Specialization reads it).
+12. **Design system:** if `design.enabled` with a snapshot dir, note that `/align-ds` is active; else the
     `/align-ds` command will no-op with a clear message.
 
 ## Phase 5 — Report

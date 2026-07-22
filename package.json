@@ -11,7 +11,8 @@
     "profile",
     "scripts",
     "install.sh",
-    "install.ps1"
+    "install.ps1",
+    "CHANGELOG.md"
   ],
   "engines": {
     "node": ">=18"

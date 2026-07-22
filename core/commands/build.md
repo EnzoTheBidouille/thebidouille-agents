@@ -60,7 +60,8 @@ the reconciled `surfaces` list from §1.5 (existing + any just-rendered). Give E
 agent needs — re-supply everything every time, as **exact file paths** (spec, contract, the surface's
 tree), never "find the relevant files". Keep the dispatch prompt **structurally identical across
 dispatches and fix loops** (same template below, only the variable parts change) so repeated dispatches
-hit the prompt cache. For each surface in `surfaces`:
+hit the prompt cache. Note the epoch (`date +%s`) just before dispatching — §4's metrics line needs
+the batch wall-clock. For each surface in `surfaces`:
 
 > `subagent_type: <surface.agent>` — "Implement the **<surface.key>** surface for feature `$ARGUMENTS`.
 > Read `PIPELINE.md` first. Spec: `specs/$ARGUMENTS.md`. Contract: `<contract.path>/$ARGUMENTS.<ext>`
@@ -71,6 +72,11 @@ hit the prompt cache. For each surface in `surfaces`:
 
 ## 4. Integrate
 
-When all return, summarize their handoffs, flag any contract mismatch reported, and tell the human to
-test (bring up infra if any, run migrations, `commands.dev`, smoke-test across surfaces), then `/review`.
-Do not run the app or migrations yourself unless asked — the human holds the test gate.
+When all return, summarize their handoffs and flag any contract mismatch reported. Append **one line
+per dispatched agent** to `.claude/pipeline-metrics.jsonl` (create it if absent; it must be
+gitignored):
+`{"ts":"<ISO date>","feature":"$ARGUMENTS","phase":"build","surface":"<key>","seconds":<batch wall-clock>,"result":"ok|error"}`
+— this is the evidence SCHEMA.md §Specialization asks for before splitting a surface.
+Then tell the human: run `/smoke $ARGUMENTS` to exercise the feature end-to-end (or test by hand),
+then `/review $ARGUMENTS`. Do not run the app or migrations yourself here — `/smoke` is the
+sanctioned path for that.
