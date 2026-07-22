@@ -145,6 +145,31 @@ this exact procedure so a surface is always defined the same way. To add surface
 Removing/merging a surface is the reverse: drop the `surfaces[]` entry, delete its agent file, fold its
 conventions. Never leave an agent file with no matching `surfaces[]` entry (orphan) or vice-versa.
 
+## Reconcile — bringing generated files up to the current core
+
+`/init-pipeline` is **one-time per project**. Afterwards, `/update-pipeline` runs this procedure so a
+core upgrade never requires re-running init — new pipeline features flow into the repo's generated
+files automatically. It works because every generated artifact is a **deterministic function of
+(current template × the profile's data)**; nothing needs re-detecting or re-interviewing.
+
+1. **Profile top-up.** Diff `PIPELINE.md`'s machine block against the current
+   `pipeline/PIPELINE.template.md`: every block/field the template has and the profile lacks is added
+   with its documented default (e.g. `surfaces[].model: inherit`, `retrieval.provider: serena`).
+   **Ask only when a new field is a genuine human decision** (batch into ONE question set); never
+   change a value the profile already sets; never rewrite the prose sections.
+2. **Re-render agent frontmatter + body.** For each `surfaces[]` entry, re-render
+   `.claude/agents/<agent>.md` from the current `implementer.template.md` per §Rendering above. Safe by
+   doctrine: rendered agents are regenerable artifacts — hand-written rules belong in `PIPELINE.md`
+   §Conventions (which reconcile never touches), NOT in agent files, where they'd be clobbered here.
+3. **Additive settings patch.** Bring `.claude/settings.json` + `gate-config.json` up to the current
+   init spec (missing `allow` entries, hooks per install mode) — add what's missing, never remove or
+   rewrite existing/custom keys.
+4. **Capability wiring.** If a top-up added a capability needing external setup (e.g. a `retrieval`
+   provider whose MCP server isn't registered yet), run its wiring step from `/init-pipeline` Phase 4.
+
+Re-running `/init-pipeline` remains possible (it reconciles too) but is only *needed* when the stack
+itself changes in ways `/build` §1.5 can't auto-grow (e.g. package manager or contract mechanism swap).
+
 ## Global capability — research → (optional) questionnaire
 
 A **user-scoped** track, separate from the dev flow and NOT configured in `PIPELINE.md`. Its facts live

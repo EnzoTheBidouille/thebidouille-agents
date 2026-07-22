@@ -129,12 +129,16 @@ npx thebidouille-agents@latest update             # a repo's bundled core in <pr
 
 (Script equivalents: `sh install.sh --update [--global]` / `.\install.ps1 -Update [-Global]`.)
 
-Refreshes the generic core (commands, hook, templates) **without** touching your `PIPELINE.md`,
-rendered agents, `gate-config.json`, `settings.json`, or your filled
-`~/.claude/questionnaire.config.yaml`. Re-run `/init-pipeline` if your stack changed.
+The installer refreshes the generic core (commands, hook, templates) **without** touching your
+`PIPELINE.md`, rendered agents, `gate-config.json`, `settings.json`, or your filled
+`~/.claude/questionnaire.config.yaml`.
 
-From inside Claude Code you can also just run **`/update-pipeline`** — it runs the right
-update invocation for your install scope and reports `old → new` from the VERSION stamp.
+From inside Claude Code, prefer **`/update-pipeline`**: it runs the right update invocation for your
+install scope, reports `old → new` — and then **reconciles the repo's generated files to the new
+core**: new profile fields are added at their defaults (you're only asked for genuinely new
+decisions), surface agents are re-rendered, settings are patched additively, new capabilities get
+wired. **`/init-pipeline` is one-time per project** — after init, `/update-pipeline` is the only
+maintenance command you ever run (`/build` auto-grows surfaces as specs need them).
 
 ## Releasing (maintainers)
 
