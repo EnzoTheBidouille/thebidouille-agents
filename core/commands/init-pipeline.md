@@ -133,7 +133,8 @@ conventions, no narration, no facts derivable from the code. **Show the human th
      it later. Then register at **project scope** (committed `.mcp.json`, portable — `--project-from-cwd`
      resolves the project at server start): `claude mcp add --scope project serena -- serena
      start-mcp-server --context claude-code --project-from-cwd`. Skip registration if `.mcp.json`
-     already has a `serena` entry. On a large repo, offer the one-off `serena project index`.
+     already has a `serena` entry. Add `.serena/` to the repo's `.gitignore` (per-machine cache/config
+     Serena creates on first launch). On a large repo, offer the one-off `serena project index`.
    - **graphify:** have the human install it (`uv tool install graphify` then `graphify install`),
      build the initial graph (`/graphify .`), and note it needs incremental rescans (`--update`) after
      big changes.

@@ -84,7 +84,8 @@ follow is provider-agnostic: _"prefer the retrieval MCP tools over Grep/Glob + w
   **project scope** so the registration is committed and portable (`--project-from-cwd` resolves the
   project at server start, so the committed entry works on every machine):
   `claude mcp add --scope project serena -- serena start-mcp-server --context claude-code --project-from-cwd`.
-  Optionally pre-index large repos once: `serena project index`.
+  Gitignore `.serena/` (per-machine cache/config). Optionally pre-index large repos once:
+  `serena project index`.
 - `graphify` — requires `uv tool install graphify` + `graphify install`; build the initial graph
   (`/graphify .`) and rescan incrementally after big changes (`--update`). See graphify.net.
 - Rendered agents get the provider's MCP tools appended to their `tools:` list (e.g. `mcp__serena`
