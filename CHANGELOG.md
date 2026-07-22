@@ -3,6 +3,14 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 0.1.17 — 2026-07-22
+
+- **Serena dashboard no longer auto-opens** — the per-repo Serena launcher `/init-pipeline` wires now
+  passes `--open-web-dashboard False`. The dashboard stays available (`http://localhost:24282/dashboard/`)
+  but no longer pops a browser tab on every server start. The flag overrides each machine's
+  `serena_config.yml`, so behaviour is uniform across the team; `/update-pipeline`'s health check appends
+  the flag to launcher entries that predate it.
+
 ## 0.1.16 — 2026-07-22
 
 - **Obsidian store: research and questionnaires split** — research notes land in
