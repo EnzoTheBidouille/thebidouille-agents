@@ -24,6 +24,7 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
 | `surfaces[].label`                   | string       | build, init (`<SURFACE_LABEL>`)   | Human label + framework, e.g. `frontend (React)`.            |
 | `surfaces[].agent`                   | string       | build (`subagent_type`)           | Rendered agent file name.                                     |
 | `surfaces[].tools`                   | list         | init                              | Frontmatter `tools:` for the rendered agent.                  |
+| `surfaces[].model`                   | enum         | init (`<SURFACE_MODEL>`)          | Frontmatter `model:` tier — `inherit`/`sonnet`/`haiku`. `haiku` for mechanical surfaces; default `inherit`. |
 | `surfaces[].*_cmd`                   | string       | implementer                       | test/lint/format/typecheck/build commands.                    |
 | `surfaces[].uses_design`             | bool         | build, frontend                   | Whether this surface consumes designs.                        |
 | `contract.enabled`                   | bool         | build                             | `false` ⇒ skip contract authoring (§2 of /build).             |
@@ -46,10 +47,6 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
 | `isolation.compose_file` `.registry` | path         | new-feature script                | Docker stack + slot registry.                                 |
 | `gate.deny[]`                        | list         | hooks/gate.py, settings           | Command substrings hard-denied.                               |
 | `gate.ask[]`                         | list         | hooks/gate.py, settings           | Command substrings that require confirm.                      |
-| `tdd.enforce`                        | bool         | hooks/tdd_gate.py                 | Opt-in TDD gate; `false` ⇒ hook is silent. Default `false`.   |
-| `tdd.prod_exts[]`                    | list         | hooks/tdd_gate.py                 | File extensions treated as production code to gate.           |
-| `tdd.test_roots[]`                   | list         | hooks/tdd_gate.py                 | Dirs searched for an existing test (surface paths); [] ⇒ repo.|
-| `tdd.skip_globs[]`                   | list         | hooks/tdd_gate.py                 | Globs never gated (`*.d.ts`, migrations, config, generated).  |
 
 ## Prose sections
 
@@ -65,9 +62,6 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
 - **Commands** (`/build`, `/review`, …) parse the `yaml pipeline-profile` block to know how
   many surfaces to dispatch, the contract mechanism, the commands, and the capability flags.
 - **Hook** (`gate.py`) reads `gate.deny`/`gate.ask` from a generated `.claude/gate-config.json`.
-- **Hook** (`tdd_gate.py`, opt-in) reads the `tdd` block from the same `.claude/gate-config.json`:
-  on Write/Edit of a `prod_exts` file with no discoverable test, it emits a confirm (`ask`), never a
-  hard deny. Silent unless `tdd.enforce: true`.
 - **Scripts** (`new-feature.sh`) read the `isolation` block (rendered in at init).
 
 ## Specialization — when to split one surface into more agents
@@ -105,13 +99,15 @@ this exact procedure so a surface is always defined the same way. To add surface
 
 1. **Add the `surfaces[]` entry** to `PIPELINE.md`: `key`, `path` (the disjoint tree it exclusively
    owns), `label`, `agent` (rendered file name), `tools` (add `DesignSync` only if `uses_design: true`),
-   the five `*_cmd`s (derive from the surface's `package.json` / workspace filter, mirroring a sibling
-   surface), and `uses_design`.
+   `model` (tier for the rendered agent: `haiku` when the surface's work is mechanical — scaffolding,
+   applying a frozen contract to a well-trodden stack; `inherit` (default) or `sonnet` when it makes
+   real design decisions), the five `*_cmd`s (derive from the surface's `package.json` / workspace
+   filter, mirroring a sibling surface), and `uses_design`.
 2. **Render the agent file** `.claude/agents/<agent>.md` from `pipeline/implementer.template.md`
    (resolve bundled `.claude/` vs global `~/.claude/`), substituting `<SURFACE_AGENT>`, `<SURFACE_LABEL>`,
-   `<SURFACE_PATH>`, `<SURFACE_TOOLS>`, `<PROJECT_NAME>`, and the surface-specific blocks
-   (`<SURFACE_EXTRA_NEVER>`, `<SURFACE_DESIGN_INPUT>`, `<SURFACE_TDD_STEP1>` — fill the design ones only
-   when `uses_design`).
+   `<SURFACE_PATH>`, `<SURFACE_TOOLS>`, `<SURFACE_MODEL>`, `<PROJECT_NAME>`, and the surface-specific
+   blocks (`<SURFACE_EXTRA_NEVER>`, `<SURFACE_DESIGN_INPUT>`, `<SURFACE_TDD_STEP1>` — fill the design
+   ones only when `uses_design`).
 3. **Add a §Conventions + §Testing stanza** for `S` in `PIPELINE.md` (mirror a sibling surface; keep it
    rule-shaped). If `S` is a shared-code surface, its convention is "single owner of shared X; slices
    consume, never redefine."

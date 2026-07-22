@@ -143,6 +143,33 @@ try {
         Copy-Item (Join-Path $src 'scripts\*.template')           (Join-Path $dest 'pipeline\scripts') -Force
         Copy-Item (Join-Path $src 'core\agents\implementer.template.md') (Join-Path $dest 'pipeline') -Force
         [System.IO.File]::WriteAllText((Join-Path $dest 'pipeline\VERSION'), "$ver`n", [System.Text.UTF8Encoding]::new($false))
+        Clear-TddGate
+    }
+
+    # The TDD gate was removed in 0.1.6. Older installs have hooks\tdd_gate.py on disk and
+    # possibly registered in settings.json (by the sh/npm installers) — copy-over never deletes,
+    # and a registered hook whose file is gone errors on every Write/Edit, so scrub both.
+    function Clear-TddGate {
+        Remove-Item -LiteralPath (Join-Path $dest 'hooks\tdd_gate.py') -Force -ErrorAction SilentlyContinue
+        $settingsPath = Join-Path $dest 'settings.json'
+        $data = Read-JsonFile $settingsPath
+        if ($data -is [pscustomobject] -and $data.PSObject.Properties['hooks'] -and
+            $data.hooks.PSObject.Properties['PreToolUse']) {
+            $kept = @()
+            $dropped = $false
+            foreach ($entry in @($data.hooks.PreToolUse)) {
+                $isTdd = $false
+                foreach ($h in @($entry.hooks)) {
+                    if ($h -and $h.command -and "$($h.command)".Trim().TrimEnd('"').EndsWith('tdd_gate.py')) { $isTdd = $true }
+                }
+                if ($isTdd) { $dropped = $true } else { $kept += $entry }
+            }
+            if ($dropped) {
+                $data.hooks.PreToolUse = $kept
+                Write-JsonFile $settingsPath $data
+                Write-Host "  - removed the retired tdd_gate.py hook (file + settings registration)"
+            }
+        }
     }
 
     # the fixed (non-rendered) agents: dev review/release + the questionnaire capability's three

@@ -108,7 +108,9 @@ design system), **interviews** you for the gaps, and **generates**:
 
 - `PIPELINE.md` — the project profile (a machine-readable `pipeline-profile` YAML block + prose conventions)
 - one implementer agent per **surface** (e.g. `backend.md`, `frontend.md`) with strict tree ownership
-- `.claude/gate-config.json` + `.claude/settings.json` — the destructive-command gate
+  and a per-surface `model:` tier (Haiku for mechanical surfaces, bigger models where design decisions live)
+- `.claude/gate-config.json` + `.claude/settings.json` — the destructive-command gate, plus an
+  `allow` list of the project's read-only commands so agents don't stall on permission prompts
 - `scripts/new-feature.sh` + `remove-feature.sh` — parallel worktree isolation (if you enable it)
 - `specs/_template.md`
 
@@ -157,19 +159,6 @@ it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.
     MCP. Heavier (indexing step); worth it on large or mixed code+docs corpora.
   - Init would register the chosen MCP server and set the flag so agents/commands know to prefer
     graph/symbol queries over grep-and-read.
-- [ ] **Agent speed pass** — the other levers behind slow agent runs, orthogonal to retrieval:
-  - _Parallel dispatch_: audit `/build` (and `/refactor`) so the per-surface implementers are
-    launched concurrently (one message, multiple Agent calls — worktree isolation if they touch
-    overlapping files), not serially.
-  - _Model tier per agent_: add `model:` to rendered agent frontmatter — Haiku for mechanical
-    stages (scaffolding, applying a frozen contract), the big models only for spec/design/review.
-  - _Permission allowlist at init_: have `/init-pipeline` seed `.claude/settings.json` with the
-    project's read-only commands (or point users at `/fewer-permission-prompts`) — waiting on
-    permission prompts is a big share of perceived slowness.
-  - _Lean, cache-stable context_: keep `PIPELINE.md` short (stateless agents re-read it every
-    dispatch) and agent prompts stable so repeated dispatches hit the prompt cache; pass exact
-    file paths to agents instead of making them search.
-  - _Hooks for the mechanical_: format/lint via PostToolUse hooks instead of agent turns.
 
 ## The commands
 
@@ -251,7 +240,7 @@ core/                   # copied verbatim into ~/.claude (global) or <project>/.
   agents/               # implementer.template.md (rendered per surface) + review.md + release.md
                         #   + questionnaire-{researcher,writer,validator}.md (fixed capability agents)
   commands/             # init-pipeline + the workflow commands + /update-pipeline, /research, /questionnaire
-  hooks/                # gate.py (destructive-command gate) + tdd_gate.py (opt-in TDD gate)
+  hooks/                # gate.py (destructive-command gate)
   templates/            # handoff / brainstorm-return / design-brief / review-feedback / pr-body / spec
                         #   + questionnaire-{domain-brief,blueprint,declaration,verdict} (frozen contracts)
 profile/

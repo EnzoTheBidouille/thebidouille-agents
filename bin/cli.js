@@ -86,9 +86,27 @@ function copyCore() {
                   path.join(pipelineDir, 'implementer.template.md'));
   fs.writeFileSync(path.join(pipelineDir, 'VERSION'), VERSION + '\n');
   if (process.platform !== 'win32') {
-    for (const h of ['gate.py', 'tdd_gate.py']) {
-      try { fs.chmodSync(path.join(dest, 'hooks', h), 0o755); } catch { /* optional */ }
-    }
+    try { fs.chmodSync(path.join(dest, 'hooks', 'gate.py'), 0o755); } catch { /* optional */ }
+  }
+  scrubTddGate();
+}
+
+// The TDD gate was removed in 0.1.6. Older installs have hooks/tdd_gate.py on disk and
+// registered in settings.json — copy-over never deletes, and a registered hook whose file
+// is gone errors on every Write/Edit, so scrub both.
+function scrubTddGate() {
+  fs.rmSync(path.join(dest, 'hooks', 'tdd_gate.py'), { force: true });
+  const settingsPath = path.join(dest, 'settings.json');
+  let data;
+  try { data = JSON.parse(fs.readFileSync(settingsPath, 'utf8')); } catch { return; }
+  const pre = data && data.hooks && Array.isArray(data.hooks.PreToolUse) ? data.hooks.PreToolUse : null;
+  if (!pre) return;
+  const kept = pre.filter(entry => !(entry.hooks || []).some(
+    h => typeof h.command === 'string' && h.command.trim().endsWith('tdd_gate.py')));
+  if (kept.length !== pre.length) {
+    data.hooks.PreToolUse = kept;
+    fs.writeFileSync(settingsPath, JSON.stringify(data, null, 2) + '\n');
+    console.log('  · removed the retired tdd_gate.py hook (file + settings registration)');
   }
 }
 
@@ -123,9 +141,9 @@ function findPython() {
   return null;
 }
 
-// Register the profile-driven hooks in the GLOBAL settings.json. Idempotent: each
-// hook reads each repo's own .claude/gate-config.json (and no-ops where absent /
-// where tdd.enforce is off), so one registration serves every project.
+// Register the profile-driven gate hook in the GLOBAL settings.json. Idempotent: the
+// hook reads each repo's own .claude/gate-config.json (and no-ops where absent),
+// so one registration serves every project.
 function registerGlobalHook() {
   const python = findPython();
   if (!python) return 'skipped (no python found — register the gate hook manually)';
@@ -140,7 +158,6 @@ function registerGlobalHook() {
   const pre = data.hooks.PreToolUse;
   const hooks = [
     { file: path.join(dest, 'hooks', 'gate.py'), matcher: 'Bash' },
-    { file: path.join(dest, 'hooks', 'tdd_gate.py'), matcher: 'Write|Edit|MultiEdit' },
   ];
   for (const { file, matcher } of hooks) {
     const base = path.basename(file);

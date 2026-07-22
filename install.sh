@@ -85,7 +85,37 @@ copy_core() {
   cp "$src"/scripts/*.template           "$dest/pipeline/scripts/"
   cp "$src/core/agents/implementer.template.md" "$dest/pipeline/"
   printf '%s\n' "$ver" > "$dest/pipeline/VERSION"
-  chmod +x "$dest/hooks/gate.py" "$dest/hooks/tdd_gate.py" 2>/dev/null || true
+  chmod +x "$dest/hooks/gate.py" 2>/dev/null || true
+  scrub_tdd_gate
+}
+
+# The TDD gate was removed in 0.1.6. Older installs have hooks/tdd_gate.py on disk and
+# registered in settings.json — copy-over never deletes, and a registered hook whose file
+# is gone errors on every Write/Edit, so scrub both.
+scrub_tdd_gate() {
+  rm -f "$dest/hooks/tdd_gate.py"
+  [ -f "$dest/settings.json" ] || return 0
+  command -v python3 >/dev/null 2>&1 || return 0
+  python3 - "$dest/settings.json" <<'PY'
+import json, sys
+settings = sys.argv[1]
+try:
+    with open(settings) as fh:
+        data = json.load(fh)
+except Exception:
+    sys.exit(0)
+pre = data.get("hooks", {}).get("PreToolUse")
+if not isinstance(pre, list):
+    sys.exit(0)
+kept = [e for e in pre if not any(
+    h.get("command", "").strip().endswith("tdd_gate.py") for h in e.get("hooks", []))]
+if len(kept) != len(pre):
+    data["hooks"]["PreToolUse"] = kept
+    with open(settings, "w") as fh:
+        json.dump(data, fh, indent=2)
+        fh.write("\n")
+    print("  · removed the retired tdd_gate.py hook (file + settings registration)")
+PY
 }
 
 # the fixed (non-rendered) agents: dev review/release + the questionnaire capability's three
@@ -111,15 +141,15 @@ seed_questionnaire_config() {
   fi
 }
 
-# Register the profile-driven hooks in the GLOBAL settings.json. Idempotent: each
-# hook reads each repo's own .claude/gate-config.json (and no-ops where absent /
-# where tdd.enforce is off), so one registration serves every project.
+# Register the profile-driven gate hook in the GLOBAL settings.json. Idempotent: the
+# hook reads each repo's own .claude/gate-config.json (and no-ops where absent),
+# so one registration serves every project.
 register_global_hook() {
-  python3 - "$dest/settings.json" "$dest/hooks/gate.py" "$dest/hooks/tdd_gate.py" <<'PY'
+  python3 - "$dest/settings.json" "$dest/hooks/gate.py" <<'PY'
 import json, sys
-settings, gate, tdd = sys.argv[1], sys.argv[2], sys.argv[3]
+settings, gate = sys.argv[1], sys.argv[2]
 # (hook path, PreToolUse matcher)
-hooks = [(gate, "Bash"), (tdd, "Write|Edit|MultiEdit")]
+hooks = [(gate, "Bash")]
 try:
     with open(settings) as fh:
         data = json.load(fh)
