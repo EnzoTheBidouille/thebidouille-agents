@@ -16,8 +16,11 @@ You are the **lead**. Build feature **$ARGUMENTS** from its frozen spec.
 - Read `specs/$ARGUMENTS.md`. If missing or `status` not `frozen`/`in-review`, stop — tell the human to
   run `/spec` first.
 - **Design gate** — only if `design.enabled` and the feature has UI (some surface `uses_design`): if the
-  spec front-matter `design_files` is empty, ask the human for the feature's design page link(s), extract
-  the file name(s) into `design_files`, then continue. Skip if the feature is backend-only / no UI.
+  spec front-matter `design_files` is empty, ask the human for the feature's design page link(s) and
+  store them in `design_files`, then continue. Then **resolve the feature's design project**: a full
+  link carries its own project — extract the project id from the URL (it wins over the profile);
+  a bare file name falls back to `design.design_project`. If neither yields a project, ask the human.
+  Skip if the feature is backend-only / no UI.
 - If this is a fix loop (`## Remediation` has unchecked items), note them — they go to every agent.
 
 ## 1.5 Reconcile surfaces — auto-grow / specialize agents
@@ -62,7 +65,8 @@ hit the prompt cache. For each surface in `surfaces`:
 > `subagent_type: <surface.agent>` — "Implement the **<surface.key>** surface for feature `$ARGUMENTS`.
 > Read `PIPELINE.md` first. Spec: `specs/$ARGUMENTS.md`. Contract: `<contract.path>/$ARGUMENTS.<ext>`
 > (import read-only). Work test-first. Touch only `<surface.path>`. [If a `uses_design` surface: design
-> > files = the spec's `design_files` in `design_project`; build mobile-first.] [If fix loop: address the
+> > files = the spec's `design_files` in project `<resolved design project id>` (from §1's design gate);
+> > build mobile-first.] [If fix loop: address the
 > > `## Remediation` items; current diff: …]. Return the handoff per `.claude/templates/agent-handoff.md`."
 
 ## 4. Integrate
