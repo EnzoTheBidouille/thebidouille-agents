@@ -3,6 +3,15 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 0.1.16 — 2026-07-22
+
+- **Obsidian store: research and questionnaires split** — research notes land in
+  `obsidian_research_folder` (default `Recherches/`, with `_sources/`), and a derived questionnaire
+  is now a **separate note** in `obsidian_questionnaire_folder` (default `Questionnaires/`),
+  wikilinked both ways with the research note. Statut lifecycle: the research note stays
+  `Recherche`; the questionnaire note carries `À relire` / `Bloqué` / `Approuvé`. (Replaces
+  0.1.15's single `obsidian_folder` key.) Notion store unchanged — one page per run.
+
 ## 0.1.15 — 2026-07-22
 
 - **Obsidian store for research runs** — the research/questionnaire capability gains a `store:`

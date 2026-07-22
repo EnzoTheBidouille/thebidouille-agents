@@ -6,13 +6,16 @@ argument-hint: <run-id-or-page-url>
 You are the **orchestrator** of the questionnaire derivation: turning an existing **research run** (the
 page produced by `/research` in the configured store) into a validated, engine-format questionnaire —
 only because the human asked for one; research runs are valuable without this step. You read the
-research from the store, hold intermediate artifacts in conversation memory, and write results back to
-the **same page**. **Nothing here reaches production** — the human reviews the page and flips the
-Statut to « Approuvé » before anything enters the survey engine.
+research from the store, hold intermediate artifacts in conversation memory, and write the result back
+to the store — notion: the **same page**; obsidian: a **separate questionnaire note wikilinked to the
+research note** (research and questionnaires live in distinct folders). **Nothing here reaches
+production** — the human reviews the result and flips the Statut to « Approuvé » before anything
+enters the survey engine.
 
 > **First action, always:** read **`~/.claude/questionnaire.config.yaml`**. If missing or `enabled` is
 > not `true`, **stop** and say how to enable. Otherwise note `store` (missing/empty ⇒ `notion`), its
-> store-specific keys (`notion_database_id`, or `obsidian_vault_path` + `obsidian_folder`),
+> store-specific keys (`notion_database_id`, or `obsidian_vault_path` +
+> `obsidian_research_folder`/`obsidian_questionnaire_folder`),
 > `engine_format`, `ui_language`. If the store was never set up (empty `notion_database_id` / empty
 > `obsidian_vault_path`), there is no research to derive from: tell the human to run `/research` first.
 
@@ -24,11 +27,12 @@ Resolve `$ARGUMENTS`:
   Notion runs stay readable after a switch to obsidian);
 - a **run-id** ⇒ notion: find the page in `notion_database_id` whose **Run ID** property matches
   (query the data source, or fetch the database and scan); obsidian: the note in
-  `<vault>/<obsidian_folder>/` whose frontmatter `run_id` matches (Grep, then Read).
+  `<vault>/<obsidian_research_folder>/` whose frontmatter `run_id` matches (Grep, then Read).
 
 If nothing is found, **stop**: tell the human to run `/research <pdf> [subject]` first. Read the page:
-the research report (body) and its properties/frontmatter. If it already contains a `# Questionnaire`
-section, ask before superseding it.
+the research report (body) and its properties/frontmatter. If a questionnaire already exists for the
+run (notion: a `# Questionnaire` section on the page; obsidian: a note
+`<obsidian_questionnaire_folder>/<run-id>.md`), ask before superseding it.
 
 ## 2. Derive the blueprint — dispatch `questionnaire-researcher` in BLUEPRINT mode
 
@@ -67,17 +71,28 @@ If `status: "fail"`, re-dispatch the **writer** with the `errors[]` inlined and 
 rounds total**. Still `fail` after 3 ⇒ keep the last versions, the Statut will be **« Bloqué »**, and
 flag it to the human.
 
-## 5. Complete the run's page — CONFIRM FIRST
+## 5. Write the questionnaire to the store — CONFIRM FIRST
 
-**Ask the human to confirm** the write. On yes, **update the research page** (never create a
-duplicate): append a `# Questionnaire` section with `blueprint.json`, `questionnaire.json`, and
-`verdict.json` as fenced code blocks, and flip **Statut** → `« À relire »` (pass) or `« Bloqué »`
-(fail after 3) — notion: the Statut property; obsidian: the note's frontmatter `statut` (Edit — body
-appended, frontmatter updated, nothing else touched). If the human declines, print the questionnaire
-JSON in the conversation and stop — no fallback location.
+**Ask the human to confirm** the write. On yes:
+
+- **notion** — **update the research page** (never create a duplicate): append a `# Questionnaire`
+  section with `blueprint.json`, `questionnaire.json`, and `verdict.json` as fenced code blocks, and
+  flip the **Statut** property → `« À relire »` (pass) or `« Bloqué »` (fail after 3).
+- **obsidian** — write a **separate note** `<vault>/<obsidian_questionnaire_folder>/<run-id>.md`
+  (superseding it only after the §1 confirmation): YAML frontmatter `run_id` · `sujet` ·
+  `statut: À relire` (pass) or `Bloqué` (fail after 3) · `date` (today) ·
+  `recherche: "[[<obsidian_research_folder>/<run-id>]]"` · `tags: [questionnaire]`; body = a
+  wikilink line to the research note, then `blueprint.json`, `questionnaire.json`, `verdict.json` as
+  fenced code blocks. Then add `questionnaire: "[[<obsidian_questionnaire_folder>/<run-id>]]"` to
+  the **research note's** frontmatter (Edit — frontmatter only, body untouched; its `statut` stays
+  `Recherche`).
+
+If the human declines, print the questionnaire JSON in the conversation and stop — no fallback
+location.
 
 ## 6. Report
 
 Print: run-id, subject, item/dimension counts, validation status (pass / blocked after N rounds), and
-the page (notion: link; obsidian: note path + `obsidian://` URI). Remind the human: nothing enters
-`<engine_format>` until they review the page and move the Statut to **« Approuvé »**.
+the result (notion: page link; obsidian: questionnaire note path + `obsidian://` URI). Remind the
+human: nothing enters `<engine_format>` until they review it and move the Statut (notion: the page
+property; obsidian: the questionnaire note's frontmatter) to **« Approuvé »**.
