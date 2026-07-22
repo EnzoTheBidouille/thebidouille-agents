@@ -131,13 +131,15 @@ conventions, no narration, no facts derivable from the code. **Show the human th
 6. **Wire the retrieval provider** (skip if `retrieval.provider: none`):
    - **serena:** if the `serena` CLI is missing, have the human install it (`uv tool install -p 3.13
      serena-agent`) — or set the provider to `none` if they decline, and say `/update-pipeline` can wire
-     it later. If the binary exists (e.g. `~/.local/bin/serena`) but `command -v serena` fails, fix
-     PATH first (`uv tool update-shell`, or add `~/.local/bin` to the shell profile) — the committed
-     `.mcp.json` launches the bare `serena` command, so an unresolvable PATH means the server
-     silently never starts. Then register at **project scope** (committed `.mcp.json`, portable —
-     `--project-from-cwd` resolves the project at server start): `claude mcp add --scope project
-     serena -- serena start-mcp-server --context claude-code --project-from-cwd`. Skip registration
-     if `.mcp.json` already has a `serena` entry. Add `.serena/` to the repo's `.gitignore`
+     it later. If the binary exists (e.g. `~/.local/bin/serena`) but `command -v serena` fails,
+     recommend the PATH fix (`uv tool update-shell`, or add `~/.local/bin` to the shell profile) for
+     CLI use. Then register at **project scope** (committed `.mcp.json`, portable —
+     `--project-from-cwd` resolves the project at server start) using the **PATH-proof launcher**
+     from SCHEMA.md §Code retrieval (`sh -c 'exec "$(command -v serena || echo
+     "$HOME/.local/bin/serena")" start-mcp-server …'` — a bare `serena` entry dies with ENOENT when
+     Claude Code was launched from an environment without `~/.local/bin` on PATH; Windows-native
+     teams use the bare form + PATH instead). If `.mcp.json` already has a bare `serena` entry,
+     upgrade it to the launcher form rather than skipping. Add `.serena/` to the repo's `.gitignore`
      (per-machine cache/config Serena creates on first launch). On a large repo, offer the one-off
      `serena project index`. Finish with the **health check** from SCHEMA.md §Code retrieval and
      report each result — if the static checks pass but the server isn't connected in this session,
