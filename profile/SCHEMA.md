@@ -80,9 +80,14 @@ follow is provider-agnostic: _"prefer the retrieval MCP tools over Grep/Glob + w
 
 **Wiring (done by `/init-pipeline`, or `/update-pipeline` retroactively):**
 
-- `serena` — requires the `serena` CLI (`uv tool install -p 3.13 serena-agent`). Register at
-  **project scope** so the registration is committed and portable (`--project-from-cwd` resolves the
-  project at server start, so the committed entry works on every machine):
+- `serena` — requires the `serena` CLI (`uv tool install -p 3.13 serena-agent`) **resolvable from
+  PATH**: the committed `.mcp.json` entry launches the bare command `serena`, so if the environment
+  Claude Code starts from can't resolve it, the server silently never starts. uv installs to
+  `~/.local/bin` — when `command -v serena` fails but `~/.local/bin/serena` exists, the fix is PATH,
+  not a reinstall (`uv tool update-shell`, or add `~/.local/bin` to the shell profile, then restart
+  the terminal). Register at **project scope** so the registration is committed and portable
+  (`--project-from-cwd` resolves the project at server start, so the committed entry works on every
+  machine):
   `claude mcp add --scope project serena -- serena start-mcp-server --context claude-code --project-from-cwd`.
   Gitignore `.serena/` (per-machine cache/config). Optionally pre-index large repos once:
   `serena project index`.
@@ -91,8 +96,22 @@ follow is provider-agnostic: _"prefer the retrieval MCP tools over Grep/Glob + w
 - Rendered agents get the provider's MCP tools appended to their `tools:` list (e.g. `mcp__serena`
   grants the whole server); `none` ⇒ nothing appended.
 
-Teammates cloning the repo get the committed `.mcp.json` and only need the provider CLI installed —
-if it's missing, the MCP server fails to start and agents silently fall back to Grep/Read.
+**Serena health check** — run after wiring in `/init-pipeline` AND on every `/update-pipeline`
+reconcile (wiring that worked once can rot: PATH changes, tool uninstalled, entry hand-edited):
+
+1. **CLI resolves:** `command -v serena`. Fails but `~/.local/bin/serena` exists ⇒ PATH repair
+   above; missing entirely ⇒ reinstall.
+2. **Registered:** this repo's `.mcp.json` has the `serena` entry ⇒ else re-run the `claude mcp add`.
+3. **Gitignored:** `.serena/` is in `.gitignore` ⇒ else append it.
+4. **Actually connected:** the `mcp__serena` tools are exposed in the session (or `claude mcp list`
+   shows serena connected). If 1–3 pass but this fails, a session restart is needed — say so
+   explicitly instead of reporting success.
+
+Report each check's result; never report Serena "wired" on registration alone.
+
+Teammates cloning the repo get the committed `.mcp.json` and only need the provider CLI installed
+and on PATH — if either is missing, the MCP server fails to start and agents silently fall back to
+Grep/Read; the health check above is the diagnostic.
 
 ## Specialization — when to split one surface into more agents
 
@@ -167,6 +186,8 @@ files automatically. It works because every generated artifact is a **determinis
    rewrite existing/custom keys.
 4. **Capability wiring.** If a top-up added a capability needing external setup (e.g. a `retrieval`
    provider whose MCP server isn't registered yet), run its wiring step from `/init-pipeline` Phase 4.
+   Even when nothing new was added, re-run the provider's health check (§Code retrieval) — wiring
+   rots (PATH changes, uninstalls, hand-edits) — and repair whatever fails.
 
 Re-running `/init-pipeline` remains possible (it reconciles too) but is only *needed* when the stack
 itself changes in ways `/build` §1.5 can't auto-grow (e.g. package manager or contract mechanism swap).

@@ -220,6 +220,11 @@ Per repo:
      teammates know to install the global core ($REPO_URL).
   3. Commit PIPELINE.md + .claude/, then  /brainstorm  to start a feature.
 
+Code retrieval (Serena — the default provider /init-pipeline wires per repo):
+  uv tool install -p 3.13 serena-agent   # once per machine
+  Make sure ~/.local/bin is on PATH (uv tool update-shell) — otherwise the
+  registered MCP server silently fails to start.
+
 Research / questionnaire capability (global, works anywhere — optional):
   1. Connect Notion:  claude mcp add --transport http notion https://mcp.notion.com/mcp
   2. Set  enabled: true  in ~/.claude/questionnaire.config.yaml — that's all: the Notion
@@ -245,6 +250,11 @@ Next:
   2. Run  /init-pipeline   — it detects your stack, asks the gaps, and generates
      PIPELINE.md + renders one implementer agent per surface.
   3. Commit PIPELINE.md, then  /brainstorm  to start a feature.
+
+Code retrieval (Serena — the default provider /init-pipeline wires per repo):
+  uv tool install -p 3.13 serena-agent   # once per machine
+  Make sure ~/.local/bin is on PATH (uv tool update-shell) — otherwise the
+  registered MCP server silently fails to start.
 
 Prefer one shared core across all your repos?  Re-run with  --global.
 EOF

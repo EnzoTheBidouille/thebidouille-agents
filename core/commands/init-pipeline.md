@@ -45,9 +45,10 @@ Gather evidence, then summarize what you found. Look for:
   `golang-migrate`), a `docker-compose.yml`, DB service.
 - **Design system:** an existing `design-reference/` snapshot, `components/ui`, a DesignSync MCP
   connection, Figma links, or none.
-- **Code retrieval:** is the `serena` CLI on PATH (`serena --version`)? `graphify`? Is either already
-  registered in this repo's `.mcp.json` or `claude mcp list`? (Feeds the retrieval question + Phase 4
-  wiring — default provider is `serena`.)
+- **Code retrieval:** is the `serena` CLI resolvable (`command -v serena`)? If not, does
+  `~/.local/bin/serena` exist anyway — installed but PATH-broken (see SCHEMA.md §Code retrieval)?
+  `graphify`? Is either already registered in this repo's `.mcp.json` or `claude mcp list`? (Feeds
+  the retrieval question + Phase 4 wiring — default provider is `serena`.)
 - **VCS:** `git remote -v` → host + `owner/repo`; the default branch (`git symbolic-ref refs/remotes/origin/HEAD` or `git branch`).
 - **Existing `CLAUDE.md`** — read it; it may already state stack/conventions to fold in. **Existing
   `PIPELINE.md`** — if present, this is a re-run: load it as the starting draft and only reconcile deltas.
@@ -130,11 +131,17 @@ conventions, no narration, no facts derivable from the code. **Show the human th
 6. **Wire the retrieval provider** (skip if `retrieval.provider: none`):
    - **serena:** if the `serena` CLI is missing, have the human install it (`uv tool install -p 3.13
      serena-agent`) — or set the provider to `none` if they decline, and say `/update-pipeline` can wire
-     it later. Then register at **project scope** (committed `.mcp.json`, portable — `--project-from-cwd`
-     resolves the project at server start): `claude mcp add --scope project serena -- serena
-     start-mcp-server --context claude-code --project-from-cwd`. Skip registration if `.mcp.json`
-     already has a `serena` entry. Add `.serena/` to the repo's `.gitignore` (per-machine cache/config
-     Serena creates on first launch). On a large repo, offer the one-off `serena project index`.
+     it later. If the binary exists (e.g. `~/.local/bin/serena`) but `command -v serena` fails, fix
+     PATH first (`uv tool update-shell`, or add `~/.local/bin` to the shell profile) — the committed
+     `.mcp.json` launches the bare `serena` command, so an unresolvable PATH means the server
+     silently never starts. Then register at **project scope** (committed `.mcp.json`, portable —
+     `--project-from-cwd` resolves the project at server start): `claude mcp add --scope project
+     serena -- serena start-mcp-server --context claude-code --project-from-cwd`. Skip registration
+     if `.mcp.json` already has a `serena` entry. Add `.serena/` to the repo's `.gitignore`
+     (per-machine cache/config Serena creates on first launch). On a large repo, offer the one-off
+     `serena project index`. Finish with the **health check** from SCHEMA.md §Code retrieval and
+     report each result — if the static checks pass but the server isn't connected in this session,
+     say a session restart is needed; never report Serena wired on registration alone.
    - **graphify:** have the human install it (`uv tool install graphify` then `graphify install`),
      build the initial graph (`/graphify .`), and note it needs incremental rescans (`--update`) after
      big changes.

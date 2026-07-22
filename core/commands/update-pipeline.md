@@ -59,8 +59,11 @@ Only when the current repo has a `PIPELINE.md`: run the **Reconcile procedure** 
 (one batched question set for any genuinely new human decision, e.g. choosing a `retrieval` provider),
 re-render the surface agents from the current `implementer.template.md`, additively patch
 `settings.json`/`gate-config.json`, and run any newly-added capability's wiring (e.g. Serena's
-project-scope `claude mcp add`). Report what was reconciled; if nothing was missing, say so. This is
-why `/init-pipeline` never needs re-running for a core upgrade.
+project-scope `claude mcp add`). Even when no capability is new, **re-run the retrieval provider's
+health check** (SCHEMA.md §Code retrieval: CLI resolvable from PATH, `.mcp.json` entry present,
+`.serena/` gitignored, server actually connected) and repair whatever fails — wiring that worked at
+init can rot (PATH changes, uninstalls, hand-edits). Report what was reconciled; if nothing was
+missing, say so. This is why `/init-pipeline` never needs re-running for a core upgrade.
 
 ## 4. Tell the human the follow-ups
 
