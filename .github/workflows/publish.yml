@@ -47,6 +47,18 @@ jobs:
             echo "Version $LOCAL already published — skipping."
           fi
 
+      - name: Require a CHANGELOG entry for the new version
+        if: steps.version.outputs.changed == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.local }}
+        run: |
+          if grep -qE "^## ${VERSION//./\\.}( |$)" CHANGELOG.md; then
+            echo "CHANGELOG.md has an entry for $VERSION."
+          else
+            echo "::error file=CHANGELOG.md::Missing '## $VERSION — <date>' section. Add the What's-new entry (shown by /update-pipeline) before releasing."
+            exit 1
+          fi
+
   publish:
     name: Publish v${{ needs.check.outputs.version }}
     needs: check
