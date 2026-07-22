@@ -14,6 +14,10 @@ the human's choices — so `/init-pipeline` never needs re-running for an upgrad
 - **Global** install ⇒ `~/.claude/pipeline/VERSION` exists. **Bundled** ⇒ this repo's
   `.claude/pipeline/VERSION` exists. (Both can exist; prefer the bundled one when running inside such a
   repo, and update both if the human wants.)
+- **Never migrate a repo between bundled and global mode on your own.** Updating means refreshing the
+  core *in its current mode*. Only migrate (e.g. delete a bundled core in favor of the global one) if
+  the human explicitly asks — and confirm before deleting anything, since it rewrites the repo's
+  committed `.claude/` and the `pipeline.json` pointer teammates rely on.
 - Read the VERSION file(s) — a semver like `0.1.0`, possibly suffixed `(abc1234)` for from-main
   installs, or a bare commit hash on old cores. If missing, note "unknown (pre-versioning)".
 
