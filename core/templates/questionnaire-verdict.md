@@ -1,7 +1,8 @@
 # CONTRACT — verdict · `<run-id>`
 
 > Frozen contract: `questionnaire-validator`'s output. Held in memory by `/questionnaire` and archived
-> in the run's Notion page. Drives the writer↔validator fix loop (max 3 rounds) and the Notion Statut. JSON.
+> in the run's page (Notion or Obsidian, per the config `store`). Drives the writer↔validator fix loop
+> (max 3 rounds) and the run's Statut. JSON.
 
 ```json
 {
@@ -21,4 +22,4 @@ Semantics:
   can fix it blindly on the next loop.
 - `questionnaire` echoes the exact document validated — the validator never edits it.
 - **Loop:** on `fail`, `/questionnaire` re-dispatches the writer with these `errors[]`, then re-validates —
-  up to **3 rounds**. Still `fail` after 3 ⇒ the run is archived with Notion status **« Bloqué »**.
+  up to **3 rounds**. Still `fail` after 3 ⇒ the run is archived with Statut **« Bloqué »**.

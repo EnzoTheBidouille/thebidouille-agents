@@ -3,7 +3,7 @@
 > Frozen contract between `questionnaire-researcher` (mode blueprint, author) and `questionnaire-writer` +
 > `questionnaire-validator` (consumers). The **conceptual skeleton** of the questionnaire — constructs and
 > guidance, **never items**. Derived by `/questionnaire` from the run's research report (the researcher's
-> `===BLUEPRINT.JSON===` block), held in memory and archived in the run's Notion page. JSON, not prose.
+> `===BLUEPRINT.JSON===` block), held in memory and archived in the run's page (Notion or Obsidian, per the config `store`). JSON, not prose.
 
 ```json
 {

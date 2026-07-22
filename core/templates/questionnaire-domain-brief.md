@@ -2,7 +2,7 @@
 
 > Frozen contract: the **input** to `questionnaire-researcher` (mode research). Authored by `/research`
 > from the command args (source + optional subject) — held in memory, inlined into the dispatch, and
-> archived in the run's Notion page (nothing is stored locally). Fields below; JSON, not prose.
+> archived in the run's page — Notion or Obsidian, per the config `store` (nothing is stored elsewhere). Fields below; JSON, not prose.
 
 ```json
 {

@@ -1,28 +1,34 @@
 ---
-description: (Global capability) OPTIONAL second step after /research — derive a conceptual blueprint from a research run's Notion page, write an ORIGINAL Likert questionnaire in the engine format, validate it, and complete the same Notion page. Nothing is stored locally.
-argument-hint: <run-id-or-notion-url>
+description: (Global capability) OPTIONAL second step after /research — derive a conceptual blueprint from a research run's archived page (Notion or Obsidian), write an ORIGINAL Likert questionnaire in the engine format, validate it, and complete the same page. Nothing is stored outside the store.
+argument-hint: <run-id-or-page-url>
 ---
 
-You are the **orchestrator** of the questionnaire derivation: turning an existing **research run** (a
-Notion page produced by `/research`) into a validated, engine-format questionnaire — only because the
-human asked for one; research runs are valuable without this step. **Nothing is written to local
-disk** — you read the research from Notion, hold intermediate artifacts in conversation memory, and
-write results back to the same Notion page. **Nothing here reaches production** — the human reviews in
-Notion and flips the Statut to « Approuvé » before anything enters the survey engine.
+You are the **orchestrator** of the questionnaire derivation: turning an existing **research run** (the
+page produced by `/research` in the configured store) into a validated, engine-format questionnaire —
+only because the human asked for one; research runs are valuable without this step. You read the
+research from the store, hold intermediate artifacts in conversation memory, and write results back to
+the **same page**. **Nothing here reaches production** — the human reviews the page and flips the
+Statut to « Approuvé » before anything enters the survey engine.
 
 > **First action, always:** read **`~/.claude/questionnaire.config.yaml`**. If missing or `enabled` is
-> not `true`, **stop** and say how to enable. Otherwise note `notion_database_id`,
-> `notion_parent_page_id`, `engine_format`, `ui_language`. If `notion_database_id` is empty, run the
-> same Notion auto-setup as `/research` §0 — though with no database there is no research to derive
-> from: tell the human to run `/research` first.
+> not `true`, **stop** and say how to enable. Otherwise note `store` (missing/empty ⇒ `notion`), its
+> store-specific keys (`notion_database_id`, or `obsidian_vault_path` + `obsidian_folder`),
+> `engine_format`, `ui_language`. If the store was never set up (empty `notion_database_id` / empty
+> `obsidian_vault_path`), there is no research to derive from: tell the human to run `/research` first.
 
-## 1. Load the research from Notion
+## 1. Load the research from the store
 
-Resolve `$ARGUMENTS`: a Notion URL ⇒ fetch it directly; a run-id ⇒ find the page in
-`notion_database_id` whose **Run ID** property matches (query the data source, or fetch the database
-and scan). If no page is found, **stop**: tell the human to run `/research <pdf> [subject]` first.
-Read the page: the research report (body) and its properties. If the page already contains a
-questionnaire section, ask before superseding it.
+Resolve `$ARGUMENTS`:
+
+- a **Notion URL** ⇒ fetch that page directly via the Notion MCP (works regardless of `store` — old
+  Notion runs stay readable after a switch to obsidian);
+- a **run-id** ⇒ notion: find the page in `notion_database_id` whose **Run ID** property matches
+  (query the data source, or fetch the database and scan); obsidian: the note in
+  `<vault>/<obsidian_folder>/` whose frontmatter `run_id` matches (Grep, then Read).
+
+If nothing is found, **stop**: tell the human to run `/research <pdf> [subject]` first. Read the page:
+the research report (body) and its properties/frontmatter. If it already contains a `# Questionnaire`
+section, ask before superseding it.
 
 ## 2. Derive the blueprint — dispatch `questionnaire-researcher` in BLUEPRINT mode
 
@@ -61,16 +67,17 @@ If `status: "fail"`, re-dispatch the **writer** with the `errors[]` inlined and 
 rounds total**. Still `fail` after 3 ⇒ keep the last versions, the Statut will be **« Bloqué »**, and
 flag it to the human.
 
-## 5. Complete the Notion page — CONFIRM FIRST
+## 5. Complete the run's page — CONFIRM FIRST
 
-**Ask the human to confirm** the Notion write. On yes, **update the research page** (never create a
+**Ask the human to confirm** the write. On yes, **update the research page** (never create a
 duplicate): append a `# Questionnaire` section with `blueprint.json`, `questionnaire.json`, and
 `verdict.json` as fenced code blocks, and flip **Statut** → `« À relire »` (pass) or `« Bloqué »`
-(fail after 3). If the human declines, print the questionnaire JSON in the conversation and stop — no
-local fallback.
+(fail after 3) — notion: the Statut property; obsidian: the note's frontmatter `statut` (Edit — body
+appended, frontmatter updated, nothing else touched). If the human declines, print the questionnaire
+JSON in the conversation and stop — no fallback location.
 
 ## 6. Report
 
 Print: run-id, subject, item/dimension counts, validation status (pass / blocked after N rounds), and
-the Notion page link. Remind the human: nothing enters `<engine_format>` until they review the page and
-move the Statut to **« Approuvé »**.
+the page (notion: link; obsidian: note path + `obsidian://` URI). Remind the human: nothing enters
+`<engine_format>` until they review the page and move the Statut to **« Approuvé »**.

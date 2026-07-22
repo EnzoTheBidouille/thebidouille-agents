@@ -172,32 +172,33 @@ it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.
 | `/align-ds`          | Align the code UI kit to the design system (no-op if none configured).                |
 | `/update-pipeline`   | Refresh the installed core (global or bundled) to the latest published version.       |
 | `/doctor`            | Diagnose the installation (core, agents↔surfaces, hooks, gate, retrieval, worktrees). |
-| `/research <pdf>`    | _Global capability._ Deep-research a PDF (URL or local file) into a standalone report, archived in Notion. |
-| `/questionnaire <id>`| _Global capability._ Optional: derive + write + validate a survey from a research run's Notion page. |
+| `/research <pdf>`    | _Global capability._ Deep-research a PDF (URL or local file) into a standalone report, archived in Notion or Obsidian. |
+| `/questionnaire <id>`| _Global capability._ Optional: derive + write + validate a survey from a research run's archived page. |
 
 ## Global capability — research → (optional) questionnaire
 
 A **user-scoped** capability, separate from the dev flow (`/brainstorm…/ship`) and independent of any
 project's `PIPELINE.md` — its config lives in **`~/.claude/questionnaire.config.yaml`** (seeded by the
-installer, never clobbered on update) and it behaves the same in every directory. **Nothing is stored
-locally: the Notion page IS the run.**
+installer, never clobbered on update) and it behaves the same in every directory. **The archived page
+IS the run** — a page in a Notion database, or a markdown note in your Obsidian vault, per the
+config's `store:` (Notion is the default; Obsidian needs no MCP, just `obsidian_vault_path`).
 
 ```
 /research <pdf-url-or-path> [subject]        →   (optional)  /questionnaire <run-id>
    standalone research report                       blueprint + ORIGINAL Likert-5 survey + verdict
-   → Notion page (Statut « Recherche »)             → same Notion page (« À relire » / « Bloqué »)
+   → archived page (Statut « Recherche »)           → same page (« À relire » / « Bloqué »)
 ```
 
 - **`/research`** is genuine research, valuable on its own: the read-only **researcher** reads the PDF —
   **a URL, or a local file** (pass a path to skip CAPTCHAs/paywalls entirely) — and produces a standalone
   research report (state of the art, domain analysis, debates, licences, open questions, sources). It
-  **never drafts items** and never reproduces licensed instrument text. The report lands in Notion
+  **never drafts items** and never reproduces licensed instrument text. The report lands in the store
   (under your confirmation) as a page with Statut « Recherche »; a local source file is attached to the
-  page for provenance.
+  page (Notion) or copied to the vault's `_sources/` (Obsidian) for provenance.
 - **`/questionnaire`** exists only if you want a survey out of a research run: it derives a conceptual
   **blueprint** from the report (researcher, blueprint mode), dispatches the **writer** (*original*
   Likert-5 items — no tools, so it never sees the source or the report) then the **validator** (loops up
-  to 3×), and **completes the same Notion page** (blueprint + questionnaire + verdict, Statut flipped)
+  to 3×), and **completes the same page** (blueprint + questionnaire + verdict, Statut flipped)
   **under your confirmation**. Nothing enters the survey engine until you review the page and mark it
   « Approuvé ».
 
@@ -205,11 +206,13 @@ locally: the Notion page IS the run.**
 
 ```yaml
 enabled: true          # that's all — the Notion database is auto-created on the first /research
+# store: obsidian     # …or archive to your vault instead (obsidian_vault_path asked once, then saved)
 ```
 
 (`notion_database_id` is filled back automatically; set `notion_parent_page_id` beforehand if you want
-the database created under a specific page. `engine_format` and `ui_language` default to
-`generic` / `French`.)
+the database created under a specific page. With `store: obsidian`, runs live as notes in
+`<vault>/Questionnaires/` with frontmatter properties, and old Notion runs stay readable — pass their
+URL to `/questionnaire`. `engine_format` and `ui_language` default to `generic` / `French`.)
 
 With `enabled: false` (or the file absent), `/research` and `/questionnaire` refuse cleanly and change
 nothing. The capability requires the Notion MCP (it is the storage):

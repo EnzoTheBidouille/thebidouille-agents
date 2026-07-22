@@ -227,9 +227,11 @@ Code retrieval (Serena — the default provider /init-pipeline wires per repo):
   registered MCP server silently fails to start.
 
 Research / questionnaire capability (global, works anywhere — optional):
-  1. Connect Notion:  claude mcp add --transport http notion https://mcp.notion.com/mcp
-  2. Set  enabled: true  in ~/.claude/questionnaire.config.yaml — that's all: the Notion
-     database is CREATED AUTOMATICALLY on the first run (nothing is stored locally).
+  1. Set  enabled: true  in ~/.claude/questionnaire.config.yaml.
+  2. Pick the store there: notion (default — connect it first:
+     claude mcp add --transport http notion https://mcp.notion.com/mcp ; the database is
+     CREATED AUTOMATICALLY on the first run) or  store: obsidian  (no MCP — runs are
+     markdown notes in your vault; the vault path is asked once, then saved).
   3. Run  /research <pdf-url-or-file> [subject]  — then optionally  /questionnaire <run-id>.
 EOF
   exit 0
