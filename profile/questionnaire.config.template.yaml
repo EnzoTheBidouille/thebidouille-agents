@@ -30,9 +30,11 @@ notion_parent_page_id: ""
 # /research if empty, then written back here.
 obsidian_vault_path: ""
 
-# Folder inside the vault where run notes live (created if missing). Source PDFs are copied
-# to <folder>/_sources/ for provenance.
-obsidian_folder: "Questionnaires"
+# Two folders inside the vault (created if missing): research notes in one, questionnaire
+# notes in the other — a derived questionnaire is a SEPARATE note wikilinked to its research
+# note, never appended to it. Source PDFs are copied to <research folder>/_sources/.
+obsidian_research_folder: "Recherches"
+obsidian_questionnaire_folder: "Questionnaires"
 
 # Label of YOUR target survey-engine format (passed to the writer/validator as context).
 engine_format: generic

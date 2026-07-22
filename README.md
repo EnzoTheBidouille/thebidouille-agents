@@ -210,9 +210,11 @@ enabled: true          # that's all — the Notion database is auto-created on t
 ```
 
 (`notion_database_id` is filled back automatically; set `notion_parent_page_id` beforehand if you want
-the database created under a specific page. With `store: obsidian`, runs live as notes in
-`<vault>/Questionnaires/` with frontmatter properties, and old Notion runs stay readable — pass their
-URL to `/questionnaire`. `engine_format` and `ui_language` default to `generic` / `French`.)
+the database created under a specific page. With `store: obsidian`, research notes live in
+`<vault>/Recherches/` and derived questionnaires as separate wikilinked notes in
+`<vault>/Questionnaires/` (both frontmatter-tagged, folders configurable), and old Notion runs stay
+readable — pass their URL to `/questionnaire`. `engine_format` and `ui_language` default to
+`generic` / `French`.)
 
 With `enabled: false` (or the file absent), `/research` and `/questionnaire` refuse cleanly and change
 nothing. The capability requires the Notion MCP (it is the storage):

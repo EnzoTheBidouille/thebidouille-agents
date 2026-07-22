@@ -12,7 +12,8 @@ run's storage** — you hold artifacts in conversation memory and write nothing 
 > **First action, always:** read **`~/.claude/questionnaire.config.yaml`** (the global capability
 > config). If it's missing or `enabled` is not `true`, **stop**: tell the human to set `enabled: true`
 > in that file. Otherwise note `store` (missing/empty ⇒ `notion`), its store-specific keys
-> (`notion_database_id` + `notion_parent_page_id`, or `obsidian_vault_path` + `obsidian_folder`),
+> (`notion_database_id` + `notion_parent_page_id`, or `obsidian_vault_path` +
+> `obsidian_research_folder`/`obsidian_questionnaire_folder`),
 > `engine_format`, `ui_language`.
 
 ## 0. Store auto-setup (first run only)
@@ -26,8 +27,9 @@ run's storage** — you hold artifacts in conversation memory and write nothing 
   `claude mcp add --transport http notion https://mcp.notion.com/mcp`.
 - **`store: obsidian`** — if `obsidian_vault_path` is empty, ask the human for their vault path and
   **write it back into the config**. Verify the path exists (warn — don't block — if it contains no
-  `.obsidian/`, it may not be a vault); create `<vault>/<obsidian_folder>/` and
-  `<vault>/<obsidian_folder>/_sources/` if missing. No MCP needed — notes are written directly.
+  `.obsidian/`, it may not be a vault); create `<vault>/<obsidian_research_folder>/` (+ its
+  `_sources/`) and `<vault>/<obsidian_questionnaire_folder>/` if missing. No MCP needed — notes are
+  written directly.
 
 Parse `$ARGUMENTS`: first token = the **source PDF** (URL or local file path); the rest (optional) = the
 **subject**.
@@ -36,7 +38,7 @@ Parse `$ARGUMENTS`: first token = the **source PDF** (URL or local file path); t
 
 Derive a **run-id** (kebab-case) from the subject (else from the source's last path segment). Confirm it
 if ambiguous. Check the store for an existing run — notion: a page whose **Run ID** property matches;
-obsidian: a note in `<obsidian_folder>` whose frontmatter `run_id` matches (Grep). If one exists, ask —
+obsidian: a note in `<obsidian_research_folder>` whose frontmatter `run_id` matches (Grep). If one exists, ask —
 update that page (supersede) or pick a new run-id.
 
 ## 2. Frame the research (in memory — no file)
@@ -69,10 +71,11 @@ Show the human a short summary and **ask to confirm** the write. On yes:
   framework identified) · **Statut** = `« Recherche »` · **Date** = today · **Run ID** = `<run-id>`;
   body = the report, plus the domain brief in a fenced JSON block at the end. If the source was a
   **local file**, also attach it (`notion-create-attachment`) — best effort, skip gracefully.
-- **obsidian** — write `<vault>/<obsidian_folder>/<run-id>.md`: YAML frontmatter
+- **obsidian** — write `<vault>/<obsidian_research_folder>/<run-id>.md`: YAML frontmatter
   `run_id` · `sujet` · `cadre` · `statut: Recherche` · `date` (today, YYYY-MM-DD) ·
   `tags: [questionnaire-run]`; body = the report, plus the domain brief in a fenced JSON block at the
-  end. If the source was a **local file**, copy the PDF to `<obsidian_folder>/_sources/<run-id>.pdf`
+  end. If the source was a **local file**, copy the PDF to
+  `<obsidian_research_folder>/_sources/<run-id>.pdf`
   and link it near the top (`![[_sources/<run-id>.pdf]]`).
 
 If the human declines the write, print the report in the conversation instead and stop — there is
@@ -81,6 +84,6 @@ deliberately no fallback location.
 ## 5. Report
 
 Print: run-id, subject, main framework + licence summary, and the page — notion: the page link;
-obsidian: the note path + the `obsidian://open?vault=<vault folder name>&file=<obsidian_folder>/<run-id>`
-URI. Tell the human: review the research; if — and only if — they want a survey derived from it, run
+obsidian: the note path + the
+`obsidian://open?vault=<vault folder name>&file=<obsidian_research_folder>/<run-id>` URI. Tell the human: review the research; if — and only if — they want a survey derived from it, run
 **`/questionnaire <run-id>`**.
