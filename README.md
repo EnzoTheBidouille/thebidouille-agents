@@ -111,6 +111,10 @@ design system), **interviews** you for the gaps, and **generates**:
   and a per-surface `model:` tier (Haiku for mechanical surfaces, bigger models where design decisions live)
 - `.claude/gate-config.json` + `.claude/settings.json` — the destructive-command gate, plus an
   `allow` list of the project's read-only commands so agents don't stall on permission prompts
+- a **code-retrieval provider** wired as a committed project-scope MCP server —
+  [Serena](https://github.com/oraios/serena) by default (live LSP symbol navigation: agents query
+  symbols instead of grep-and-reading whole files; `graphify` or `none` also available via the
+  profile's `retrieval.provider`)
 - `scripts/new-feature.sh` + `remove-feature.sh` — parallel worktree isolation (if you enable it)
 - `specs/_template.md`
 
@@ -146,19 +150,6 @@ release). No local tagging needed.
 
 `npx thebidouille-agents@latest …` then serves the new version everywhere; installed cores record
 it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.json` pointer.
-
-## Roadmap
-
-- [ ] **Opt-in code-retrieval tooling at `/init-pipeline` / `/update-pipeline`** — agents spend
-      most of their wall-clock reading the repo; semantic retrieval cuts that. During the init
-      interview, offer to wire one of these as a capability flag in the project profile
-      (`/update-pipeline` asks retroactively when the flag is absent):
-  - _[Serena](https://github.com/oraios/serena)_ — LSP-based MCP server, symbol-level navigation
-    instead of whole-file reads. Light setup, good default for most repos.
-  - _[Graphify](https://graphify.net/)_ — persistent knowledge graph over code + docs, queried via
-    MCP. Heavier (indexing step); worth it on large or mixed code+docs corpora.
-  - Init would register the chosen MCP server and set the flag so agents/commands know to prefer
-    graph/symbol queries over grep-and-read.
 
 ## The commands
 

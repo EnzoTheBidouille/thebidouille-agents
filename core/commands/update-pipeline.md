@@ -46,6 +46,17 @@ repo. The installer's `--update` mode never touches generated files: `PIPELINE.m
 Re-read the VERSION file(s) and print `old → new`. If unchanged, say the core was already up to date.
 For a bundled repo, note that `.claude/pipeline.json`'s `core_version` was bumped and should be committed.
 
+## 3.5 Retrieval flag — ask retroactively
+
+Only when the current repo has a `PIPELINE.md` **without a `retrieval:` block** (profile predates the
+capability): ask whether to wire a code-retrieval provider now — `serena` (Recommended default),
+`graphify`, or `none` (see the installed `pipeline/SCHEMA.md` §Code retrieval for the trade-off). On a
+choice, add the `retrieval:` block to `PIPELINE.md` and run the same wiring as `/init-pipeline` Phase 4
+step 6 (install check + project-scope `claude mcp add` for serena; install + initial index for
+graphify). For a provider ≠ `none`, also append its MCP tools (e.g. `mcp__serena`) to each rendered
+surface agent's `tools:` list — the retrieval guidance itself is already in the updated implementer
+core, so no other re-render is needed.
+
 ## 4. Tell the human the follow-ups
 
 - **Restart / reload the Claude Code session** so it picks up updated commands and agents.
