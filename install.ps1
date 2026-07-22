@@ -139,7 +139,7 @@ try {
         New-Item -ItemType Directory -Force -Path (Join-Path $dest 'pipeline\scripts') | Out-Null
         Copy-Item (Join-Path $src 'profile\PIPELINE.template.md') (Join-Path $dest 'pipeline') -Force
         Copy-Item (Join-Path $src 'profile\SCHEMA.md')            (Join-Path $dest 'pipeline') -Force
-        Copy-Item (Join-Path $src 'profile\questionnaire.config.template.yaml') (Join-Path $dest 'pipeline') -Force
+        Copy-Item (Join-Path $src 'profile\thebidouille.config.template.yaml') (Join-Path $dest 'pipeline') -Force
         Copy-Item (Join-Path $src 'scripts\*.template')           (Join-Path $dest 'pipeline\scripts') -Force
         Copy-Item (Join-Path $src 'core\agents\implementer.template.md') (Join-Path $dest 'pipeline') -Force
         if (Test-Path (Join-Path $src 'CHANGELOG.md')) { Copy-Item (Join-Path $src 'CHANGELOG.md') (Join-Path $dest 'pipeline') -Force }
@@ -183,17 +183,23 @@ try {
                   (Join-Path $src 'core\agents\questionnaire-validator.md') (Join-Path $dest 'agents') -Force
     }
 
-    # questionnaire capability config is USER-level (Notion DB, runs path) — it lives in
-    # the user's .claude regardless of install scope. Seed only if no filled copy exists.
-    function Initialize-QuestionnaireConfig {
+    # pipeline capability config is USER-level (vault, Notion DB, kanban boards) — it lives in
+    # the user's .claude regardless of install scope. Seed only if neither the consolidated nor
+    # the legacy copy exists. Non-interactive here: seeds disabled defaults; /init-pipeline +
+    # /update-pipeline wire it (npx's installer offers a quick interview instead).
+    function Initialize-Config {
         $userClaude = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $HOME '.claude' }
-        $qcfg = Join-Path $userClaude 'questionnaire.config.yaml'
-        if (-not (Test-Path -LiteralPath $qcfg)) {
-            New-Item -ItemType Directory -Force -Path $userClaude | Out-Null
-            Copy-Item (Join-Path $src 'profile\questionnaire.config.template.yaml') $qcfg
-            Write-Host "  - seeded $qcfg (fill it in to enable /research + /questionnaire)"
+        $cfg = Join-Path $userClaude 'thebidouille.config.yaml'
+        $legacy = Join-Path $userClaude 'questionnaire.config.yaml'
+        if (Test-Path -LiteralPath $cfg) {
+            Write-Host "  - kept your existing $cfg"
+        } elseif (Test-Path -LiteralPath $legacy) {
+            Write-Host "  - found legacy $legacy — kept as-is (read as a fallback)."
+            Write-Host "    Run /update-pipeline to migrate it into thebidouille.config.yaml + wire the kanban."
         } else {
-            Write-Host "  - kept your existing $qcfg"
+            New-Item -ItemType Directory -Force -Path $userClaude | Out-Null
+            Copy-Item (Join-Path $src 'profile\thebidouille.config.template.yaml') $cfg
+            Write-Host "  - seeded $cfg (disabled defaults — enable via /init-pipeline or /update-pipeline)"
         }
     }
 
@@ -256,7 +262,7 @@ try {
         Copy-FixedAgents
         Copy-Core
         $hookState = Register-GlobalHook
-        Initialize-QuestionnaireConfig
+        Initialize-Config
         Write-Host @"
 
 OK pipeline core installed globally into $dest  (version $ver)
@@ -277,13 +283,12 @@ Code retrieval (Serena — the default provider /init-pipeline wires per repo):
   Make sure the uv tools dir is on PATH (uv tool update-shell) — otherwise the
   registered MCP server silently fails to start.
 
-Research / questionnaire capability (global, works anywhere — optional):
-  1. Set  enabled: true  in ~/.claude/questionnaire.config.yaml.
-  2. Pick the store there: notion (default — connect it first:
-     claude mcp add --transport http notion https://mcp.notion.com/mcp ; the database is
-     CREATED AUTOMATICALLY on the first run) or  store: obsidian  (no MCP — runs are
-     markdown notes in your vault; the vault path is asked once, then saved).
-  3. Run  /research <pdf-url-or-file> [subject]  — then optionally  /questionnaire <run-id>.
+Global capabilities config (research / questionnaire / kanban), user-scoped — optional:
+  · One consolidated file: ~/.claude/thebidouille.config.yaml (don't hand-edit it).
+  · /init-pipeline (new project) and /update-pipeline (existing) wire it for you: enabling
+    research/questionnaire, and creating + syncing an Obsidian kanban board of the pipeline.
+  · Research with  store: notion  needs Notion first:
+    claude mcp add --transport http notion https://mcp.notion.com/mcp
 "@
         return
     }
@@ -292,7 +297,7 @@ Research / questionnaire capability (global, works anywhere — optional):
         Write-Host "-> installing pipeline core into $dest"
         Copy-FixedAgents
         Copy-Core
-        Initialize-QuestionnaireConfig
+        Initialize-Config
         New-Item -ItemType Directory -Force -Path (Join-Path $Target 'specs') | Out-Null
         if (-not (Test-Path -LiteralPath (Join-Path $Target 'specs\_template.md'))) {
             Copy-Item (Join-Path $src 'core\templates\spec.template.md') (Join-Path $Target 'specs\_template.md')
@@ -320,7 +325,7 @@ Prefer one shared core across all your repos?  Re-run with  -Global.
         if (Test-Path -LiteralPath (Join-Path $dest 'agents')) {
             Copy-FixedAgents
         }
-        Initialize-QuestionnaireConfig
+        Initialize-Config
         Update-PointerVersion (Join-Path $dest 'pipeline.json') $ver
         Write-Host @"
 

@@ -1,7 +1,7 @@
 # CONTRACT — questionnaire (engine declaration) · `<run-id>`
 
 > Frozen contract: `questionnaire-writer`'s output, the questionnaire in the survey engine's format
-> (`engine_format` from `~/.claude/questionnaire.config.yaml`). Held in memory by
+> (`engine_format` from `~/.claude/thebidouille.config.yaml`). Held in memory by
 > `/questionnaire` and archived in the run's page (Notion or Obsidian, per the config `store`). Consumed by `questionnaire-validator`. JSON.
 
 ```json

@@ -9,8 +9,9 @@ touch no external service; the orchestrator persists your output (to the configu
 Obsidian — nothing is stored elsewhere). You have no memory; work only from your dispatch inputs. Your dispatch prompt names your
 **MODE** — `research` or `blueprint`. Honour exactly that mode's output contract, nothing else.
 
-> **First action, always:** read **`~/.claude/questionnaire.config.yaml`** — note `ui_language` (the
-> language of everything you write) and `engine_format`.
+> **First action, always:** read **`~/.claude/thebidouille.config.yaml`** (or, if absent, the legacy
+> flat `~/.claude/questionnaire.config.yaml`) — note `ui_language` (the language of everything you
+> write) and `engine_format` (nested under `questionnaire.` in the consolidated file, flat in legacy).
 
 ## Hard rules (both modes — content must stay licence-free downstream)
 

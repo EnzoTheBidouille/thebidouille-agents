@@ -203,6 +203,16 @@ files automatically. It works because every generated artifact is a **determinis
    provider whose MCP server isn't registered yet), run its wiring step from `/init-pipeline` Phase 4.
    Even when nothing new was added, re-run the provider's health check (§Code retrieval) — wiring
    rots (PATH changes, uninstalls, hand-edits) — and repair whatever fails.
+5. **Global config migration.** If `~/.claude/thebidouille.config.yaml` is absent but the legacy
+   `~/.claude/questionnaire.config.yaml` exists, migrate it: seed the consolidated file from the
+   template and carry every filled legacy value into its new home (`enabled`→`research.enabled`
+   +`questionnaire.enabled`, `store`→`research.store`, `notion_*`→`research.notion_*`,
+   `obsidian_vault_path`→`obsidian.vault_path`, `obsidian_research_folder`→`research.folder`,
+   `obsidian_questionnaire_folder`→`questionnaire.folder`, `engine_format`→`questionnaire.engine_format`,
+   `ui_language` stays top-level). Keep the legacy file in place (the commands still read it as a
+   fallback); report the migration.
+6. **Kanban sync.** Run the §Kanban reconcile: link/create the project's board if configured, verify
+   its columns, and backfill/sync cards from `specs/*.md`. See §Kanban.
 
 Re-running `/init-pipeline` remains possible (it reconciles too) but is only *needed* when the stack
 itself changes in ways `/build` §1.5 can't auto-grow (e.g. package manager or contract mechanism swap).
@@ -210,17 +220,23 @@ itself changes in ways `/build` §1.5 can't auto-grow (e.g. package manager or c
 ## Global capability — research → (optional) questionnaire
 
 A **user-scoped** track, separate from the dev flow and NOT configured in `PIPELINE.md`. Its facts live
-in **`~/.claude/questionnaire.config.yaml`** (template: `profile/questionnaire.config.template.yaml`,
-seeded by the installer, never clobbered on update). **Nothing is stored locally: each run lives
-entirely as a page in the Notion database**, which is **auto-created on the first `/research`**.
+in the **consolidated global config `~/.claude/thebidouille.config.yaml`** (template:
+`profile/thebidouille.config.template.yaml`, seeded by the installer, never clobbered on update) — the
+older flat `~/.claude/questionnaire.config.yaml` is still read as a **fallback** when the consolidated
+file is absent. A run is archived in the chosen `store`: **notion** (a page in a database auto-created
+on the first `/research`) or **obsidian** (a note in the shared vault, `obsidian.vault_path`).
 
-| Field                   | Used by                   | Meaning                                                         |
-| ----------------------- | ------------------------- | --------------------------------------------------------------- |
-| `enabled`               | /research, /questionnaire | `false`/absent ⇒ both commands refuse cleanly.                  |
-| `notion_database_id`    | /research, /questionnaire | The archive database. Empty ⇒ auto-created on first run, id written back. |
-| `notion_parent_page_id` | /research (setup)         | Optional parent page for the auto-created database.             |
-| `engine_format`         | writer, validator         | Label of the user's target survey-engine format.                |
-| `ui_language`           | researcher, writer        | Language of the reports + all questionnaire labels.             |
+| Field                            | Used by                   | Meaning                                                         |
+| -------------------------------- | ------------------------- | --------------------------------------------------------------- |
+| `research.enabled`               | /research                 | `false`/absent ⇒ /research refuses cleanly.                     |
+| `questionnaire.enabled`          | /questionnaire            | `false`/absent ⇒ /questionnaire refuses cleanly.                |
+| `research.store`                 | /research, /questionnaire | `notion` \| `obsidian` — where each run is archived.            |
+| `research.notion_database_id`    | /research, /questionnaire | The archive database. Empty ⇒ auto-created on first run, id written back. |
+| `research.notion_parent_page_id` | /research (setup)         | Optional parent page for the auto-created database.             |
+| `research.folder` · `questionnaire.folder` | /research, /questionnaire | obsidian store: the vault sub-folders for research + questionnaire notes. |
+| `obsidian.vault_path`            | /research, /questionnaire, kanban | Shared vault path (see §Kanban).                        |
+| `questionnaire.engine_format`    | writer, validator         | Label of the user's target survey-engine format.                |
+| `ui_language`                    | researcher, writer        | Language of the reports + all questionnaire labels.             |
 
 - `/research <pdf-url-or-path> [subject]` → dispatches `questionnaire-researcher` (**mode research**,
   read-only): produces a **standalone research report** (state of the art, domain analysis, debates,
@@ -240,3 +256,56 @@ Guarantees the workflow preserves: researcher analyses/structures but never draf
 original Likert-5 items but never sees the source; nothing is interpreted (no thresholds/levels); agents
 are read-only, the orchestrator does all Notion writes, each write is confirmation-gated; nothing enters
 the survey engine until the human flips the page's Statut to « Approuvé ».
+
+## Kanban — mirroring the pipeline onto an Obsidian board
+
+An **optional, user-scoped** mirror of the dev flow: each pipeline stage moves a card across an
+[Obsidian Kanban](https://github.com/mgmeyers/obsidian-kanban) board, one board per project. Config
+lives in the consolidated global config `~/.claude/thebidouille.config.yaml` §`kanban` (NOT in
+`PIPELINE.md` — the board path points at the user's personal vault, so it is machine-specific and must
+not be committed). Everything below **no-ops silently** when the config is absent, `kanban.enabled` is
+false, no board is configured for the current project, or the board file is missing — the pipeline never
+blocks on the board.
+
+**Config & board resolution.** `kanban.boards` is keyed by the project's `PIPELINE.md` `name`. To resolve
+the current project's board: read `name` from `PIPELINE.md`, look up `kanban.boards[name]`. Found ⇒ the
+board file is `<obsidian.vault_path>/<boards[name].board>`, its columns are `boards[name].columns` if
+present else `kanban.columns`. Not found ⇒ kanban off for this project.
+
+**Card format.** A card is a Kanban list item under a `## <column>` heading:
+`- [ ] <human title>  #<feature_id>`. The `#<feature_id>` tag is the join key between a card and its
+`specs/<feature_id>.md`; it is how every stage finds *its* card (Grep the board for `#<id>`). Free-text
+notes a human writes as sub-bullets under an Ideas card are seed context for `/brainstorm`. Never touch
+the trailing `%% kanban:settings … %%` block or the `kanban-plugin: board` front-matter.
+
+**Move a card (the core op).** To move card `#<id>` to a stage's column: find the list item carrying
+`#<id>` under its current `## <column>` heading, delete it there, and append it (whole line, tag
+preserved) under the target `## <column>` heading. If no card carries `#<id>` (feature started outside
+the board), create the card in the target column instead of erroring. One card per `#<id>`; if
+duplicates exist, keep the first and drop the rest.
+
+**Stage → column**, used both by each pipeline command (to move its card live) and by backfill:
+
+| Pipeline moment                         | Column          |
+| --------------------------------------- | --------------- |
+| human drops a raw idea (manual)         | `ideas`         |
+| `/brainstorm` picks it up               | `brainstorm`    |
+| `/spec` opens (draft)                   | `spec`          |
+| `/spec` freezes (`status: frozen`)      | `ready`         |
+| `/build`                                | `building`      |
+| `/smoke` · `/review`                    | `review`        |
+| `/fix`                                  | `fix`           |
+| `/ship` starts                          | `ship`          |
+| PR opened (`status: shipped`)           | `shipped`       |
+
+**Backfill / sync from specs (reconcile).** `specs/*.md` is the source of truth. For each spec, read its
+`feature_id` (front-matter or filename) and `status`, map `status`→column — `frozen`→`ready`,
+`in-review`→`review`, `shipped`→`shipped`, anything else / a spec with no status→`spec` — then **full
+sync**: card absent ⇒ add it in that column; card present ⇒ **move it** to that column so the board
+always reflects the specs (this repositions cards the human may have moved by hand). Report cards
+added vs. moved vs. already-correct.
+
+**Create a board.** When linking a project with no board file yet: write
+`<obsidian.vault_path>/<folder>/Tasks.md` with the `kanban-plugin: board` front-matter, one `## <heading>`
+per configured column in pipeline order, and the closing `%% kanban:settings %%` block
+(`{"kanban-plugin":"board","list-collapse":[false,…]}` with one `false` per column).

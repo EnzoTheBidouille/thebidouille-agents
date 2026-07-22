@@ -12,6 +12,9 @@ You run the **spec** step in the main thread — interactive, with the human. Pa
 >
 > Template paths below (`.claude/templates/…`) resolve to `~/.claude/templates/…` when the core is
 > installed globally — read whichever exists.
+>
+> **Kanban** (SCHEMA.md §Kanban): when the spec opens, move card `#<feature_id>` → **Spec**; on freeze
+> (`status: frozen`, Mode A) → **Ready to build**. No-op silently if no board is configured.
 
 Detect the mode from the pasted content:
 

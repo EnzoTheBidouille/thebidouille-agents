@@ -11,6 +11,9 @@ that change the *contract*; `/fix` is for everything else.
 >
 > Template paths below (`.claude/templates/…`) resolve to `~/.claude/templates/…` when the core is
 > installed globally — read whichever exists.
+>
+> **Kanban** (SCHEMA.md §Kanban): move card `#$ARGUMENTS` → **Fix** on ingest (it returns to **Review**
+> when `/review` re-runs). No-op silently if no board.
 
 ## 1. Ingest the report
 
