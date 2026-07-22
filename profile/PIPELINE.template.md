@@ -29,6 +29,15 @@ repo:
   layout: <monorepo | single>
   workspace_tool: <turborepo | nx | none>
 
+# ── code retrieval (semantic navigation — cuts agent read time) ─────────────
+# Agents prefer symbol/graph MCP queries over grep-and-read when a provider is
+# wired. serena = live LSP symbol navigation (default, no index to maintain);
+# graphify = persistent tree-sitter knowledge graph over code + docs (needs an
+# index step + rescans); none = agents fall back to Grep/Glob/Read.
+# Registered by /init-pipeline as a project-scope MCP server (committed .mcp.json).
+retrieval:
+  provider: serena                            # serena | graphify | none
+
 # ── surfaces ────────────────────────────────────────────────────────────────
 # One entry per independently-implemented code area. /build dispatches ONE
 # implementer agent per surface, in parallel. Each surface is rendered by
@@ -42,7 +51,7 @@ surfaces:
     path: apps/api                            # the ONLY tree this surface's agent may touch
     label: backend (AdonisJS)
     agent: backend                            # rendered agent file: .claude/agents/backend.md
-    tools: [Read, Write, Edit, Bash, Grep, Glob]
+    tools: [Read, Write, Edit, Bash, Grep, Glob, mcp__serena]   # mcp__<provider> mirrors retrieval.provider
     model: inherit                            # frontmatter model tier: inherit | sonnet | haiku
                                               #   haiku = mechanical work (scaffolding, applying a
                                               #   frozen contract); keep inherit/sonnet for surfaces
@@ -57,7 +66,7 @@ surfaces:
     path: apps/web
     label: frontend (React/TanStack)
     agent: frontend
-    tools: [Read, Write, Edit, Bash, Grep, Glob, DesignSync]
+    tools: [Read, Write, Edit, Bash, Grep, Glob, DesignSync, mcp__serena]
     model: inherit
     test_cmd: pnpm --filter web test
     lint_cmd: pnpm --filter web lint

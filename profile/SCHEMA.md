@@ -18,6 +18,7 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
 | `vcs.feature_branch_prefix`          | string       | ship, isolation script            | `feature/` → branch `feature/<id>`.                           |
 | `repo.layout`                        | enum         | build, audit                      | `monorepo` (many surfaces) or `single`.                       |
 | `repo.workspace_tool`                | enum         | audit                             | `turborepo`/`nx`/`none`.                                      |
+| `retrieval.provider`                 | enum         | init, update-pipeline, implementer | `serena` (default) / `graphify` / `none` — see §Code retrieval. |
 | **`surfaces[]`**                     | list         | **build, review, refactor, init** | One per independently-built area. Grows via reconcile (below). |
 | `surfaces[].key`                     | string       | build                             | Short id + review scope.                                      |
 | `surfaces[].path`                    | string       | implementer                       | The ONLY tree that surface's agent may touch.                 |
@@ -64,6 +65,34 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
 - **Hook** (`gate.py`) reads `gate.deny`/`gate.ask` from a generated `.claude/gate-config.json`.
 - **Scripts** (`new-feature.sh`) read the `isolation` block (rendered in at init).
 
+## Code retrieval — `retrieval.provider`
+
+Agents spend most of their wall-clock reading the repo; a retrieval provider replaces grep-and-read
+with symbol/graph queries. The flag is a **value, not a boolean**, so switching provider later is a
+one-line profile change + re-running the wiring (no agent re-render needed — the guidance agents
+follow is provider-agnostic: _"prefer the retrieval MCP tools over Grep/Glob + whole-file Reads"_).
+
+| Provider | Mechanism | Freshness | Cost |
+| --- | --- | --- | --- |
+| `serena` (default) | live LSP symbol navigation (find symbol, references, semantic edits) | always current | none — no index |
+| `graphify` | persistent tree-sitter knowledge graph over code + docs | as fresh as the last rescan | index step + re-index discipline |
+| `none` | agents fall back to Grep/Glob/Read | — | — |
+
+**Wiring (done by `/init-pipeline`, or `/update-pipeline` retroactively):**
+
+- `serena` — requires the `serena` CLI (`uv tool install -p 3.13 serena-agent`). Register at
+  **project scope** so the registration is committed and portable (`--project-from-cwd` resolves the
+  project at server start, so the committed entry works on every machine):
+  `claude mcp add --scope project serena -- serena start-mcp-server --context claude-code --project-from-cwd`.
+  Optionally pre-index large repos once: `serena project index`.
+- `graphify` — requires `uv tool install graphify` + `graphify install`; build the initial graph
+  (`/graphify .`) and rescan incrementally after big changes (`--update`). See graphify.net.
+- Rendered agents get the provider's MCP tools appended to their `tools:` list (e.g. `mcp__serena`
+  grants the whole server); `none` ⇒ nothing appended.
+
+Teammates cloning the repo get the committed `.mcp.json` and only need the provider CLI installed —
+if it's missing, the MCP server fails to start and agents silently fall back to Grep/Read.
+
 ## Specialization — when to split one surface into more agents
 
 `/build` dispatches ONE agent per surface, in parallel, so build wall-clock ≈ the **slowest single
@@ -98,7 +127,8 @@ Both `/init-pipeline` (initial render) and `/build` (auto-reconcile when a spec 
 this exact procedure so a surface is always defined the same way. To add surface `S`:
 
 1. **Add the `surfaces[]` entry** to `PIPELINE.md`: `key`, `path` (the disjoint tree it exclusively
-   owns), `label`, `agent` (rendered file name), `tools` (add `DesignSync` only if `uses_design: true`),
+   owns), `label`, `agent` (rendered file name), `tools` (add `DesignSync` only if `uses_design: true`;
+   append the retrieval provider's MCP tools when `retrieval.provider` ≠ `none` — e.g. `mcp__serena`),
    `model` (tier for the rendered agent: `haiku` when the surface's work is mechanical — scaffolding,
    applying a frozen contract to a well-trodden stack; `inherit` (default) or `sonnet` when it makes
    real design decisions), the five `*_cmd`s (derive from the surface's `package.json` / workspace

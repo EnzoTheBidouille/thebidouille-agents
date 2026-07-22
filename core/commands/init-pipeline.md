@@ -45,6 +45,9 @@ Gather evidence, then summarize what you found. Look for:
   `golang-migrate`), a `docker-compose.yml`, DB service.
 - **Design system:** an existing `design-reference/` snapshot, `components/ui`, a DesignSync MCP
   connection, Figma links, or none.
+- **Code retrieval:** is the `serena` CLI on PATH (`serena --version`)? `graphify`? Is either already
+  registered in this repo's `.mcp.json` or `claude mcp list`? (Feeds the retrieval question + Phase 4
+  wiring — default provider is `serena`.)
 - **VCS:** `git remote -v` → host + `owner/repo`; the default branch (`git symbolic-ref refs/remotes/origin/HEAD` or `git branch`).
 - **Existing `CLAUDE.md`** — read it; it may already state stack/conventions to fold in. **Existing
   `PIPELINE.md`** — if present, this is a re-run: load it as the starting draft and only reconcile deltas.
@@ -71,6 +74,10 @@ Ask ONLY what you couldn't confidently detect. Batch related questions. Cover:
 - **UI language** — language of all user-facing copy.
 - **RBAC** — is there a role hierarchy? If yes, list it highest→lowest.
 - **Design system** — enabled? provider (Claude Design / Figma / none) + project ids + kit/token paths.
+- **Code retrieval** — confirm the provider (see SCHEMA.md §Code retrieval): `serena` (Recommended
+  default — live LSP symbol navigation, no index to maintain), `graphify` (persistent knowledge graph
+  over code + docs — better on very large or mixed code+docs repos, but needs an index step + rescans),
+  or `none`. Only demote from `serena` if the human objects or the provider CLI can't be installed.
 - **Isolation** — build features in parallel git worktrees with per-feature DB + ports, or just in the
   main checkout? If worktrees: DB-per-worktree? port bases? compose file?
 - **Gate** — confirm the destructive commands to hard-deny and the ones to confirm-first (seed from the
@@ -120,13 +127,25 @@ conventions, no narration, no facts derivable from the code. **Show the human th
      registration serves every repo; you only supply this repo's `gate-config.json`. Still write the
      PostToolUse formatter hook + the permissions.
    Preserve any existing custom keys.
-6. **Render the isolation scripts** (if `isolation.enabled`) from the installer's
+6. **Wire the retrieval provider** (skip if `retrieval.provider: none`):
+   - **serena:** if the `serena` CLI is missing, have the human install it (`uv tool install -p 3.13
+     serena-agent`) — or set the provider to `none` if they decline, and say `/update-pipeline` can wire
+     it later. Then register at **project scope** (committed `.mcp.json`, portable — `--project-from-cwd`
+     resolves the project at server start): `claude mcp add --scope project serena -- serena
+     start-mcp-server --context claude-code --project-from-cwd`. Skip registration if `.mcp.json`
+     already has a `serena` entry. On a large repo, offer the one-off `serena project index`.
+   - **graphify:** have the human install it (`uv tool install graphify` then `graphify install`),
+     build the initial graph (`/graphify .`), and note it needs incremental rescans (`--update`) after
+     big changes.
+   - Either way the rendered agents already carry the provider's MCP tools in their `tools:` list
+     (step 3 / SCHEMA §Rendering); remind the human the new MCP server appears after a session restart.
+7. **Render the isolation scripts** (if `isolation.enabled`) from the installer's
    `pipeline/scripts/*.template` to this repo's `scripts/new-feature.sh` and `scripts/remove-feature.sh`,
    substituting the `__TOKENS__` (project
    slug, DB pattern, port bases, compose file, branch prefix, install/dev/migrate commands, per-surface
    env stanzas). `chmod +x` them. If isolation is disabled, skip and note features build in the main checkout.
-7. **Ensure `specs/_template.md`** exists (copy from the installer's `templates/spec.template.md` if missing).
-8. **Write the pointer** `.claude/pipeline.json` (committed — this is how a teammate who clones the repo
+8. **Ensure `specs/_template.md`** exists (copy from the installer's `templates/spec.template.md` if missing).
+9. **Write the pointer** `.claude/pipeline.json` (committed — this is how a teammate who clones the repo
    knows which core to install):
    `{ "pipeline": "thebidouille-agents", "mode": "<bundled|global>", "core_version": "<contents of the
    installer's pipeline/VERSION>", "install": "<per mode: bundled ⇒ \"npx thebidouille-agents install\"
@@ -135,8 +154,8 @@ conventions, no narration, no facts derivable from the code. **Show the human th
    Windows: install.ps1 -Global from the same repo)> " }`.
    In **global** mode also add, near the top of `CLAUDE.md`, a one-liner:
    `> Pipeline: global core — run the installer above if /brainstorm etc. are missing.`
-9. **Design system:** if `design.enabled` with a snapshot dir, note that `/align-ds` is active; else the
-   `/align-ds` command will no-op with a clear message.
+10. **Design system:** if `design.enabled` with a snapshot dir, note that `/align-ds` is active; else the
+    `/align-ds` command will no-op with a clear message.
 
 ## Phase 5 — Report
 

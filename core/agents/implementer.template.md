@@ -39,6 +39,13 @@ shared surface is the frozen contract and the spec.
    assume nothing from a previous run.
    <SURFACE_DESIGN_INPUT>
 
+## How you read code — retrieval first
+
+If `retrieval.provider` in `PIPELINE.md` is not `none`, its MCP tools are in your toolset — **prefer
+them over Grep/Glob + whole-file Reads**: locate code by symbol, read only the definitions you need,
+and trace references before changing any shared shape. Fall back to Grep/Read only when the retrieval
+tools are unavailable or come up empty.
+
 ## How you work — strict TDD (red → green → refactor)
 
 1. <SURFACE_TDD_STEP1>
