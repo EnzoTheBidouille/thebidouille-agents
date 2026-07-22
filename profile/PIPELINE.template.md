@@ -43,6 +43,10 @@ surfaces:
     label: backend (AdonisJS)
     agent: backend                            # rendered agent file: .claude/agents/backend.md
     tools: [Read, Write, Edit, Bash, Grep, Glob]
+    model: inherit                            # frontmatter model tier: inherit | sonnet | haiku
+                                              #   haiku = mechanical work (scaffolding, applying a
+                                              #   frozen contract); keep inherit/sonnet for surfaces
+                                              #   with real design decisions
     test_cmd: pnpm --filter api test
     lint_cmd: pnpm --filter api lint
     format_cmd: pnpm --filter api format
@@ -54,6 +58,7 @@ surfaces:
     label: frontend (React/TanStack)
     agent: frontend
     tools: [Read, Write, Edit, Bash, Grep, Glob, DesignSync]
+    model: inherit
     test_cmd: pnpm --filter web test
     lint_cmd: pnpm --filter web lint
     format_cmd: pnpm --filter web format
@@ -129,19 +134,6 @@ gate:
     - "psql"
     - "docker compose"
 
-# ── tdd gate (optional — drives .claude/hooks/tdd_gate.py) ───────────────────
-# Opt-in enforcement of the §Testing red→green contract at tool-call time: when an
-# agent Writes/Edits production code with no discoverable test, the hook asks the
-# human to confirm (never a hard block). enforce:false ⇒ hook stays silent.
-tdd:
-  enforce: false                              # flip to true to arm the gate
-  prod_exts: [ts, tsx, py, go, rs]            # extensions counted as production code
-  test_roots: [apps/api, apps/web/src]        # surface trees to search for a matching test; [] ⇒ whole repo
-  skip_globs:                                 # files never gated
-    - "**/*.d.ts"
-    - "**/*.config.*"
-    - "**/migrations/**"
-    - "**/*.gen.*"
 ```
 
 > **Note.** The **questionnaire capability** (`/research` + `/questionnaire`) is **user-scoped** — it is

@@ -33,8 +33,8 @@ Map every area the spec touches (§5 contract + each surface's tasks + touched p
   chunk into its own specialized surface. Use the heuristic in SCHEMA.md §Specialization — only when the
   boundary is clean; skip when tangled or tiny.
 
-For each surface to add: infer its `key`, `path`, `label`, `agent`, `tools`, `*_cmd`s, and `uses_design`
-(mirror a sibling surface), show the human a one-line proposal, and on go-ahead **render it now** per
+For each surface to add: infer its `key`, `path`, `label`, `agent`, `tools`, `model`, `*_cmd`s, and
+`uses_design` (mirror a sibling surface), show the human a one-line proposal, and on go-ahead **render it now** per
 SCHEMA.md §"Rendering / reconciling a surface agent" — write the `surfaces[]` entry + §Conventions/§Testing
 stanza into `PIPELINE.md`, render `.claude/agents/<agent>.md` from the implementer template, applying the
 shared-code rule (shared trees get a single-owner surface; cross-slice shapes go through the contract).
@@ -51,9 +51,13 @@ the sync channel — say so and skip.
 
 ## 3. Dispatch one implementer per surface — IN PARALLEL
 
-Spawn every surface's agent in a **single message** (one Task call each) so they run concurrently. Use
+Spawn every surface's agent in a **single message** (one Task call each) so they run concurrently —
+NEVER serially: build wall-clock must be the slowest surface, not the sum. Use
 the reconciled `surfaces` list from §1.5 (existing + any just-rendered). Give EACH only what a stateless
-agent needs — re-supply everything every time. For each surface in `surfaces`:
+agent needs — re-supply everything every time, as **exact file paths** (spec, contract, the surface's
+tree), never "find the relevant files". Keep the dispatch prompt **structurally identical across
+dispatches and fix loops** (same template below, only the variable parts change) so repeated dispatches
+hit the prompt cache. For each surface in `surfaces`:
 
 > `subagent_type: <surface.agent>` — "Implement the **<surface.key>** surface for feature `$ARGUMENTS`.
 > Read `PIPELINE.md` first. Spec: `specs/$ARGUMENTS.md`. Contract: `<contract.path>/$ARGUMENTS.<ext>`

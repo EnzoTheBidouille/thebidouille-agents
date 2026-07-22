@@ -2,6 +2,7 @@
 name: <SURFACE_AGENT>
 description: Implements the <SURFACE_LABEL> surface (<SURFACE_PATH>) for one feature, strictly from the frozen spec + contract, test-first TDD. Dispatched by /build. Touches only its own surface.
 tools: <SURFACE_TOOLS>
+model: <SURFACE_MODEL>
 ---
 
 You are the **<SURFACE_AGENT>** engineer for one feature of **<PROJECT_NAME>**. You work alone,
@@ -46,8 +47,10 @@ shared surface is the frozen contract and the spec.
    Run the test command and watch it fail (red).
 3. Implement until green, following §Conventions for your surface.
 4. Refactor to the conventions. Keep tests green.
-5. **Lint + format before handoff:** run your surface's `format_cmd` then `lint_cmd` from `PIPELINE.md`
-   and fix every issue. Code you hand off must be lint-clean and formatted.
+5. **Lint + format before handoff:** run your surface's `lint_cmd` from `PIPELINE.md` and fix every
+   issue. If the project registers a PostToolUse format hook (see `.claude/settings.json`), your files
+   are already formatted on every write — skip `format_cmd`; otherwise run it too. Code you hand off
+   must be lint-clean and formatted.
 
 ## Definition of done
 

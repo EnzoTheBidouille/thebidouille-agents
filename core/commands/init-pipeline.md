@@ -58,7 +58,9 @@ Ask ONLY what you couldn't confidently detect. Batch related questions. Cover:
 
 - **Surfaces & ownership** — confirm the surface list and each one's path + owning agent name. (If a
   single-app repo, one surface.) Confirm the `tools` each agent needs (add `DesignSync` only to a
-  surface with `uses_design: true`).
+  surface with `uses_design: true`), and each surface's `model` tier: `haiku` for mechanical surfaces
+  (scaffolding, applying a frozen contract to a well-trodden stack — noticeably faster + cheaper),
+  `inherit` (Recommended default) or `sonnet` for surfaces with real design decisions.
 - **Specialization (only if Phase 1 flagged a large + cleanly-separable surface)** — offer to split it
   into specialized sub-surfaces (e.g. `web-checkout`, `web-billing`) so `/build` runs them in parallel,
   per SCHEMA.md §Specialization. If the human accepts, apply the rules: **shared code (routing, global
@@ -73,10 +75,6 @@ Ask ONLY what you couldn't confidently detect. Batch related questions. Cover:
   main checkout? If worktrees: DB-per-worktree? port bases? compose file?
 - **Gate** — confirm the destructive commands to hard-deny and the ones to confirm-first (seed from the
   detected DB/migration tooling + always git commit/push/merge/rebase/reset).
-- **TDD gate (optional, default off)** — arm the tool-call TDD gate (`tdd.enforce`)? If yes, it asks the
-  human to confirm whenever an agent writes production code with no discoverable test. Seed `prod_exts`
-  from the detected surface languages and `test_roots` from the surface paths. Default **off** — the
-  review agent already flags untested surface; only enable when the team wants test-first enforced live.
 - **Personas** — keep the default `/brainstorm` panel, or customize members for this domain?
 
 Prefer sensible defaults from Phase 1 as the first (Recommended) option in each question.
@@ -88,8 +86,10 @@ Prefer sensible defaults from Phase 1 as the first (Recommended) option in each 
 
 Assemble the full `PIPELINE.md` from the installer's `pipeline/PIPELINE.template.md` (resolve
 bundled-vs-global per the note above), filling the `yaml pipeline-profile`
-block and every prose section from Phases 1–2. **Show the human the drafted `PIPELINE.md` in a fenced
-block and get a go-ahead** before writing.
+block and every prose section from Phases 1–2. **Keep it lean**: every stateless agent re-reads this
+file on every dispatch, so its length is a per-dispatch token+latency tax — terse rule-shaped
+conventions, no narration, no facts derivable from the code. **Show the human the drafted
+`PIPELINE.md` in a fenced block and get a go-ahead** before writing.
 
 ## Phase 4 — Write & render (after go-ahead)
 
@@ -100,20 +100,23 @@ block and get a go-ahead** before writing.
 3. **Render one agent per surface** — for each surface, follow SCHEMA.md §"Rendering / reconciling a
    surface agent" (steps 2–3): render `.claude/agents/<agent>.md` from the installer's
    `pipeline/implementer.template.md`, substituting `<SURFACE_AGENT>`, `<SURFACE_LABEL>`, `<SURFACE_PATH>`,
-   `<SURFACE_TOOLS>`, `<PROJECT_NAME>`, and the surface-specific blocks (`<SURFACE_EXTRA_NEVER>`,
-   `<SURFACE_DESIGN_INPUT>`, `<SURFACE_TDD_STEP1>` — fill design-related ones only when `uses_design`).
+   `<SURFACE_TOOLS>`, `<SURFACE_MODEL>`, `<PROJECT_NAME>`, and the surface-specific blocks
+   (`<SURFACE_EXTRA_NEVER>`, `<SURFACE_DESIGN_INPUT>`, `<SURFACE_TDD_STEP1>` — fill design-related ones
+   only when `uses_design`).
    Leave `review.md` + `release.md` as-is (generic).
-4. **Generate `.claude/gate-config.json`** from the `gate` block: `{"deny": [...], "ask": [...]}`. If the
-   profile's `tdd` block has `enforce: true`, add a `"tdd"` key mirroring it (`enforce`, `prod_exts`,
-   `test_roots`, `skip_globs`); omit the key entirely when TDD enforcement is off.
-5. **Write `.claude/settings.json`** permissions (`ask`/`deny` lists mirroring the gate) + the hooks,
-   **conditioned on the install mode:**
-   - **bundled:** register the PreToolUse `Bash` hook `.claude/hooks/gate.py`, the PostToolUse formatter
-     (detected formatter), and — only if `tdd.enforce` — the PreToolUse `Write|Edit|MultiEdit` hook
-     `.claude/hooks/tdd_gate.py`.
-   - **global:** the PreToolUse gate hook (and, if the global installer registered it, `tdd_gate.py`) is
+4. **Generate `.claude/gate-config.json`** from the `gate` block: `{"deny": [...], "ask": [...]}`.
+5. **Write `.claude/settings.json`** permissions (`ask`/`deny` lists mirroring the gate, **plus an
+   `allow` list of the project's read-only / verification commands** so agents don't stall on
+   permission prompts: the detected per-surface `test_cmd`/`lint_cmd`/`typecheck_cmd`/`build_cmd`
+   and repo-wide `commands.*` equivalents as `Bash(<cmd>:*)` rules, plus read-only git —
+   `Bash(git status:*)`, `Bash(git diff:*)`, `Bash(git log:*)`. Never allowlist anything matching a
+   `gate.ask`/`gate.deny` pattern. Mention the human can widen it later with
+   `/fewer-permission-prompts`) + the hooks, **conditioned on the install mode:**
+   - **bundled:** register the PreToolUse `Bash` hook `.claude/hooks/gate.py` and the PostToolUse
+     formatter (detected formatter).
+   - **global:** the PreToolUse gate hook is
      already in `~/.claude/settings.json` and reads this repo's `gate-config.json` — do **not** re-register
-     either here (double-registration double-prompts). Both no-op where their config is absent, so one
+     it here (double-registration double-prompts). It no-ops where its config is absent, so one
      registration serves every repo; you only supply this repo's `gate-config.json`. Still write the
      PostToolUse formatter hook + the permissions.
    Preserve any existing custom keys.
