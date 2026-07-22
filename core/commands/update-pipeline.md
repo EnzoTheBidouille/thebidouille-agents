@@ -1,11 +1,13 @@
 ---
-description: Refresh the pipeline core (global ~/.claude, or a repo's bundled .claude) to the latest published thebidouille-agents version. Keeps your questionnaire.config.yaml and every generated file.
+description: Refresh the pipeline core (global ~/.claude, or a repo's bundled .claude) to the latest published thebidouille-agents version, then reconcile this repo's generated files to it — /init-pipeline stays one-time.
 argument-hint: [path-to-local-checkout]
 ---
 
 You are the **pipeline updater**. Refresh the installed pipeline core to the latest version of the pipeline
 repo. The installer's `--update` mode never touches generated files: `PIPELINE.md`, rendered surface agents,
 `gate-config.json`, `settings.json`, and the filled `~/.claude/questionnaire.config.yaml` are all preserved.
+YOU then bring those generated files up to the new core yourself (§3.5) — additively, never clobbering
+the human's choices — so `/init-pipeline` never needs re-running for an upgrade.
 
 ## 1. Detect the install scope + current version
 
@@ -46,22 +48,22 @@ repo. The installer's `--update` mode never touches generated files: `PIPELINE.m
 Re-read the VERSION file(s) and print `old → new`. If unchanged, say the core was already up to date.
 For a bundled repo, note that `.claude/pipeline.json`'s `core_version` was bumped and should be committed.
 
-## 3.5 Retrieval flag — ask retroactively
+## 3.5 Reconcile this repo's generated files
 
-Only when the current repo has a `PIPELINE.md` **without a `retrieval:` block** (profile predates the
-capability): ask whether to wire a code-retrieval provider now — `serena` (Recommended default),
-`graphify`, or `none` (see the installed `pipeline/SCHEMA.md` §Code retrieval for the trade-off). On a
-choice, add the `retrieval:` block to `PIPELINE.md` and run the same wiring as `/init-pipeline` Phase 4
-step 6 (install check + project-scope `claude mcp add` for serena; install + initial index for
-graphify). For a provider ≠ `none`, also append its MCP tools (e.g. `mcp__serena`) to each rendered
-surface agent's `tools:` list — the retrieval guidance itself is already in the updated implementer
-core, so no other re-render is needed.
+Only when the current repo has a `PIPELINE.md`: run the **Reconcile procedure** from the installed
+`pipeline/SCHEMA.md` §Reconcile — top up the profile's machine block with new fields at their defaults
+(one batched question set for any genuinely new human decision, e.g. choosing a `retrieval` provider),
+re-render the surface agents from the current `implementer.template.md`, additively patch
+`settings.json`/`gate-config.json`, and run any newly-added capability's wiring (e.g. Serena's
+project-scope `claude mcp add`). Report what was reconciled; if nothing was missing, say so. This is
+why `/init-pipeline` never needs re-running for a core upgrade.
 
 ## 4. Tell the human the follow-ups
 
-- **Restart / reload the Claude Code session** so it picks up updated commands and agents.
-- **Per repo using the dev pipeline:** re-run `/init-pipeline` to reconcile if the update changed
-  `implementer.template.md`, the hooks, or the scripts (it loads the existing `PIPELINE.md` and only
-  applies deltas) — harmless otherwise.
+- **Restart / reload the Claude Code session** so it picks up updated commands, agents, and any
+  newly-registered MCP server.
+- **Other repos using the global core:** their core is already fresh, but reconcile is per-repo — run
+  `/update-pipeline` inside each (it will skip the already-done core update and just reconcile).
+- **Commit** the reconciled files (`PIPELINE.md`, `.claude/`, `.mcp.json` if added) so teammates get them.
 - The questionnaire capability needs nothing per repo — its config is global
   (`~/.claude/questionnaire.config.yaml`) and untouched by updates.

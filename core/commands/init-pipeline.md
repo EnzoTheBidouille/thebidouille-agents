@@ -1,6 +1,6 @@
 ---
 description: Detect this project's stack, interview the gaps, and generate PIPELINE.md + render the agents so the portable pipeline fits this repo.
-argument-hint: (none) — run once per project, re-run to refresh the profile
+argument-hint: (none) — one-time per project; afterwards /update-pipeline keeps everything current
 ---
 
 You are the **pipeline installer**. Your job: turn the generic pipeline into one tailored to **this**
@@ -163,5 +163,7 @@ Print: the install mode (bundled core under `.claude/` vs global core in `~/.cla
 `.claude/pipeline.json` pointer), the files written/rendered, the surface→agent mapping, and the
 tailored workflow line, e.g.
 `/brainstorm → /spec → (design) → /build <id> → test → /review → /ship`. Tell the human to sanity-check
-`PIPELINE.md`, commit it, and run `/brainstorm` to start a feature. Note they can re-run `/init-pipeline`
-any time to refresh the profile after a stack change.
+`PIPELINE.md`, commit it, and run `/brainstorm` to start a feature. Note that this was the one-time
+setup: from now on `/update-pipeline` both refreshes the core AND reconciles the generated files
+(SCHEMA.md §Reconcile), and `/build` auto-grows surfaces — re-running `/init-pipeline` is only for deep
+stack changes (package manager, contract mechanism, surface overhaul).
