@@ -147,9 +147,10 @@ gate:
 
 ```
 
-> **Note.** The **questionnaire capability** (`/research` + `/questionnaire`) is **user-scoped** — it is
-> NOT configured here. Its facts live in `~/.claude/questionnaire.config.yaml`, read at runtime. This
-> project profile only governs the dev pipeline (`/brainstorm…/ship`).
+> **Note.** The **research/questionnaire capability** (`/research` + `/questionnaire`) and the
+> **kanban** board link are **user-scoped** — NOT configured here. Their facts live in the consolidated
+> `~/.claude/thebidouille.config.yaml`, read at runtime (the kanban board is keyed by this profile's
+> `name`). This project profile only governs the dev pipeline (`/brainstorm…/ship`).
 
 ---
 

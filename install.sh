@@ -81,7 +81,7 @@ copy_core() {
   mkdir -p "$dest/pipeline/scripts"
   cp "$src/profile/PIPELINE.template.md" "$dest/pipeline/"
   cp "$src/profile/SCHEMA.md"            "$dest/pipeline/"
-  cp "$src/profile/questionnaire.config.template.yaml" "$dest/pipeline/"
+  cp "$src/profile/thebidouille.config.template.yaml" "$dest/pipeline/"
   cp "$src"/scripts/*.template           "$dest/pipeline/scripts/"
   cp "$src/core/agents/implementer.template.md" "$dest/pipeline/"
   [ -f "$src/CHANGELOG.md" ] && cp "$src/CHANGELOG.md" "$dest/pipeline/"
@@ -129,16 +129,23 @@ copy_fixed_agents() {
      "$dest/agents/"
 }
 
-# questionnaire capability config is USER-level (Notion DB, runs path) — it lives in
-# ~/.claude regardless of install scope. Seed it only if the user has no filled copy.
-seed_questionnaire_config() {
-  qcfg="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/questionnaire.config.yaml"
-  if [ ! -f "$qcfg" ]; then
-    mkdir -p "$(dirname "$qcfg")"
-    cp "$src/profile/questionnaire.config.template.yaml" "$qcfg"
-    echo "  · seeded $qcfg (fill it in to enable /research + /questionnaire)"
+# pipeline capability config is USER-level (vault, Notion DB, kanban boards) — it lives in
+# ~/.claude regardless of install scope. Seed it only if neither the consolidated nor the
+# legacy copy exists. This piped installer is non-interactive: it seeds disabled defaults;
+# /init-pipeline + /update-pipeline wire it (npx's installer offers a quick interview instead).
+seed_config() {
+  base="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+  cfg="$base/thebidouille.config.yaml"
+  legacy="$base/questionnaire.config.yaml"
+  if [ -f "$cfg" ]; then
+    echo "  · kept your existing $cfg"
+  elif [ -f "$legacy" ]; then
+    echo "  · found legacy $legacy — kept as-is (read as a fallback)."
+    echo "    Run /update-pipeline to migrate it into thebidouille.config.yaml + wire the kanban."
   else
-    echo "  · kept your existing $qcfg"
+    mkdir -p "$base"
+    cp "$src/profile/thebidouille.config.template.yaml" "$cfg"
+    echo "  · seeded $cfg (disabled defaults — enable via /init-pipeline or /update-pipeline)"
   fi
 }
 
@@ -205,7 +212,7 @@ if [ "$scope" = "global" ]; then
   copy_fixed_agents
   copy_core
   hook_state=$(register_global_hook || echo "skipped")
-  seed_questionnaire_config
+  seed_config
   cat <<EOF
 
 ✓ pipeline core installed globally into $dest  (version $ver)
@@ -226,13 +233,12 @@ Code retrieval (Serena — the default provider /init-pipeline wires per repo):
   Make sure ~/.local/bin is on PATH (uv tool update-shell) — otherwise the
   registered MCP server silently fails to start.
 
-Research / questionnaire capability (global, works anywhere — optional):
-  1. Set  enabled: true  in ~/.claude/questionnaire.config.yaml.
-  2. Pick the store there: notion (default — connect it first:
-     claude mcp add --transport http notion https://mcp.notion.com/mcp ; the database is
-     CREATED AUTOMATICALLY on the first run) or  store: obsidian  (no MCP — runs are
-     markdown notes in your vault; the vault path is asked once, then saved).
-  3. Run  /research <pdf-url-or-file> [subject]  — then optionally  /questionnaire <run-id>.
+Global capabilities config (research / questionnaire / kanban), user-scoped — optional:
+  · One consolidated file: ~/.claude/thebidouille.config.yaml (don't hand-edit it).
+  · /init-pipeline (new project) and /update-pipeline (existing) wire it for you: enabling
+    research/questionnaire, and creating + syncing an Obsidian kanban board of the pipeline.
+  · Research with  store: notion  needs Notion first:
+    claude mcp add --transport http notion https://mcp.notion.com/mcp
 EOF
   exit 0
 fi
@@ -241,7 +247,7 @@ if [ "$mode" = "install" ]; then
   echo "→ installing pipeline core into $dest"
   copy_fixed_agents
   copy_core
-  seed_questionnaire_config
+  seed_config
   mkdir -p "$target/specs"
   [ -f "$target/specs/_template.md" ] || cp "$src/core/templates/spec.template.md" "$target/specs/_template.md"
   cat <<EOF
@@ -265,7 +271,7 @@ else
   echo "→ updating pipeline core in $dest (keeping your PIPELINE.md + rendered agents)"
   copy_core
   copy_fixed_agents 2>/dev/null || true
-  seed_questionnaire_config
+  seed_config
   bump_pointer_version "$dest/pipeline.json" "$ver"
   cat <<EOF
 

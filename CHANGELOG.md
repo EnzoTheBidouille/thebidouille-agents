@@ -3,6 +3,21 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 0.1.18 — 2026-07-22
+
+- **Consolidated global config** — the research/questionnaire settings move from
+  `~/.claude/questionnaire.config.yaml` into one `~/.claude/thebidouille.config.yaml` with
+  `obsidian` / `research` / `questionnaire` / `kanban` sections and a shared `obsidian.vault_path`.
+  The old file is still read as a fallback; `/update-pipeline` migrates it for you. The `npx`
+  installer now offers a quick interactive setup on a TTY.
+- **Obsidian kanban mirror** — an optional per-project board mirrors the pipeline
+  (`/brainstorm`…`/ship`): each stage moves the feature's card across columns
+  (Ideas → Brainstorm → Spec → Ready to build → Building → Review → Fix → Ship → Shipped).
+  `/brainstorm` can pick an idea straight from the *Ideas* column; `/init-pipeline` creates + links
+  a board (keyed by the project's `PIPELINE.md` name); `/update-pipeline` links/repairs it and
+  **backfills existing `specs/` onto the board**, syncing each card to its spec's status. Enable it
+  via `/init-pipeline` (new project) or `/update-pipeline` (existing) — no hand-editing.
+
 ## 0.1.17 — 2026-07-22
 
 - **Serena dashboard no longer auto-opens** — the per-repo Serena launcher `/init-pipeline` wires now

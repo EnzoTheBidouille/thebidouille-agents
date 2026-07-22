@@ -6,6 +6,9 @@ argument-hint: <feature_id>
 You are the **lead**. Ship feature **$ARGUMENTS**. This is the outward-facing gate.
 
 > Read `PIPELINE.md` §`vcs` (host, remote, default_branch, feature_branch_prefix).
+>
+> **Kanban** (SCHEMA.md §Kanban): once the human confirms in §1, move card `#$ARGUMENTS` → **Ship**;
+> after the PR is open (§5), move it → **Shipped**. No-op silently if no board.
 
 ## 1. Pre-flight (confirm before doing anything irreversible)
 

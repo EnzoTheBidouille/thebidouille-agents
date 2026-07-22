@@ -28,13 +28,13 @@ Two independent tracks ship with it:
 | --- | --- | --- | --- |
 | **Generic core** | the workflow doctrine: commands, fixed agents, templates, hooks — zero project facts | `~/.claude` (global) — or vendored in a repo's `.claude/` (bundled) | identical everywhere, installed once |
 | **Project profile** | stack, surfaces, commands, conventions, gates | `PIPELINE.md` + rendered surface agents + `gate-config.json`, **committed in each repo** | generated per project by `/init-pipeline` |
-| **User config** | the research capability's facts (Notion DB, language, engine format) | `~/.claude/questionnaire.config.yaml` | personal, project-independent |
+| **User config** | research/questionnaire facts (Notion DB, language) + kanban board links | `~/.claude/thebidouille.config.yaml` | personal, project-independent |
 
 The core never hardcodes stack facts. Two mechanisms keep it generic:
 
 1. **Runtime indirection** — commands/agents read project facts from `PIPELINE.md` (dev pipeline) or
-   `~/.claude/questionnaire.config.yaml` (research capability) at run time — an agent's _first
-   action_ is to read its config.
+   `~/.claude/thebidouille.config.yaml` (research/questionnaire + kanban) at run time — an agent's
+   _first action_ is to read its config.
 2. **Render-at-init** — things that must be in agent frontmatter (name, `tools:`, surface ownership)
    are rendered per **surface** by `/init-pipeline` from `implementer.template.md`.
 
@@ -131,7 +131,7 @@ npx thebidouille-agents@latest update             # a repo's bundled core in <pr
 
 The installer refreshes the generic core (commands, hook, templates) **without** touching your
 `PIPELINE.md`, rendered agents, `gate-config.json`, `settings.json`, or your filled
-`~/.claude/questionnaire.config.yaml`.
+`~/.claude/thebidouille.config.yaml`.
 
 From inside Claude Code, prefer **`/update-pipeline`**: it runs the right update invocation for your
 install scope, reports `old → new` — and then **reconciles the repo's generated files to the new
@@ -178,7 +178,7 @@ it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.
 ## Global capability — research → (optional) questionnaire
 
 A **user-scoped** capability, separate from the dev flow (`/brainstorm…/ship`) and independent of any
-project's `PIPELINE.md` — its config lives in **`~/.claude/questionnaire.config.yaml`** (seeded by the
+project's `PIPELINE.md` — its config lives in **`~/.claude/thebidouille.config.yaml`** (seeded by the
 installer, never clobbered on update) and it behaves the same in every directory. **The archived page
 IS the run** — a page in a Notion database, or a markdown note in your Obsidian vault, per the
 config's `store:` (Notion is the default; Obsidian needs no MCP, just `obsidian_vault_path`).
@@ -202,22 +202,25 @@ config's `store:` (Notion is the default; Obsidian needs no MCP, just `obsidian_
   **under your confirmation**. Nothing enters the survey engine until you review the page and mark it
   « Approuvé ».
 
-**Enable it** — one line in `~/.claude/questionnaire.config.yaml`:
+**Enable it** — best via `/update-pipeline` (it wires the config for you), or in the consolidated
+`~/.claude/thebidouille.config.yaml`:
 
 ```yaml
-enabled: true          # that's all — the Notion database is auto-created on the first /research
-# store: obsidian     # …or archive to your vault instead (obsidian_vault_path asked once, then saved)
+research:
+  enabled: true        # the Notion database is auto-created on the first /research
+  store: notion        # …or `obsidian` to archive to your vault (obsidian.vault_path asked once)
+questionnaire:
+  enabled: true        # the optional derivation step
 ```
 
-(`notion_database_id` is filled back automatically; set `notion_parent_page_id` beforehand if you want
-the database created under a specific page. With `store: obsidian`, research notes live in
+(`research.notion_database_id` is filled back automatically; set `research.notion_parent_page_id`
+beforehand for a specific parent page. With `store: obsidian`, research notes live in
 `<vault>/Recherches/` and derived questionnaires as separate wikilinked notes in
-`<vault>/Questionnaires/` (both frontmatter-tagged, folders configurable), and old Notion runs stay
-readable — pass their URL to `/questionnaire`. `engine_format` and `ui_language` default to
-`generic` / `French`.)
+`<vault>/Questionnaires/` (folders configurable), and old Notion runs stay readable — pass their URL to
+`/questionnaire`. `questionnaire.engine_format` and `ui_language` default to `generic` / `French`.)
 
-With `enabled: false` (or the file absent), `/research` and `/questionnaire` refuse cleanly and change
-nothing. The capability requires the Notion MCP (it is the storage):
+With the capability `enabled: false` (or the file absent), `/research` and `/questionnaire` refuse
+cleanly and change nothing. The capability requires the Notion MCP (it is the storage):
 
 ```sh
 claude mcp add --transport http notion https://mcp.notion.com/mcp
@@ -249,6 +252,6 @@ core/                   # copied verbatim into ~/.claude (global) or <project>/.
 profile/
   PIPELINE.template.md  # the profile skeleton /init-pipeline fills
   SCHEMA.md             # field reference
-  questionnaire.config.template.yaml  # seeds ~/.claude/questionnaire.config.yaml (global capability)
+  thebidouille.config.template.yaml   # seeds ~/.claude/thebidouille.config.yaml (research/questionnaire + kanban)
 scripts/                # new-feature / remove-feature worktree-isolation templates
 ```

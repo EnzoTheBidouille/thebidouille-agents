@@ -12,11 +12,16 @@ research note** (research and questionnaires live in distinct folders). **Nothin
 production** — the human reviews the result and flips the Statut to « Approuvé » before anything
 enters the survey engine.
 
-> **First action, always:** read **`~/.claude/questionnaire.config.yaml`**. If missing or `enabled` is
-> not `true`, **stop** and say how to enable. Otherwise note `store` (missing/empty ⇒ `notion`), its
-> store-specific keys (`notion_database_id`, or `obsidian_vault_path` +
-> `obsidian_research_folder`/`obsidian_questionnaire_folder`),
-> `engine_format`, `ui_language`. If the store was never set up (empty `notion_database_id` / empty
+> **First action, always:** read the consolidated global config
+> **`~/.claude/thebidouille.config.yaml`**; if absent, fall back to the legacy flat
+> **`~/.claude/questionnaire.config.yaml`**. If neither exists, or `questionnaire.enabled` (legacy:
+> `enabled`) is not `true`, **stop** and say how to enable (via `/update-pipeline`). Otherwise read
+> these values (nested in the consolidated file, flat in the legacy one), referred to below by the
+> short names on the left: `store` = `research.store` (missing/empty ⇒ `notion`) · `notion_database_id`
+> = `research.notion_database_id` · `obsidian_vault_path` = `obsidian.vault_path` ·
+> `obsidian_research_folder` = `research.folder` · `obsidian_questionnaire_folder` =
+> `questionnaire.folder` · `engine_format` = `questionnaire.engine_format` · `ui_language` =
+> `ui_language`. If the store was never set up (empty `notion_database_id` / empty
 > `obsidian_vault_path`), there is no research to derive from: tell the human to run `/research` first.
 
 ## 1. Load the research from the store
@@ -38,7 +43,7 @@ run (notion: a `# Questionnaire` section on the page; obsidian: a note
 
 The blueprint is derived **from the research report** (our own original text — not from the source
 PDF). Spawn one agent (`subagent_type: questionnaire-researcher`): "MODE: blueprint. Read
-`~/.claude/questionnaire.config.yaml` first for `ui_language` + `engine_format`. Derive a conceptual
+`~/.claude/thebidouille.config.yaml` (or legacy `questionnaire.config.yaml`) first for `ui_language` + `engine_format`. Derive a conceptual
 questionnaire blueprint from this research report (inline): <the full report markdown>. Return EXACTLY
 one tagged block `===BLUEPRINT.JSON===` per the schema in your agent spec — dimensions/subdimensions
 with concept + item_guidance (concepts, NEVER ready-made items), polarity, target_items, and a

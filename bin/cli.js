@@ -35,7 +35,7 @@ Commands:
             available to every project on this machine.
   update    Refresh the stack-agnostic core only. PIPELINE.md, rendered surface
             agents, gate-config.json, settings.json and your filled
-            ~/.claude/questionnaire.config.yaml are never touched.
+            ~/.claude/thebidouille.config.yaml are never touched.
   version   Print the installed CLI version.`);
   process.exit(code);
 }
@@ -74,7 +74,7 @@ function copyCore() {
   }
   const pipelineDir = path.join(dest, 'pipeline');
   fs.mkdirSync(path.join(pipelineDir, 'scripts'), { recursive: true });
-  for (const f of ['PIPELINE.template.md', 'SCHEMA.md', 'questionnaire.config.template.yaml']) {
+  for (const f of ['PIPELINE.template.md', 'SCHEMA.md', 'thebidouille.config.template.yaml']) {
     fs.copyFileSync(path.join(src, 'profile', f), path.join(pipelineDir, f));
   }
   for (const f of fs.readdirSync(path.join(src, 'scripts'))) {
@@ -119,16 +119,68 @@ function copyFixedAgents() {
   }
 }
 
-// questionnaire capability config is USER-level (Notion DB, runs path) — it lives in
-// ~/.claude regardless of install scope. Seed it only if the user has no filled copy.
-function seedQuestionnaireConfig() {
-  const qcfg = path.join(globalDir, 'questionnaire.config.yaml');
-  if (!fs.existsSync(qcfg)) {
-    fs.mkdirSync(path.dirname(qcfg), { recursive: true });
-    fs.copyFileSync(path.join(src, 'profile', 'questionnaire.config.template.yaml'), qcfg);
-    console.log(`  · seeded ${qcfg} (fill it in to enable /research + /questionnaire)`);
+// --- interactive config helpers ---------------------------------------------
+// Ask one question on the TTY. Resolves to the trimmed answer (or '' on EOF).
+function ask(question) {
+  const rl = require('readline').createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise(res => rl.question(question, a => { rl.close(); res((a || '').trim()); }));
+}
+function yes(a) { return /^(y|yes|o|oui)$/i.test(a); }
+
+// Set the value on the line carrying `# cfg:<cfgKey>`, preserving the yaml key + the comment.
+// The config template anchors every interactive field this way, so we never parse YAML.
+// Line-scoped on purpose (a multiline regex would let \s span newlines and mangle keys).
+function setCfg(text, cfgKey, value) {
+  const marker = `# cfg:${cfgKey}`;
+  return text.split('\n').map(line => {
+    const idx = line.indexOf(marker);
+    if (idx === -1) return line;
+    const m = line.slice(0, idx).match(/^(\s*[\w.]+:\s*)/);   // "  key: "
+    return m ? `${m[1]}${value}  ${line.slice(idx)}` : line;
+  }).join('\n');
+}
+
+// Fill the seeded config from a short TTY interview (research/questionnaire + shared vault).
+// Kanban is per-project, so it is wired later by /init-pipeline — not asked here.
+async function promptConfig(text) {
+  console.log('\n  Quick setup (Enter to skip any of these — you can also wire them later via');
+  console.log('  /init-pipeline or /update-pipeline):');
+  const lang = await ask('    · UI language for research/questionnaire [French]: ');
+  if (lang) text = setCfg(text, 'ui_language', lang);
+  if (yes(await ask('    · Enable the research / questionnaire capability now? [y/N]: '))) {
+    text = setCfg(text, 'research_enabled', 'true');
+    text = setCfg(text, 'questionnaire_enabled', 'true');
+    const store = (await ask('        store — notion or obsidian? [notion]: ')).toLowerCase();
+    if (store === 'obsidian') {
+      text = setCfg(text, 'store', 'obsidian');
+      const vault = await ask('        absolute path to your Obsidian vault: ');
+      if (vault) text = setCfg(text, 'vault_path', `"${vault}"`);
+    }
+  }
+  return text;
+}
+
+// The pipeline capability config is USER-level (vault, Notion DB, kanban boards) — it lives in
+// ~/.claude regardless of install scope. Seed it only if the user has no copy (consolidated OR
+// legacy). On a TTY, offer a quick interview to fill it; otherwise seed disabled defaults.
+async function seedConfig() {
+  const cfg = path.join(globalDir, 'thebidouille.config.yaml');
+  const legacy = path.join(globalDir, 'questionnaire.config.yaml');
+  if (fs.existsSync(cfg)) { console.log(`  · kept your existing ${cfg}`); return; }
+  if (fs.existsSync(legacy)) {
+    console.log(`  · found legacy ${legacy} — kept as-is (still read as a fallback).`);
+    console.log('    Run /update-pipeline to migrate it into thebidouille.config.yaml + wire the kanban.');
+    return;
+  }
+  fs.mkdirSync(path.dirname(cfg), { recursive: true });
+  let text = fs.readFileSync(path.join(src, 'profile', 'thebidouille.config.template.yaml'), 'utf8');
+  if (process.stdin.isTTY && process.stdout.isTTY) {
+    text = await promptConfig(text);
+    fs.writeFileSync(cfg, text);
+    console.log(`  · seeded ${cfg} from your answers`);
   } else {
-    console.log(`  · kept your existing ${qcfg}`);
+    fs.writeFileSync(cfg, text);
+    console.log(`  · seeded ${cfg} (disabled defaults — enable via /init-pipeline or /update-pipeline)`);
   }
 }
 
@@ -185,6 +237,7 @@ function bumpPointerVersion(ptr) {
 }
 
 // --- run ---------------------------------------------------------------------
+(async () => {
 if (scope === 'global') {
   console.log(mode === 'install'
     ? `→ installing pipeline core GLOBALLY into ${dest}`
@@ -192,7 +245,7 @@ if (scope === 'global') {
   copyFixedAgents();
   copyCore();
   const hookState = mode === 'install' ? registerGlobalHook() : 'unchanged';
-  seedQuestionnaireConfig();
+  await seedConfig();
   console.log(`
 ✓ pipeline core installed globally into ${dest}  (version ${VERSION})
   gate hook: ${hookState}  (reads each repo's .claude/gate-config.json; silent where absent)
@@ -209,16 +262,16 @@ Per repo:
 
 Update later with:  npx thebidouille-agents@latest update --global
 
-Research / questionnaire capability (global, works anywhere — optional):
-  1. Connect Notion:  claude mcp add --transport http notion https://mcp.notion.com/mcp
-  2. Set  enabled: true  in ${path.join(globalDir, 'questionnaire.config.yaml')} — that's all: the
-     Notion database is CREATED AUTOMATICALLY on the first run (nothing is stored locally).
-  3. Run  /research <pdf-url-or-file> [subject]  — then optionally  /questionnaire <run-id>.`);
+Global capabilities config (research / questionnaire / kanban), user-scoped — optional:
+  · One consolidated file: ${path.join(globalDir, 'thebidouille.config.yaml')}
+  · Don't hand-edit it — /init-pipeline (new project) and /update-pipeline (existing) wire it
+    for you: enabling research/questionnaire, and creating + syncing an Obsidian kanban board.
+  · Research needs Notion (store: notion):  claude mcp add --transport http notion https://mcp.notion.com/mcp`);
 } else if (mode === 'install') {
   console.log(`→ installing pipeline core into ${dest}`);
   copyFixedAgents();
   copyCore();
-  seedQuestionnaireConfig();
+  await seedConfig();
   fs.mkdirSync(path.join(target, 'specs'), { recursive: true });
   const specTemplate = path.join(target, 'specs', '_template.md');
   if (!fs.existsSync(specTemplate)) {
@@ -239,9 +292,10 @@ Prefer one shared core across all your repos?  Re-run with  --global.`);
   console.log(`→ updating pipeline core in ${dest} (keeping your PIPELINE.md + rendered agents)`);
   copyCore();
   try { copyFixedAgents(); } catch { /* best-effort, as in install.sh */ }
-  seedQuestionnaireConfig();
+  await seedConfig();
   bumpPointerVersion(path.join(dest, 'pipeline.json'));
   console.log(`
 ✓ core refreshed to ${VERSION}. Your PIPELINE.md, rendered surface agents, gate-config.json and
   settings.json were left as-is. Re-run /init-pipeline if your stack changed.`);
 }
+})();

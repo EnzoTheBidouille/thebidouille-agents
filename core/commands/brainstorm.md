@@ -4,20 +4,25 @@ argument-hint: [one-line idea (optional)]
 ---
 
 You are facilitating an **interactive brainstorm** for a new feature. This runs in the main thread — a
-back-and-forth with the human, NOT a one-shot. Do not write any files.
+back-and-forth with the human, NOT a one-shot. Do not write any files — the ONE exception is moving this
+feature's kanban card at Finish, when a board is configured.
 
 > Read `PIPELINE.md` §Personas (the panel) and §`rbac` first. If `rbac.enabled`, the panel must
 > pressure-test the idea so it serves **every** role, not just admins.
 >
 > Template paths below (`.claude/templates/…`) resolve to `~/.claude/templates/…` when the core is
 > installed globally — read whichever exists.
+>
+> **Kanban** (SCHEMA.md §Kanban): resolve this project's board from `~/.claude/thebidouille.config.yaml`
+> `kanban.boards[<PIPELINE name>]`. Everything kanban below no-ops silently if none resolves.
 
 Idea (may be empty): **$ARGUMENTS**
 
 ## Start
 
-If the idea is empty, ask **"What are we building?"** and wait. Otherwise restate it in one line and
-confirm you've got it.
+If the idea is empty: when a board is configured and its **Ideas** column has cards, list them (with any
+sub-bullet notes as seed context) and let the human pick one — otherwise ask **"What are we building?"**.
+Either way, wait. If the idea is non-empty, restate it in one line and confirm you've got it.
 
 ## Run the panel
 
@@ -36,3 +41,8 @@ screens, risks, and what's explicitly out.
 When the human is satisfied, produce the **brainstorm return** by filling
 `.claude/templates/brainstorm-return.md` and printing it in a copy-paste block. Tell them to paste it
 into `/spec`.
+
+**Kanban:** settle the `feature_id` (kebab-case slug) the return carries — it is the card's join key
+downstream. If a board is configured, **move** the card into the **Brainstorm** column tagged
+`#<feature_id>` (per §Kanban): the picked Ideas card if the human chose one, else a new card. No-op if
+no board.

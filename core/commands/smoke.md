@@ -10,6 +10,8 @@ through `/fix`). Observe honestly: report what happened, not what should have ha
 > Read `PIPELINE.md` §`pipeline-profile`: `commands` (migrate/dev), `isolation` (worktree, slot
 > ports, db), `contract`, `design`, `surfaces`, and the spec `specs/$ARGUMENTS.md` (§5 contract,
 > §9 acceptance).
+>
+> **Kanban** (SCHEMA.md §Kanban): move card `#$ARGUMENTS` → **Review**. No-op silently if no board.
 
 ## 1. Bring the feature up
 

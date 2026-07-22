@@ -5,7 +5,7 @@ argument-hint: [path-to-local-checkout]
 
 You are the **pipeline updater**. Refresh the installed pipeline core to the latest version of the pipeline
 repo. The installer's `--update` mode never touches generated files: `PIPELINE.md`, rendered surface agents,
-`gate-config.json`, `settings.json`, and the filled `~/.claude/questionnaire.config.yaml` are all preserved.
+`gate-config.json`, `settings.json`, and the filled `~/.claude/thebidouille.config.yaml` are all preserved.
 YOU then bring those generated files up to the new core yourself (§3.5) — additively, never clobbering
 the human's choices — so `/init-pipeline` never needs re-running for an upgrade.
 
@@ -70,6 +70,21 @@ actually connected) and repair whatever fails — wiring that worked at
 init can rot (PATH changes, uninstalls, hand-edits). Report what was reconciled; if nothing was
 missing, say so. This is why `/init-pipeline` never needs re-running for a core upgrade.
 
+Two of the §Reconcile steps matter specifically here:
+
+- **Global config migration** (§Reconcile step 5): if `~/.claude/thebidouille.config.yaml` is absent
+  but the legacy `~/.claude/questionnaire.config.yaml` exists, seed the consolidated file from the
+  template and carry every filled legacy value into its nested home. Keep the legacy file (still read
+  as a fallback). Report the migration.
+- **Kanban sync** (§Reconcile step 6): resolve this project's board from `kanban.boards[<PIPELINE
+  name>]`. **Not linked** → offer to link/create a board (confirm the vault + `<folder>/Tasks.md`,
+  write the `boards` entry, create the board file per §Kanban). **Linked** → verify the board file
+  exists (recreate if the human confirms) and its columns match `kanban.columns` (repair drift). Either
+  way, run the §Kanban **full sync/backfill** from `specs/*.md` — this is what adds every
+  already-developed feature to the board and repositions cards to match each spec's `status`. Report
+  cards added / moved / already-correct. Skip silently if `kanban.enabled` is false and the human
+  doesn't want to turn it on.
+
 ## 4. Tell the human the follow-ups
 
 - **Restart / reload the Claude Code session** so it picks up updated commands, agents, and any
@@ -77,5 +92,6 @@ missing, say so. This is why `/init-pipeline` never needs re-running for a core 
 - **Other repos using the global core:** their core is already fresh, but reconcile is per-repo — run
   `/update-pipeline` inside each (it will skip the already-done core update and just reconcile).
 - **Commit** the reconciled files (`PIPELINE.md`, `.claude/`, `.mcp.json` if added) so teammates get them.
-- The questionnaire capability needs nothing per repo — its config is global
-  (`~/.claude/questionnaire.config.yaml`) and untouched by updates.
+- The research/questionnaire + kanban config is global and user-scoped
+  (`~/.claude/thebidouille.config.yaml`) — never committed. The core update never touches it; only the
+  reconcile above migrates the legacy file and writes kanban board links (into that global file, not the repo).

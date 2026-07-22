@@ -10,6 +10,9 @@ You are the **lead**. Build feature **$ARGUMENTS** from its frozen spec.
 >
 > Template paths below (`.claude/templates/…`) resolve to `~/.claude/templates/…` when the core is
 > installed globally — read whichever exists.
+>
+> **Kanban** (SCHEMA.md §Kanban): once §1 confirms the frozen spec, move card `#$ARGUMENTS` →
+> **Building**. No-op silently if no board is configured.
 
 ## 1. Load & check
 

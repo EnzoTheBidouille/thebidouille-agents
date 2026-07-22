@@ -9,6 +9,8 @@ You are the **lead**. Dispatch the review for feature **$ARGUMENTS**.
 >
 > Template paths below (`.claude/templates/…`) resolve to `~/.claude/templates/…` when the core is
 > installed globally — read whichever exists.
+>
+> **Kanban** (SCHEMA.md §Kanban): move card `#$ARGUMENTS` → **Review**. No-op silently if no board.
 
 ## 1. Gather the inputs for stateless reviewers
 

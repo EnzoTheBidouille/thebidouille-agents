@@ -9,12 +9,20 @@ later step (`/questionnaire <run-id>`), derived from the report only if the huma
 **global, user-scoped** command; it behaves identically in every directory. **The store page IS the
 run's storage** — you hold artifacts in conversation memory and write nothing anywhere else.
 
-> **First action, always:** read **`~/.claude/questionnaire.config.yaml`** (the global capability
-> config). If it's missing or `enabled` is not `true`, **stop**: tell the human to set `enabled: true`
-> in that file. Otherwise note `store` (missing/empty ⇒ `notion`), its store-specific keys
-> (`notion_database_id` + `notion_parent_page_id`, or `obsidian_vault_path` +
-> `obsidian_research_folder`/`obsidian_questionnaire_folder`),
-> `engine_format`, `ui_language`.
+> **First action, always:** read the consolidated global config
+> **`~/.claude/thebidouille.config.yaml`**; if it's absent, fall back to the legacy flat
+> **`~/.claude/questionnaire.config.yaml`**. If neither exists, or `research.enabled` (legacy:
+> `enabled`) is not `true`, **stop**: tell the human to enable it via `/update-pipeline` (or set
+> `research.enabled: true`). Otherwise read these values — nested in the consolidated file, flat in
+> the legacy one — and refer to them below by the short names on the left:
+> `store` = `research.store` (missing/empty ⇒ `notion`) · `notion_database_id` =
+> `research.notion_database_id` · `notion_parent_page_id` = `research.notion_parent_page_id` ·
+> `obsidian_vault_path` = `obsidian.vault_path` · `obsidian_research_folder` = `research.folder` ·
+> `obsidian_questionnaire_folder` = `questionnaire.folder` · `engine_format` =
+> `questionnaire.engine_format` · `ui_language` = `ui_language`. When you write a value back (e.g.
+> the created `notion_database_id`, or a vault path the human supplies), write it into the
+> consolidated file at its nested key — creating that file from the template if only the legacy one
+> existed.
 
 ## 0. Store auto-setup (first run only)
 
@@ -22,8 +30,8 @@ run's storage** — you hold artifacts in conversation memory and write nothing 
   **automatically** via the Notion MCP — title « Questionnaires », schema `Sujet` TITLE · `Cadre`
   RICH_TEXT · `Statut` SELECT('Recherche':blue, 'À relire':yellow, 'Bloqué':red, 'Approuvé':green) ·
   `Date` DATE · `Run ID` RICH_TEXT — under `notion_parent_page_id` if set, else as a workspace-level
-  private page. Then **write the new database id back into `~/.claude/questionnaire.config.yaml`**
-  and tell the human where it lives. If no Notion MCP tool is connected, **stop**: print
+  private page. Then **write the new database id back into `~/.claude/thebidouille.config.yaml`**
+  (key `research.notion_database_id`) and tell the human where it lives. If no Notion MCP tool is connected, **stop**: print
   `claude mcp add --transport http notion https://mcp.notion.com/mcp`.
 - **`store: obsidian`** — if `obsidian_vault_path` is empty, ask the human for their vault path and
   **write it back into the config**. Verify the path exists (warn — don't block — if it contains no
@@ -52,7 +60,7 @@ into the archived page — never onto disk outside the store.
 ## 3. Dispatch `questionnaire-researcher` in RESEARCH mode (read-only)
 
 Spawn one agent (`subagent_type: questionnaire-researcher`): "MODE: research. Read
-`~/.claude/questionnaire.config.yaml` first for `ui_language`. Produce a standalone research report for
+`~/.claude/thebidouille.config.yaml` (or legacy `questionnaire.config.yaml`) first for `ui_language`. Produce a standalone research report for
 run `<run-id>`. domain_brief (inline): <the full brief JSON>. Source PDF: <path-or-url> — **local path ⇒
 Read tool (`pages` parameter, ~15 pages per call, as many calls as needed); URL ⇒ WebFetch** (if
 unreachable, flag it and reconstruct from secondary sources). Return EXACTLY one tagged block

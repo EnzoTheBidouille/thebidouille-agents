@@ -87,8 +87,15 @@ Ask ONLY what you couldn't confidently detect. Batch related questions. Cover:
 
 Prefer sensible defaults from Phase 1 as the first (Recommended) option in each question.
 
-> The **questionnaire capability** (`/research`, `/questionnaire`) is user-scoped and configured
-> separately in `~/.claude/questionnaire.config.yaml` — it is NOT part of this project interview.
+- **Kanban** (optional) — mirror this project's pipeline (`/brainstorm`…`/ship`) onto an Obsidian
+  Kanban board? If the human says yes: confirm the shared vault path (`obsidian.vault_path` in
+  `~/.claude/thebidouille.config.yaml`; ask if empty) and the board's location inside it (default
+  `<ProjectName>/Tasks.md`). Phase 4 creates the board and records the link. Default: no.
+
+> The **research/questionnaire capability** (`/research`, `/questionnaire`) is user-scoped and lives in
+> the same global config but is NOT wired here — enable it via `/update-pipeline`. The **kanban** link,
+> though also user-scoped (it points at a personal vault, so it never goes in the committed
+> `PIPELINE.md`), IS wired here because it is per-project — see Phase 4.
 
 ## Phase 3 — Draft the profile (show, don't write yet)
 
@@ -174,6 +181,14 @@ conventions, no narration, no facts derivable from the code. **Show the human th
     `/fix` and `/smoke` append per-dispatch evidence there (SCHEMA §Specialization reads it).
 12. **Design system:** if `design.enabled` with a snapshot dir, note that `/align-ds` is active; else the
     `/align-ds` command will no-op with a clear message.
+13. **Kanban** (only if the human opted in at Phase 2): wire it per SCHEMA.md §Kanban, writing into the
+    **global** `~/.claude/thebidouille.config.yaml` (never into this repo — the board points at a
+    personal vault). Create the file from `pipeline/thebidouille.config.template.yaml` if absent; set
+    `kanban.enabled: true` and `obsidian.vault_path` if it was empty. Add a `kanban.boards[<PIPELINE
+    name>]` entry with `board: <folder>/Tasks.md`. Then **create the board file**
+    `<vault>/<folder>/Tasks.md` (per §Kanban) if it doesn't exist — one column per `kanban.columns`
+    stage, in pipeline order. Finally run the §Kanban backfill so any spec already in `specs/` lands on
+    the board. Report the board path + the `obsidian://` URI. Skip silently if the human declined.
 
 ## Phase 5 — Report
 
