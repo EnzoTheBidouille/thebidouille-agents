@@ -10,24 +10,34 @@ You are the **lead**. Dispatch the review for feature **$ARGUMENTS**.
 > Template paths below (`.claude/templates/…`) resolve to `~/.claude/templates/…` when the core is
 > installed globally — read whichever exists.
 
-## 1. Gather the inputs for a stateless reviewer
+## 1. Gather the inputs for stateless reviewers
 
 - Confirm `specs/$ARGUMENTS.md` exists.
-- Compute the diff: `git diff <default_branch>...HEAD --stat` and note the changed files (every surface +
-  the lead's contract file).
+- Compute the diff: `git diff <default_branch>...HEAD --stat`. **Group the changed files by
+  `surfaces[].path`.** The contract file and any changed file outside every surface path form a
+  small `shared` remainder — attach it to the most relevant surface's reviewer and say so in its
+  dispatch.
 
-## 2. Dispatch the `review` agent (read-only)
+## 2. Dispatch review agents — one per touched surface, IN PARALLEL
 
-Spawn one agent (`subagent_type: review`): "Review feature `$ARGUMENTS`. Read `PIPELINE.md` first. Spec:
-`specs/$ARGUMENTS.md` (source of truth). Review the current branch diff vs `<default_branch>` (changed
-files: …). Check spec conformance first, then correctness, security, conventions (`PIPELINE.md`
-§Conventions), RBAC/mobile-first _if the profile enables them_, and TDD coverage. Emit the REVIEW REPORT
-per `.claude/templates/review-feedback.md` — every finding self-sufficient (`file:line` · severity · type
-· concrete fix)." The agent is `Read, Grep, Glob` only.
+Spawn ONE `review` agent per surface that has changed files, in a **single message** (one Task call
+each, like `/build`) so they run concurrently — NEVER serially: review wall-clock must be the
+slowest surface, not the sum. A diff touching a single surface ⇒ a single reviewer. For each:
 
-## 3. Relay the verdict
+> `subagent_type: review` — "Review feature `$ARGUMENTS` — **scope: the `<surface.key>` surface
+> only**. Read `PIPELINE.md` first (its flags + §Conventions/§Testing for `<surface.key>`). Spec:
+> `specs/$ARGUMENTS.md` (source of truth). Contract: `<contract.path>/$ARGUMENTS.<ext>`. Changed
+> files in your scope (diff vs `<default_branch>`): <list, with the `--stat` counts>. Review the
+> diff hunks + immediate context — not whole files. Check spec conformance first, then correctness,
+> security, conventions, RBAC/mobile-first _if the profile enables them_, and TDD coverage. Emit
+> the REVIEW REPORT per `.claude/templates/review-feedback.md` — every finding self-sufficient
+> (`file:line` · severity · type · concrete fix)."
 
-Print the returned REVIEW REPORT. Then:
+## 3. Merge & relay the verdict
+
+Merge the returned reports into **one** REVIEW REPORT (same template): findings concatenated and
+re-ordered by severity, counts summed, duplicates collapsed, verdict = the worst returned
+(`BLOCK` > `REVISE` > `SHIP`). Print it. Then:
 
 - **SHIP** → tell the human they can `/ship`.
 - **REVISE / BLOCK**, or any finding of any severity → tell the human to paste the report into `/spec`
