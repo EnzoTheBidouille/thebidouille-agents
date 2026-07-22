@@ -38,7 +38,7 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
 | `design.enabled`                     | bool         | build, frontend, align-ds         | `false` ⇒ design steps are no-ops.                            |
 | `design.provider`                    | enum         | frontend, align-ds                | `claude-design`/`figma`/`none`.                               |
 | `design.design_system_project`       | id           | align-ds, frontend                | UI-kit source of truth.                                       |
-| `design.design_project`              | id           | frontend                          | Per-feature screen designs.                                   |
+| `design.design_project`              | id           | build, frontend                   | Fallback project for per-feature screens; a full link in spec `design_files` wins. |
 | `design.snapshot_dir`                | path         | align-ds                          | Committed DS snapshot for diffing.                            |
 | `design.ui_kit_path` `.tokens_path`  | path         | align-ds, frontend                | Where the kit + tokens live in code.                          |
 | `isolation.enabled`                  | bool         | new-feature script                | `false` ⇒ build in main checkout.                             |

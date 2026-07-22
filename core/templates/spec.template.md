@@ -4,7 +4,7 @@ title: <Feature title>
 status: draft # draft → frozen → in-review → shipped
 branch: <feature_branch_prefix><slug>
 created: <YYYY-MM-DD>
-design_files: [] # page files in the design_project this feature touches — blank until designed; omit if no UI
+design_files: [] # design page links (full URLs — each carries its own project) or bare file names resolved in the profile's design_project — blank until designed; omit if no UI
 ---
 
 # <Feature title>

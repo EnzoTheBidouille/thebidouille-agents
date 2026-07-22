@@ -34,7 +34,10 @@ Detect the mode from the pasted content:
 5. When the human validates, **freeze**: write `specs/<id>.md` (`status: frozen`, front-matter filled).
    Create the file — do not ask the human to.
 6. Print the **spec return** (§8 design brief via `.claude/templates/design-brief.md`) in a copy-paste
-   block; tell the human: paste it into the design tool (if any), then run `/build <id>`.
+   block; tell the human: paste it into the design tool (if any — typically a fresh design project for
+   this feature), then run `/build <id>` and hand its design gate the resulting page link(s) — a full
+   link carries its own project, no profile change needed. (They can also paste the links into the
+   spec's `design_files` themselves.)
 
 ## Mode B — review return (input is a REVIEW REPORT)
 

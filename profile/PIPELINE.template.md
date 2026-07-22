@@ -109,7 +109,7 @@ design:
   enabled: <true | false>                     # false ⇒ /align-ds + design gates are no-ops
   provider: <claude-design | figma | none>
   design_system_project: <uuid-or-id>         # the UI-kit source of truth
-  design_project: <uuid-or-id>                # per-feature screen designs
+  design_project: <uuid-or-id | none>         # fallback for per-feature screens — a full link in a spec's design_files carries its own project and wins
   snapshot_dir: apps/web/design-reference     # committed DS snapshot for /align-ds diff
   direction: design-to-code                   # NEVER push code→design for a curated DS
   ui_kit_path: apps/web/src/components/ui
@@ -181,8 +181,9 @@ gate:
 ## Design brief note (feeds `/spec` §8 and Claude Design)
 
 - <design system name + primitives to use · mobile-first · copy language · brand/theming constraints>
-- Per-feature page files live in `design_project`; a feature names its subset in the spec
-  front-matter `design_files`.
+- A feature lists its design pages in the spec front-matter `design_files`: full design-tool links
+  (each carries its own project — the usual flow: one design project per feature, paste the link at
+  `/build`'s design gate) or bare file names resolved in the fallback `design_project`.
 
 ---
 
