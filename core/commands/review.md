@@ -45,7 +45,13 @@ re-ordered by severity, counts summed, duplicates collapsed, verdict = the worst
 (gitignored): `{"ts":"<ISO>","feature":"$ARGUMENTS","phase":"review","surface":"<key>","seconds":<wall-clock>,"result":"<verdict>:<finding count>"}`.
 Print the report. Then:
 
-- **SHIP** → tell the human they can `/ship`.
+- **SHIP** → a SHIP verdict *is* the pipeline's statement that the feature meets its Definition of
+  Done, so **tick the DoD**: in `specs/$ARGUMENTS.md` §`Acceptance criteria / DoD`, flip each `- [ ]`
+  → `- [x]` for the criteria the pipeline has actually verified — spec conformance + `ui_language`
+  copy (this review), tests · lint · typecheck (a green `/build`), mobile-first + runtime flows (a
+  prior `/smoke`). **Leave `- [ ]` (and say which) any item whose verifying stage didn't run this
+  cycle** — e.g. no `/smoke` ⇒ the mobile-first / runtime item stays open. Ticking is the lead's job
+  (the reviewer is read-only). Then tell the human they can `/ship`.
 - **REVISE / BLOCK**, or any finding of any severity → tell the human to run **`/fix $ARGUMENTS`** —
   it appends the report to the spec's `## Remediation` and re-dispatches ONLY the surfaces with
   findings. The full path (`/spec` Mode B then `/build`) remains for findings that change the

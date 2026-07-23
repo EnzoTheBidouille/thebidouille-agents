@@ -29,15 +29,26 @@ that change the *contract*; `/fix` is for everything else.
 
 ## 2. Scope the re-dispatch — only surfaces with findings
 
-- Map every unchecked Remediation item to a surface by matching its `file:line` path against
-  `surfaces[].path`. Items outside every surface path (contract file, root config) are yours or go
+- Map every **open** (`- [ ]`) Remediation item to a surface by matching its `file:line` path against
+  `surfaces[].path`. Items already checked `- [x]` (fixed in a prior round) are done — skip them, never
+  re-dispatch them. Items outside every surface path (contract file, root config) are yours or go
   to the most relevant surface — say which.
 - Re-dispatch **ONLY the surfaces owning ≥1 item**, in parallel, in a **single message** — the exact
   fix-loop dispatch template from `/build` §3 (spec, contract read-only, "address the `## Remediation`
   items", current diff). Surfaces without findings are NOT re-dispatched — that is the point.
 
-## 3. Integrate
+## 3. Integrate & check off what's fixed
 
-When the agents return, summarize the handoffs, append one metrics line per dispatched agent to
-`.claude/pipeline-metrics.jsonl` (see `/build` §4), then tell the human: re-run `/smoke` if the
-failures were runtime ones, and `/review $ARGUMENTS` for the re-verdict.
+When the agents return:
+
+- **Tick the resolved items.** Each handoff's `## Remediation addressed` lists what that agent fixed
+  (by `file:line`). For every Remediation item an agent reports fixed, flip its `- [ ]` → `- [x]` in
+  `specs/<id>.md` and append a terse ` — fixed: <what/where>` note (the convention prior rounds already
+  use). Leave genuinely-unaddressed items `- [ ]` so the next loop still sees them. This keeps the
+  checkbox state honest and stops a later `/fix` from re-dispatching already-fixed items (§2). Ticking
+  here is the lead's job — surface agents own only their tree, never the spec.
+- Summarize the handoffs and append one metrics line per dispatched agent to
+  `.claude/pipeline-metrics.jsonl` (see `/build` §4).
+- Tell the human: re-run `/smoke` if the failures were runtime ones, and `/review $ARGUMENTS` for the
+  re-verdict — the re-review is what *verifies* the ticked items actually hold (a regression simply
+  reappears as a new finding in the next round).
