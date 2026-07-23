@@ -3,6 +3,19 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 0.1.20 — 2026-07-24
+
+- **`/fix` now checks off resolved Remediation items** — the lead flips `- [ ]` → `- [x]` (with a
+  short "fixed" note) for every item the surface agents report addressed in their handoff, and skips
+  already-`[x]` items when scoping the re-dispatch. Fixes two long-standing quirks: a spec whose
+  Remediation looked permanently open even after fixes landed, and a later `/fix` re-sending
+  already-fixed items from earlier rounds to the agents.
+- **`/review` now ticks the §9 DoD at a SHIP verdict** — a SHIP verdict is the pipeline's statement
+  that the feature is done, so the lead checks off each Acceptance-criteria item its verifying stage
+  actually covered (conformance/copy = review, tests/lint/types = build, mobile-first/runtime = smoke),
+  leaving open any whose stage didn't run. `/ship` gains a matching gate: it lists any still-open DoD
+  item and asks before shipping (it never ticks — that's `/review`'s job).
+
 ## 0.1.19 — 2026-07-24
 
 - **Research decoupled from the questionnaire** — `/research` now dispatches a dedicated, standalone

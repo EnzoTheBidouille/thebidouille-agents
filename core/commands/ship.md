@@ -14,6 +14,10 @@ You are the **lead**. Ship feature **$ARGUMENTS**. This is the outward-facing ga
 
 - Confirm the latest `/review` returned **SHIP** (no CRITICAL, no security). If not reviewed, or the
   verdict was REVISE/BLOCK, stop and say so.
+- **DoD gate (verify, don't tick — `/review` owns the ticking).** Read `specs/$ARGUMENTS.md`
+  §`Acceptance criteria / DoD`; if any item is still `- [ ]`, list the open ones and ask the human to
+  confirm shipping anyway (they may be deferred on purpose — e.g. a UI item on a backend-only feature).
+  All `- [x]` ⇒ proceed silently.
 - Show `git status` + `git diff --stat`; confirm the branch is `<feature_branch_prefix>$ARGUMENTS`.
 - **Ask the human to confirm** they want to commit, push, and open the PR. Wait for yes.
 
