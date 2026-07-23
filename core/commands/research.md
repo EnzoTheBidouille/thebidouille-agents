@@ -27,7 +27,7 @@ run's storage** — you hold artifacts in conversation memory and write nothing 
 ## 0. Store auto-setup (first run only)
 
 - **`store: notion`** — if `notion_database_id` is empty: create the archive database
-  **automatically** via the Notion MCP — title « Questionnaires », schema `Sujet` TITLE · `Cadre`
+  **automatically** via the Notion MCP — title « Recherche », schema `Sujet` TITLE · `Cadre`
   RICH_TEXT · `Statut` SELECT('Recherche':blue, 'À relire':yellow, 'Bloqué':red, 'Approuvé':green) ·
   `Date` DATE · `Run ID` RICH_TEXT — under `notion_parent_page_id` if set, else as a workspace-level
   private page. Then **write the new database id back into `~/.claude/thebidouille.config.yaml`**
@@ -51,25 +51,60 @@ update that page (supersede) or pick a new run-id.
 
 ## 2. Frame the research (in memory — no file)
 
-Compose the domain brief per the schema in `~/.claude/templates/questionnaire-domain-brief.md`
+Compose the research brief per the schema in `~/.claude/templates/research-brief.md`
 (`subject`, `goal`, `scope`, `audience`, `constraints` — seed `ui_language` + a licence-caution note —
-and `reference_frameworks` starting with the source, `role: "source-pdf"`). Ask the human for
-`goal`/`audience`/`scope` only if they're not obvious. You will inline this brief into the dispatch and
-into the archived page — never onto disk outside the store.
+and `reference_frameworks` starting with the source, `role: "source-pdf"`). Frame `goal` as a **research
+objective** — what the report must establish and extract from the source — **never** as "what a future
+questionnaire is for"; the questionnaire is an optional downstream step and must not colour the brief.
+Ask the human for `goal`/`audience`/`scope` only if they're not obvious. You will inline this brief into
+the dispatch and into the archived page — never onto disk outside the store.
 
-## 3. Dispatch `questionnaire-researcher` in RESEARCH mode (read-only)
+## 3. Produce the report — single-pass or multi-pass (all via `research-agent`, read-only)
 
-Spawn one agent (`subagent_type: questionnaire-researcher`): "MODE: research. Read
-`~/.claude/thebidouille.config.yaml` (or legacy `questionnaire.config.yaml`) first for `ui_language`. Produce a standalone research report for
-run `<run-id>`. domain_brief (inline): <the full brief JSON>. Source PDF: <path-or-url> — **local path ⇒
-Read tool (`pages` parameter, ~15 pages per call, as many calls as needed); URL ⇒ WebFetch** (if
-unreachable, flag it and reconstruct from secondary sources). Return EXACTLY one tagged block
-`===REPORT.MD===` — an academic-register research report (Sujet & périmètre · Méthodologie · Synthèse ·
-Cadres & état de l'art · Analyse du domaine · Débats & controverses · Paysage pratique & licences ·
-Questions ouvertes · Sources), per your agent spec: **argued prose, precise citations
-(chapter/page + author–date), explicit epistemic status (established/debated/hypothesis), numbers with
-references, 2 500–5 000 words** — NOT an executive summary, NOT questionnaire-shaped. Never draft
-items, never reproduce instrument text, flag every licence."
+The `research-agent` never touches the store; the orchestrator routes every artifact between passes and
+holds them in memory. Each dispatch begins: "Read `~/.claude/thebidouille.config.yaml` (or legacy
+`questionnaire.config.yaml`) first for `ui_language`." **The orchestrator never reads the source itself**
+— every read goes through a `research-agent` pass.
+
+Pick the path by source type and size:
+
+- **URL source** ⇒ **single-pass** (WebFetch can't page reliably). Skip to §3a.
+- **Local PDF** ⇒ first run **§3.map** to size it; then the plan's `multipass` flag picks §3a (false) or
+  §3b (true).
+
+**§3.map — reading plan.** Spawn one `research-agent` (job `map`): "Job: map. research_brief (inline):
+<brief>. Source PDF: <path>. Map the table of contents / structure and return `===PLAN.JSON===` per your
+spec — segments covering the whole document (~20–35 pages each), `multipass`, `total_pages`." Parse the
+plan (re-dispatch once if it doesn't parse).
+
+**§3a — single-pass** (small source, or URL). Spawn one `research-agent` (job `analyse-full`): "Job:
+analyse-full. Produce a standalone research report for run `<run-id>`. research_brief (inline): <brief>.
+Source: <path-or-url> — **local path ⇒ Read tool (`pages`, ~15/call, as many as needed); URL ⇒ WebFetch**
+(if unreachable, flag it in the methodology note and reconstruct from secondary sources). Return EXACTLY
+one `===REPORT.MD===` — the full 9-section skeleton, argued prose, precise citations, explicit epistemic
+status, numbers with references, length scaled to the source (completeness is the ceiling), NOT
+questionnaire-shaped." That block **is** the report; go to §4.
+
+**§3b — multi-pass** (large source). Guarantees a long, exhaustive report by never asking one dispatch
+to emit the whole thing:
+
+1. **Fan out, one segment per agent (in parallel).** For each `segments[]` entry, spawn a `research-agent`
+   (job `analyse-segment`) **in the same message** so they run concurrently: "Job: analyse-segment.
+   research_brief (inline): <brief>. Source PDF: <path>. Segment: « <title> », pages <X-Y> — read ONLY
+   those pages. Return EXACTLY one `===PARTIAL.MD===` per your spec (deep analysis of this segment +
+   Fils transverses + Sources (segment))." Collect every partial. If a segment fails, re-dispatch it once.
+2. **Synthesise the cross-cutting sections.** Spawn one `research-agent` (job `synthesise`): "Job:
+   synthesise. Subject: <subject>. You are given each segment's Fils transverses + Sources (segment)
+   below (not the full bodies). <inline: for every partial, its « ### Fils transverses » and « ### Sources
+   (segment) » blocks, each under its segment title>. Return EXACTLY one `===SYNTH.MD===` per your spec —
+   unified Synthèse/Questions ouvertes, merged deduped bibliography, unified licence table; note the
+   multi-pass method (N segments) in Méthodologie."
+3. **Assemble `REPORT.MD` (orchestrator, mechanical — no source reading).** Stitch, in order: `# <Subject>`
+   → SYNTH's `## Sujet & périmètre`, `## Méthodologie`, `## Synthèse`, `## Cadres de référence & état de
+   l'art` → then `## Analyse du domaine` whose body is **each partial's analytical block concatenated in
+   segment order** (the text from `## <Segment title>` down to but excluding its `### Fils transverses`) →
+   then SYNTH's `## Débats & controverses`, `## Paysage pratique & licences`, `## Questions ouvertes`,
+   `## Sources`. The result is one coherent `REPORT.MD`; go to §4.
 
 ## 4. Archive to the store — CONFIRM FIRST (this IS the storage)
 
@@ -77,11 +112,11 @@ Show the human a short summary and **ask to confirm** the write. On yes:
 
 - **notion** — create the page in `notion_database_id`: properties **Sujet** · **Cadre** (the main
   framework identified) · **Statut** = `« Recherche »` · **Date** = today · **Run ID** = `<run-id>`;
-  body = the report, plus the domain brief in a fenced JSON block at the end. If the source was a
+  body = the report, plus the research brief in a fenced JSON block at the end. If the source was a
   **local file**, also attach it (`notion-create-attachment`) — best effort, skip gracefully.
 - **obsidian** — write `<vault>/<obsidian_research_folder>/<run-id>.md`: YAML frontmatter
   `run_id` · `sujet` · `cadre` · `statut: Recherche` · `date` (today, YYYY-MM-DD) ·
-  `tags: [questionnaire-run]`; body = the report, plus the domain brief in a fenced JSON block at the
+  `tags: [research-run]`; body = the report, plus the research brief in a fenced JSON block at the
   end. If the source was a **local file**, copy the PDF to
   `<obsidian_research_folder>/_sources/<run-id>.pdf`
   and link it near the top (`![[_sources/<run-id>.pdf]]`).

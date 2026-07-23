@@ -1,8 +1,8 @@
 # CONTRACT — blueprint · `<run-id>`
 
-> Frozen contract between `questionnaire-researcher` (mode blueprint, author) and `questionnaire-writer` +
+> Frozen contract between `questionnaire-architect` (author) and `questionnaire-writer` +
 > `questionnaire-validator` (consumers). The **conceptual skeleton** of the questionnaire — constructs and
-> guidance, **never items**. Derived by `/questionnaire` from the run's research report (the researcher's
+> guidance, **never items**. Derived by `/questionnaire` from the run's research report (the architect's
 > `===BLUEPRINT.JSON===` block), held in memory and archived in the run's page (Notion or Obsidian, per the config `store`). JSON, not prose.
 
 ```json

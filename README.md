@@ -189,16 +189,18 @@ config's `store:` (Notion is the default; Obsidian needs no MCP, just `obsidian_
    → archived page (Statut « Recherche »)           → same page (« À relire » / « Bloqué »)
 ```
 
-- **`/research`** is genuine research, valuable on its own: the read-only **researcher** reads the PDF —
-  **a URL, or a local file** (pass a path to skip CAPTCHAs/paywalls entirely) — and produces a standalone
-  research report (state of the art, domain analysis, debates, licences, open questions, sources). It
-  **never drafts items** and never reproduces licensed instrument text. The report lands in the store
-  (under your confirmation) as a page with Statut « Recherche »; a local source file is attached to the
-  page (Notion) or copied to the vault's `_sources/` (Obsidian) for provenance.
-- **`/questionnaire`** exists only if you want a survey out of a research run: it derives a conceptual
-  **blueprint** from the report (researcher, blueprint mode), dispatches the **writer** (*original*
-  Likert-5 items — no tools, so it never sees the source or the report) then the **validator** (loops up
-  to 3×), and **completes the same page** (blueprint + questionnaire + verdict, Statut flipped)
+- **`/research`** is genuine research, valuable on its own: the read-only **research-agent** — an
+  autonomous research assistant — reads the PDF — **a URL, or a local file** (pass a path to skip
+  CAPTCHAs/paywalls entirely) — and produces a standalone research report that extracts everything
+  important in the source (state of the art, domain analysis, debates, licences, open questions,
+  sources). It stands fully on its own — no questionnaire framing — and never reproduces a proprietary
+  instrument's item bank wholesale. The report lands in the store (under your confirmation) as a page
+  with Statut « Recherche »; a local source file is attached to the page (Notion) or copied to the
+  vault's `_sources/` (Obsidian) for provenance.
+- **`/questionnaire`** exists only if you want a survey out of a research run: the **questionnaire-architect**
+  derives a conceptual **blueprint** from the report, then the **writer** drafts *original* Likert-5
+  items (no tools, so it never sees the source or the report) and the **validator** checks them (loops up
+  to 3×); it **completes the same page** (blueprint + questionnaire + verdict, Statut flipped)
   **under your confirmation**. Nothing enters the survey engine until you review the page and mark it
   « Approuvé ».
 
@@ -244,11 +246,11 @@ install.sh              # script installer (fresh + --update) for no-Node enviro
 install.ps1             # same installer for Windows PowerShell (fresh + -Update)
 core/                   # copied verbatim into ~/.claude (global) or <project>/.claude (bundled)
   agents/               # implementer.template.md (rendered per surface) + review.md + release.md
-                        #   + questionnaire-{researcher,writer,validator}.md (fixed capability agents)
+                        #   + research-agent.md + questionnaire-{architect,writer,validator}.md (fixed capability agents)
   commands/             # init-pipeline + the workflow commands + /update-pipeline, /research, /questionnaire
   hooks/                # gate.py (destructive-command gate)
   templates/            # handoff / brainstorm-return / design-brief / review-feedback / pr-body / spec
-                        #   + questionnaire-{domain-brief,blueprint,declaration,verdict} (frozen contracts)
+                        #   + research-brief + questionnaire-{blueprint,declaration,verdict} (frozen contracts)
 profile/
   PIPELINE.template.md  # the profile skeleton /init-pipeline fills
   SCHEMA.md             # field reference

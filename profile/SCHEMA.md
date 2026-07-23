@@ -236,26 +236,33 @@ on the first `/research`) or **obsidian** (a note in the shared vault, `obsidian
 | `research.folder` · `questionnaire.folder` | /research, /questionnaire | obsidian store: the vault sub-folders for research + questionnaire notes. |
 | `obsidian.vault_path`            | /research, /questionnaire, kanban | Shared vault path (see §Kanban).                        |
 | `questionnaire.engine_format`    | writer, validator         | Label of the user's target survey-engine format.                |
-| `ui_language`                    | researcher, writer        | Language of the reports + all questionnaire labels.             |
+| `ui_language`                    | research-agent, architect, writer | Language of the reports + all questionnaire labels.     |
 
-- `/research <pdf-url-or-path> [subject]` → dispatches `questionnaire-researcher` (**mode research**,
-  read-only): produces a **standalone research report** (state of the art, domain analysis, debates,
-  licences, open questions, sources) — genuine research, not questionnaire-shaped. A **local file**
-  source is read via the Read tool (no internet dependency) and attached to the page for provenance; a
-  URL goes through WebFetch. The report becomes a Notion page (Statut « Recherche ») **under human
-  confirmation**. No local artifact.
+- `/research <pdf-url-or-path> [subject]` → drives `research-agent` (read-only) to produce a
+  **standalone research report** (state of the art, domain analysis, debates, licences, open questions,
+  sources) — genuine research that extracts everything important in the source, never questionnaire-shaped.
+  **Large local PDFs go multi-pass:** a `map` pass builds a reading plan, one `analyse-segment` pass runs
+  **per segment in parallel**, a `synthesise` pass writes the cross-cutting sections, and the orchestrator
+  assembles one report — so length scales with the source (no fixed word cap). Small sources / URLs take a
+  single `analyse-full` pass. A **local file** is read via the Read tool (no internet dependency) and
+  attached to the page for provenance; a URL goes through WebFetch. The report becomes a Notion page
+  (Statut « Recherche ») **under human confirmation**. No local artifact.
 - `/questionnaire <run-id-or-url>` → the OPTIONAL derivation, only if the human wants a survey: loads
-  the research from its Notion page, dispatches `questionnaire-researcher` (**mode blueprint** — derives
-  the conceptual skeleton from the report), then `questionnaire-writer` and `questionnaire-validator`
+  the research from its Notion page, dispatches `questionnaire-architect` (derives the conceptual skeleton
+  from the report), then `questionnaire-writer` and `questionnaire-validator`
   (both stateless, no tools; JSON inlined so the writer never sees the source or the report), loops
   max 3, and **completes the same Notion page** (blueprint + questionnaire + verdict appended, Statut →
   « À relire »/« Bloqué ») **under human confirmation**. Frozen contracts:
-  `templates/questionnaire-{domain-brief,blueprint,declaration,verdict}.md`.
+  `templates/research-brief.md` + `templates/questionnaire-{blueprint,declaration,verdict}.md`.
 
-Guarantees the workflow preserves: researcher analyses/structures but never drafts items; writer drafts
-original Likert-5 items but never sees the source; nothing is interpreted (no thresholds/levels); agents
-are read-only, the orchestrator does all Notion writes, each write is confirmation-gated; nothing enters
-the survey engine until the human flips the page's Statut to « Approuvé ».
+The two tracks are decoupled: `/research` stands alone (its `research-agent` never mentions a
+questionnaire), and the questionnaire is an opt-in consumer of the report. Guarantees the workflow
+preserves: the research report faithfully reports the source (including any thresholds/norms the source
+documents, attributed); the `questionnaire-architect` structures but never drafts items; the writer
+drafts original Likert-5 items but never sees the source; the **questionnaire** carries no interpretation
+(no thresholds/levels); agents are read-only, the orchestrator does all Notion writes, each write is
+confirmation-gated; nothing enters the survey engine until the human flips the page's Statut to
+« Approuvé ».
 
 ## Kanban — mirroring the pipeline onto an Obsidian board
 

@@ -78,6 +78,8 @@ copy_core() {
   cp -R "$src/core/commands"  "$dest/"
   cp -R "$src/core/hooks"     "$dest/"
   cp -R "$src/core/templates" "$dest/"
+  # 0.1.19 renamed questionnaire-domain-brief.md → research-brief.md; drop the stale copy.
+  rm -f "$dest/templates/questionnaire-domain-brief.md"
   mkdir -p "$dest/pipeline/scripts"
   cp "$src/profile/PIPELINE.template.md" "$dest/pipeline/"
   cp "$src/profile/SCHEMA.md"            "$dest/pipeline/"
@@ -119,14 +121,18 @@ if len(kept) != len(pre):
 PY
 }
 
-# the fixed (non-rendered) agents: dev review/release + the questionnaire capability's three
+# the fixed (non-rendered) agents: dev review/release + the research/questionnaire capability agents
 copy_fixed_agents() {
   mkdir -p "$dest/agents"
   cp "$src/core/agents/review.md" "$src/core/agents/release.md" \
-     "$src/core/agents/questionnaire-researcher.md" \
+     "$src/core/agents/research-agent.md" \
+     "$src/core/agents/questionnaire-architect.md" \
      "$src/core/agents/questionnaire-writer.md" \
      "$src/core/agents/questionnaire-validator.md" \
      "$dest/agents/"
+  # 0.1.19 split the bi-mode questionnaire-researcher into research-agent + questionnaire-architect;
+  # copy-over never deletes, so scrub the retired agent lest a dead subagent_type linger.
+  rm -f "$dest/agents/questionnaire-researcher.md"
 }
 
 # pipeline capability config is USER-level (vault, Notion DB, kanban boards) — it lives in
