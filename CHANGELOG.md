@@ -3,6 +3,16 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 0.1.21 — 2026-07-24
+
+- **Reliable local-PDF reading for `/research`** — subagent nodes often lack a PDF renderer (no
+  poppler), which made research-agents silently fall back to a web copy of the document — fine for a
+  public PDF, a silent fabrication risk for a private one. `/research` now **extracts the PDF to
+  per-page text ONCE up front** (pure-Python `pypdf` in a throwaway venv — no system deps) and agents
+  read that text, never the binary PDF. A local read that fails now returns a loud `===READ-FAILED===`
+  instead of reconstructing from the web; the orchestrator re-extracts or surfaces it. Adds a
+  scanned-PDF guard (no text layer ⇒ stop, needs OCR).
+
 ## 0.1.20 — 2026-07-24
 
 - **`/fix` now checks off resolved Remediation items** — the lead flips `- [ ]` → `- [x]` (with a
