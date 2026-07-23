@@ -136,6 +136,8 @@ try {
         Copy-Tree (Join-Path $src 'core\commands')  (Join-Path $dest 'commands')
         Copy-Tree (Join-Path $src 'core\hooks')     (Join-Path $dest 'hooks')
         Copy-Tree (Join-Path $src 'core\templates') (Join-Path $dest 'templates')
+        # 0.1.19 renamed questionnaire-domain-brief.md -> research-brief.md; drop the stale copy.
+        Remove-Item -LiteralPath (Join-Path $dest 'templates\questionnaire-domain-brief.md') -Force -ErrorAction SilentlyContinue
         New-Item -ItemType Directory -Force -Path (Join-Path $dest 'pipeline\scripts') | Out-Null
         Copy-Item (Join-Path $src 'profile\PIPELINE.template.md') (Join-Path $dest 'pipeline') -Force
         Copy-Item (Join-Path $src 'profile\SCHEMA.md')            (Join-Path $dest 'pipeline') -Force
@@ -173,14 +175,18 @@ try {
         }
     }
 
-    # the fixed (non-rendered) agents: dev review/release + the questionnaire capability's three
+    # the fixed (non-rendered) agents: dev review/release + the research/questionnaire capability agents
     function Copy-FixedAgents {
         New-Item -ItemType Directory -Force -Path (Join-Path $dest 'agents') | Out-Null
         Copy-Item (Join-Path $src 'core\agents\review.md'),
                   (Join-Path $src 'core\agents\release.md'),
-                  (Join-Path $src 'core\agents\questionnaire-researcher.md'),
+                  (Join-Path $src 'core\agents\research-agent.md'),
+                  (Join-Path $src 'core\agents\questionnaire-architect.md'),
                   (Join-Path $src 'core\agents\questionnaire-writer.md'),
                   (Join-Path $src 'core\agents\questionnaire-validator.md') (Join-Path $dest 'agents') -Force
+        # 0.1.19 split the bi-mode questionnaire-researcher into research-agent + questionnaire-architect;
+        # copy-over never deletes, so scrub the retired agent lest a dead subagent_type linger.
+        Remove-Item -LiteralPath (Join-Path $dest 'agents\questionnaire-researcher.md') -Force -ErrorAction SilentlyContinue
     }
 
     # pipeline capability config is USER-level (vault, Notion DB, kanban boards) — it lives in

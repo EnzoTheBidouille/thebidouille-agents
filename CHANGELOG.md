@@ -3,6 +3,21 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 0.1.19 — 2026-07-24
+
+- **Research decoupled from the questionnaire** — `/research` now dispatches a dedicated, standalone
+  **`research-agent`** (an autonomous research assistant that extracts everything important in the
+  source) instead of the old bi-mode `questionnaire-researcher`. The report no longer carries any
+  "future questionnaire" framing: the domain-brief `goal` is a research objective, and the brief
+  template is renamed `research-brief.md`. The blueprint step moves to its own **`questionnaire-architect`**
+  agent, dispatched by `/questionnaire`. New Notion archive databases are titled « Recherche ». Update
+  scrubs the retired `questionnaire-researcher` agent and old template automatically.
+- **Multi-pass research for large sources** — `/research` now maps a big PDF into a reading plan, runs
+  one deep `research-agent` pass **per segment in parallel**, synthesises the cross-cutting sections,
+  and assembles a single report. Report length scales with the source (no fixed word-count cap), so a
+  dense thesis or state-of-the-art gets exhaustive coverage instead of being compressed into one pass.
+  Small sources and URLs still take the single-pass path.
+
 ## 0.1.18 — 2026-07-22
 
 - **Consolidated global config** — the research/questionnaire settings move from

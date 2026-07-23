@@ -39,10 +39,10 @@ the research report (body) and its properties/frontmatter. If a questionnaire al
 run (notion: a `# Questionnaire` section on the page; obsidian: a note
 `<obsidian_questionnaire_folder>/<run-id>.md`), ask before superseding it.
 
-## 2. Derive the blueprint — dispatch `questionnaire-researcher` in BLUEPRINT mode
+## 2. Derive the blueprint — dispatch `questionnaire-architect`
 
 The blueprint is derived **from the research report** (our own original text — not from the source
-PDF). Spawn one agent (`subagent_type: questionnaire-researcher`): "MODE: blueprint. Read
+PDF). Spawn one agent (`subagent_type: questionnaire-architect`): "Read
 `~/.claude/thebidouille.config.yaml` (or legacy `questionnaire.config.yaml`) first for `ui_language` + `engine_format`. Derive a conceptual
 questionnaire blueprint from this research report (inline): <the full report markdown>. Return EXACTLY
 one tagged block `===BLUEPRINT.JSON===` per the schema in your agent spec — dimensions/subdimensions

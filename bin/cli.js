@@ -72,6 +72,8 @@ function copyCore() {
   for (const d of ['commands', 'hooks', 'templates']) {
     fs.cpSync(path.join(src, 'core', d), path.join(dest, d), { recursive: true, force: true });
   }
+  // 0.1.19 renamed questionnaire-domain-brief.md → research-brief.md; drop the stale copy.
+  fs.rmSync(path.join(dest, 'templates', 'questionnaire-domain-brief.md'), { force: true });
   const pipelineDir = path.join(dest, 'pipeline');
   fs.mkdirSync(path.join(pipelineDir, 'scripts'), { recursive: true });
   for (const f of ['PIPELINE.template.md', 'SCHEMA.md', 'thebidouille.config.template.yaml']) {
@@ -110,13 +112,16 @@ function scrubTddGate() {
   }
 }
 
-// the fixed (non-rendered) agents: dev review/release + the questionnaire capability's three
+// the fixed (non-rendered) agents: dev review/release + the research/questionnaire capability agents
 function copyFixedAgents() {
   fs.mkdirSync(path.join(dest, 'agents'), { recursive: true });
-  for (const f of ['review.md', 'release.md', 'questionnaire-researcher.md',
+  for (const f of ['review.md', 'release.md', 'research-agent.md', 'questionnaire-architect.md',
                    'questionnaire-writer.md', 'questionnaire-validator.md']) {
     fs.copyFileSync(path.join(src, 'core', 'agents', f), path.join(dest, 'agents', f));
   }
+  // 0.1.19 split the bi-mode questionnaire-researcher into research-agent + questionnaire-architect;
+  // copy-over never deletes, so scrub the retired agent lest a dead subagent_type linger.
+  fs.rmSync(path.join(dest, 'agents', 'questionnaire-researcher.md'), { force: true });
 }
 
 // --- interactive config helpers ---------------------------------------------
