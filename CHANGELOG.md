@@ -3,6 +3,38 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 0.1.23 — 2026-07-26
+
+- **Cheaper dev loop by default — implementers now default to `sonnet`, not the Opus lead.** A surface
+  agent mostly applies a frozen contract, which Sonnet handles well at a fraction of the cost;
+  `/init-pipeline` and reconcile now default `surfaces[].model` to `sonnet`, keeping `haiku` for purely
+  mechanical scaffolding and `inherit` only for surfaces with real design decisions. The fixed `release`
+  and `questionnaire-validator` agents drop to `haiku`, `questionnaire-writer` to `sonnet`. Existing
+  projects pick this up on the next `/update-pipeline` (agents re-render; a `model` you set by hand is kept).
+- **Stateless agents read a *slice* of `PIPELINE.md`, not the whole file.** The implementer and reviewer
+  now load the machine block + only the `### Shared` and their own `### Surface:` convention stanza
+  (+ §Testing), never the other surfaces' prose — less context re-read on every parallel dispatch.
+- **Leaner fix loops.** On a `/fix` re-dispatch, a surface agent works from the self-contained open
+  Remediation items + the diff and reads only the files those findings name — no longer re-reading the
+  whole (growing) spec or re-exploring its tree.
+- **Freshness gate at `/ship`.** `/review` now fingerprints the reviewed source (`reviewed_base` +
+  `reviewed_digest` in the spec front-matter) at a SHIP verdict, and `/ship` re-checks it — refusing to
+  ship if any source or contract file changed after the review, so a verdict can't go stale unnoticed.
+  Specs are excluded (DoD ticks + the ship status flip don't trip it); a spec predating the gate skips it.
+- **Big commands lazy-load their steps (progressive disclosure).** `/init-pipeline`, `/research` and
+  `/questionnaire` are now thin routers (a bootstrap block + a steps table) that read each step from
+  `templates/steps/<command>/NN-*.md` as they reach it, instead of one monolithic body — the branchy
+  commands (esp. `/research`) no longer pull an unused branch into context. Pure re-partition, verified
+  token-for-token identical to the old bodies. No installer change (steps ride the existing `templates/` copy).
+- **Machine-checkable postconditions on the two silent-failure gates** — `/spec` freeze asserts
+  `status: frozen` actually landed; `/build` asserts the contract file exists before dispatching agents.
+- **`/review` lets git group the diff by surface** (`git diff --name-only -- <path>` + an `:(exclude)`
+  remainder) instead of the lead reasoning it out file by file — deterministic and cheaper.
+- **`/fix` collapses fully-resolved Remediation rounds** to a one-line summary, so the spec every agent
+  re-reads stops growing unbounded across fix loops (rounds with any open item stay expanded).
+- **New SCHEMA § "Measuring cost"** — documents `/cost` (built-in per-subagent + per-command usage share)
+  and the OTEL `settings.json` env block (`claude_code.token.usage` / `cost.usage`) for exact numbers.
+
 ## 0.1.22 — 2026-07-26
 
 - **`/spec` exports a standalone design brief** — for a UI feature, freezing the spec now also writes
