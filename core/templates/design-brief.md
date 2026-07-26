@@ -1,7 +1,8 @@
 # DESIGN BRIEF — <feature title> (`<feature_id>`)
 
 > The "spec return". Paste into the design tool (see `PIPELINE.md` §design). This is §8 of the frozen
-> spec, standalone. Omit entirely if the project has no UI.
+> spec, standalone — `/spec` writes it to `specs/design/<feature_id>.md` on freeze. Omit entirely if
+> the project has no UI.
 
 **Goal:** <one line — what the user accomplishes>
 
