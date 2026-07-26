@@ -14,6 +14,12 @@ You are the **lead**. Ship feature **$ARGUMENTS**. This is the outward-facing ga
 
 - Confirm the latest `/review` returned **SHIP** (no CRITICAL, no security). If not reviewed, or the
   verdict was REVISE/BLOCK, stop and say so.
+- **Freshness gate** — the reviewed code must be exactly what ships. If the spec front-matter carries
+  `reviewed_base` + `reviewed_digest`, recompute
+  `git diff <reviewed_base> -- . ':(exclude)specs/' | sha256sum | cut -c1-16` and compare to
+  `reviewed_digest`. **Match** ⇒ source unchanged since the SHIP verdict, proceed. **Mismatch** ⇒ source
+  (or the contract) was edited after review — the verdict is **stale**: stop and tell the human to re-run
+  `/review $ARGUMENTS` before shipping. Missing fields (spec predates the gate) ⇒ skip, don't block.
 - **DoD gate (verify, don't tick — `/review` owns the ticking).** Read `specs/$ARGUMENTS.md`
   §`Acceptance criteria / DoD`; if any item is still `- [ ]`, list the open ones and ask the human to
   confirm shipping anyway (they may be deferred on purpose — e.g. a UI item on a backend-only feature).

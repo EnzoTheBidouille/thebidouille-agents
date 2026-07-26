@@ -25,7 +25,7 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
 | `surfaces[].label`                   | string       | build, init (`<SURFACE_LABEL>`)   | Human label + framework, e.g. `frontend (React)`.            |
 | `surfaces[].agent`                   | string       | build (`subagent_type`)           | Rendered agent file name.                                     |
 | `surfaces[].tools`                   | list         | init                              | Frontmatter `tools:` for the rendered agent.                  |
-| `surfaces[].model`                   | enum         | init (`<SURFACE_MODEL>`)          | Frontmatter `model:` tier — `inherit`/`sonnet`/`haiku`. `haiku` for mechanical surfaces; default `inherit`. |
+| `surfaces[].model`                   | enum         | init (`<SURFACE_MODEL>`)          | Frontmatter `model:` tier — `sonnet`/`haiku`/`inherit`. Default `sonnet` (implementers mostly apply a frozen contract — far cheaper than the Opus lead the dispatcher runs on, and Sonnet handles it well); `haiku` for purely mechanical surfaces (scaffolding); `inherit` only for surfaces with real design decisions worth the lead's model. |
 | `surfaces[].*_cmd`                   | string       | implementer                       | test/lint/format/typecheck/build commands.                    |
 | `surfaces[].uses_design`             | bool         | build, frontend                   | Whether this surface consumes designs.                        |
 | `contract.enabled`                   | bool         | build                             | `false` ⇒ skip contract authoring (§2 of /build).             |
@@ -156,6 +156,22 @@ surface that's proven slow and cleanly separable. The evidence lives in
 `/smoke`. Read it before proposing a split: split the surface that actually dominates wall-clock,
 not the one that feels big.
 
+## Measuring cost — what's slow vs what's expensive
+
+`pipeline-metrics.jsonl` records **wall-clock seconds** per dispatch (§Specialization) — it tells you what's
+SLOW. It deliberately does NOT record tokens: the lead can't reliably read a subagent's token count to log
+it. For what's EXPENSIVE, use Claude Code's own accounting:
+
+- **`/cost`** (built-in, zero setup) — reports per-**subagent** and per-**slash-command** share of your usage
+  over the last 24 h / 7 d (e.g. _"Top subagents: frontend 7 %, backend 4 % · Top skills: /build 1 %,
+  /review 1 %"_). That IS the per-phase ledger — approximate (share-of-total, machine-local, not exact
+  tokens). Read it to see which surface/command actually dominates the bill before you tune a `model` tier.
+- **OpenTelemetry** (exact numbers + dashboards) — add an `env` block to `~/.claude/settings.json`:
+  `{"env":{"CLAUDE_CODE_ENABLE_TELEMETRY":"1","OTEL_METRICS_EXPORTER":"otlp","OTEL_EXPORTER_OTLP_PROTOCOL":"http/protobuf","OTEL_EXPORTER_OTLP_ENDPOINT":"http://localhost:4318"}}`
+  and point it at a collector. Metrics `claude_code.token.usage` + `claude_code.cost.usage` carry
+  `session.id` + model + type (input/output/cacheRead). Subagent tokens roll into the session total;
+  per-subagent attribution needs traces (`CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`, beta).
+
 ## Rendering / reconciling a surface agent (shared procedure)
 
 Both `/init-pipeline` (initial render) and `/build` (auto-reconcile when a spec needs a new agent) use
@@ -164,9 +180,10 @@ this exact procedure so a surface is always defined the same way. To add surface
 1. **Add the `surfaces[]` entry** to `PIPELINE.md`: `key`, `path` (the disjoint tree it exclusively
    owns), `label`, `agent` (rendered file name), `tools` (add `DesignSync` only if `uses_design: true`;
    append the retrieval provider's MCP tools when `retrieval.provider` ≠ `none` — e.g. `mcp__serena`),
-   `model` (tier for the rendered agent: `haiku` when the surface's work is mechanical — scaffolding,
-   applying a frozen contract to a well-trodden stack; `inherit` (default) or `sonnet` when it makes
-   real design decisions), the five `*_cmd`s (derive from the surface's `package.json` / workspace
+   `model` (tier for the rendered agent: `sonnet` (default) — the implementer mostly applies a frozen
+   contract, which Sonnet does well at a fraction of the Opus-lead cost; `haiku` for purely mechanical
+   scaffolding; `inherit` only when the surface makes real design decisions worth the lead's model),
+   the five `*_cmd`s (derive from the surface's `package.json` / workspace
    filter, mirroring a sibling surface), and `uses_design`.
 2. **Render the agent file** `.claude/agents/<agent>.md` from `pipeline/implementer.template.md`
    (resolve bundled `.claude/` vs global `~/.claude/`), substituting `<SURFACE_AGENT>`, `<SURFACE_LABEL>`,
@@ -189,7 +206,7 @@ files automatically. It works because every generated artifact is a **determinis
 
 1. **Profile top-up.** Diff `PIPELINE.md`'s machine block against the current
    `pipeline/PIPELINE.template.md`: every block/field the template has and the profile lacks is added
-   with its documented default (e.g. `surfaces[].model: inherit`, `retrieval.provider: serena`).
+   with its documented default (e.g. `surfaces[].model: sonnet`, `retrieval.provider: serena`).
    **Ask only when a new field is a genuine human decision** (batch into ONE question set); never
    change a value the profile already sets; never rewrite the prose sections.
 2. **Re-render agent frontmatter + body.** For each `surfaces[]` entry, re-render

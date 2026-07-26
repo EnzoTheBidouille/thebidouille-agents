@@ -35,7 +35,8 @@ Detect the mode from the pasted content:
    `> needs new surface: <proposed key/path>`). Don't render agents here — `/build` §1.5 auto-reconciles
    it. This is just so the human isn't surprised when `/build` proposes a new agent.
 5. When the human validates, **freeze**: write `specs/<id>.md` (`status: frozen`, front-matter filled).
-   Create the file — do not ask the human to.
+   Create the file — do not ask the human to. **Postcondition:** `grep -q '^status: frozen' specs/<id>.md`
+   — if it fails the freeze didn't land; fix it before pointing the human at `/build`.
 6. Emit the **spec return** — the §8 design brief rendered via `.claude/templates/design-brief.md`.
    _Only if `design.enabled` / the feature has UI; skip entirely for a backend-only feature._
    - **Write it to `specs/design/<id>.md`** (a standalone `.md`, versioned with the spec). Create the

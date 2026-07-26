@@ -15,10 +15,12 @@ You are the **lead**. Dispatch the review for feature **$ARGUMENTS**.
 ## 1. Gather the inputs for stateless reviewers
 
 - Confirm `specs/$ARGUMENTS.md` exists.
-- Compute the diff: `git diff <default_branch>...HEAD --stat`. **Group the changed files by
-  `surfaces[].path`.** The contract file and any changed file outside every surface path form a
-  small `shared` remainder — attach it to the most relevant surface's reviewer and say so in its
-  dispatch.
+- Compute the diff, and let **git do the grouping** (deterministic — don't reason it out file by file):
+  per surface, `git diff <default_branch> --name-only -- <surface.path>` is exactly that surface's changed
+  files; the **`shared` remainder** (contract file + anything outside every surface) is
+  `git diff <default_branch> --name-only -- . $(for p in <each surface.path>; do printf ':(exclude)%s ' "$p"; done)`.
+  Attach the remainder to the most relevant surface's reviewer and say so in its dispatch. A surface whose
+  `git diff` comes back empty gets no reviewer.
 
 ## 2. Dispatch review agents — one per touched surface, IN PARALLEL
 
@@ -51,7 +53,12 @@ Print the report. Then:
   copy (this review), tests · lint · typecheck (a green `/build`), mobile-first + runtime flows (a
   prior `/smoke`). **Leave `- [ ]` (and say which) any item whose verifying stage didn't run this
   cycle** — e.g. no `/smoke` ⇒ the mobile-first / runtime item stays open. Ticking is the lead's job
-  (the reviewer is read-only). Then tell the human they can `/ship`.
+  (the reviewer is read-only). **Then stamp the freshness gate** so `/ship` can refuse to ship code
+  edited after this verdict: compute `BASE=$(git merge-base <default_branch> HEAD)` and write into the
+  spec front-matter `reviewed_base: $BASE` plus
+  `reviewed_digest: $(git diff $BASE -- . ':(exclude)specs/' | sha256sum | cut -c1-16)` — the fingerprint
+  of exactly the source you just reviewed (specs excluded, so DoD ticks + the ship status flip don't
+  trip it). Then tell the human they can `/ship`.
 - **REVISE / BLOCK**, or any finding of any severity → tell the human to run **`/fix $ARGUMENTS`** —
   it appends the report to the spec's `## Remediation` and re-dispatches ONLY the surfaces with
   findings. The full path (`/spec` Mode B then `/build`) remains for findings that change the

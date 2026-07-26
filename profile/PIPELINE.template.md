@@ -54,10 +54,10 @@ surfaces:
     label: backend (AdonisJS)
     agent: backend                            # rendered agent file: .claude/agents/backend.md
     tools: [Read, Write, Edit, Bash, Grep, Glob, mcp__serena]   # mcp__<provider> mirrors retrieval.provider
-    model: inherit                            # frontmatter model tier: inherit | sonnet | haiku
-                                              #   haiku = mechanical work (scaffolding, applying a
-                                              #   frozen contract); keep inherit/sonnet for surfaces
-                                              #   with real design decisions
+    model: sonnet                             # frontmatter model tier: sonnet | haiku | inherit
+                                              #   sonnet = default (applies the frozen contract — cheap
+                                              #   vs the Opus lead); haiku = purely mechanical scaffolding;
+                                              #   inherit = only for surfaces with real design decisions
     test_cmd: pnpm --filter api test
     lint_cmd: pnpm --filter api lint
     format_cmd: pnpm --filter api format
@@ -69,7 +69,7 @@ surfaces:
     label: frontend (React/TanStack)
     agent: frontend
     tools: [Read, Write, Edit, Bash, Grep, Glob, DesignSync, mcp__serena]
-    model: inherit
+    model: inherit                            # this surface makes real design decisions ⇒ worth the lead's model
     test_cmd: pnpm --filter web test
     lint_cmd: pnpm --filter web lint
     format_cmd: pnpm --filter web format

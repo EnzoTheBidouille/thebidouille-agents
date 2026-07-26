@@ -47,6 +47,11 @@ When the agents return:
   use). Leave genuinely-unaddressed items `- [ ]` so the next loop still sees them. This keeps the
   checkbox state honest and stops a later `/fix` from re-dispatching already-fixed items (§2). Ticking
   here is the lead's job — surface agents own only their tree, never the spec.
+- **Collapse fully-resolved rounds (keep the spec bounded).** When a whole dated Remediation round is now
+  entirely `- [x]`, replace its item lines with a single summary line (`- <date> — <N> findings, all
+  fixed`) — the audit fact survives, but the per-item bulk stops growing the spec that every agent
+  re-reads each loop. Keep any round with ≥1 still-open `- [ ]` item fully expanded (§2's skip logic
+  needs those checkboxes).
 - Summarize the handoffs and append one metrics line per dispatched agent to
   `.claude/pipeline-metrics.jsonl` (see `/build` §4).
 - Tell the human: re-run `/smoke` if the failures were runtime ones, and `/review $ARGUMENTS` for the

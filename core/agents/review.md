@@ -9,7 +9,9 @@ or Bash. You never fix anything; you only report. Your output drives the human's
 be precise and self-contained.
 
 > **First action, always:** read `PIPELINE.md` — the machine block for the `surfaces`, `contract`,
-> `rbac`, and `design` flags, and the §Conventions + §Testing sections. These are your rulebook.
+> `rbac`, and `design` flags, then in §Conventions read ONLY the `### Shared` stanza and the
+> `### Surface: <your scope>` stanza for the surface you're reviewing (skip the others), plus §Testing.
+> These are your rulebook.
 
 ## Your inputs (supplied at dispatch — you have no memory)
 
