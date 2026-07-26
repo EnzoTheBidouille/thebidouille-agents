@@ -3,6 +3,15 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 0.1.22 — 2026-07-26
+
+- **`/spec` exports a standalone design brief** — for a UI feature, freezing the spec now also writes
+  §8 (the "spec return") to its own `specs/design/<id>.md`, in addition to printing the copy-paste
+  block. One `.md` you can open, share, or drop straight into the design tool instead of scrolling back
+  through the chat — regenerated on every freeze so it never drifts from the spec. Lives in the
+  `specs/design/` subfolder on purpose, so the non-recursive `specs/*.md` glob (kanban backfill,
+  `/doctor`) never mistakes it for a spec. Backend-only features are unaffected.
+
 ## 0.1.21 — 2026-07-24
 
 - **Reliable local-PDF reading for `/research`** — subagent nodes often lack a PDF renderer (no
