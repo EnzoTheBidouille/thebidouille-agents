@@ -3,6 +3,17 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 0.1.25 — 2026-07-27
+
+- **`research-agent` defaults to `sonnet`** instead of silently inheriting the session model (Opus). Its
+  work — MAP / ANALYSE / SYNTHESISE of pre-extracted text — is extraction-and-summary that Sonnet handles
+  well at a fraction of the cost, and `/cost` showed it was one of the two heaviest subagents. The fixed
+  agents were never tiered like the surfaces; this closes the biggest gap. If cross-cutting synthesis ever
+  needs more, the `/research` SYNTHESISE dispatch can override the model for just that pass.
+- **README documents the `/clear`-safe loop** as the top token lever — since all pipeline state lives on
+  disk, `/clear`-ing between stages sheds the accumulated main-thread context (long >150k sessions are
+  expensive even cached), with the safe-to-clear boundary shown for the whole `/spec → … → /ship` loop.
+
 ## 0.1.24 — 2026-07-27
 
 - **The dev loop is now `/clear`-safe between every stage.** All pipeline state already lives on disk

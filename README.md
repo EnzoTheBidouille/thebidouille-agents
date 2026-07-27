@@ -175,6 +175,22 @@ it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.
 | `/research <pdf>`    | _Global capability._ Deep-research a PDF (URL or local file) into a standalone report, archived in Notion or Obsidian. |
 | `/questionnaire <id>`| _Global capability._ Optional: derive + write + validate a survey from a research run's archived page. |
 
+### Run the loop cheaply — `/clear` between stages
+
+Every command reloads all the state it needs **from disk** — the frozen spec, the contract, the diff, the
+Remediation checkboxes, the freshness stamp, and the last `/review`·`/smoke` report (staged to a gitignored
+`specs/reports/<id>.md`). Nothing essential lives in the conversation. So the loop is **`/clear`-safe at
+every boundary**:
+
+```
+/spec → /clear → /build → /clear → /smoke → /clear → /review → /clear → /fix → /clear → /review → /ship
+```
+
+`/clear`-ing between stages sheds the accumulated main-thread context, which is the single biggest token
+lever: long sessions (>150k) are expensive even when cached. Each command tells you when its handoff is
+safe to clear. If you'd rather stay in one session, `/compact` mid-task does the lighter version. (Claude
+can't fire `/clear` itself — it's a client-side command; the pipeline just makes it always safe to type.)
+
 ## Global capability — research → (optional) questionnaire
 
 A **user-scoped** capability, separate from the dev flow (`/brainstorm…/ship`) and independent of any
