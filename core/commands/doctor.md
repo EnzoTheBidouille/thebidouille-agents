@@ -39,7 +39,8 @@ fix only with the human's go-ahead (or hand them the command).
    `git worktree list` — flag **stale slots** (registered but no worktree) and **zombie worktrees**
    (worktree but no slot / spec already `shipped`) ⇒ suggest `scripts/remove-feature.sh <id>`.
 7. **Specs & metrics.** Every `specs/*.md` front-matter `status` is a valid stage; `shipped` specs
-   with a live worktree flagged (see 6). `.claude/pipeline-metrics.jsonl` is gitignored.
+   with a live worktree flagged (see 6). `.claude/pipeline-metrics.jsonl` and `specs/reports/` (the
+   `/review`·`/smoke` report buffer that lets a `/fix` survive a `/clear`) are gitignored.
 
 ## Report
 

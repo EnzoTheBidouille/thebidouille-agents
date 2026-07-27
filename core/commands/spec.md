@@ -48,16 +48,19 @@ Detect the mode from the pasted content:
      (if any — typically a fresh design project for this feature) or just open `specs/design/<id>.md`,
      then run `/build <id>` and hand its design gate the resulting page link(s) — a full link carries its
      own project, no profile change needed. (They can also paste the links into the spec's `design_files`
-     themselves.)
+     themselves.) _The frozen spec + `specs/design/<id>.md` are the whole handoff — `/clear` before
+     `/build` is safe._
 
 ## Mode B — review return (input is a REVIEW REPORT)
 
-1. Read the report. Identify `feature_id` from its header; open `specs/<id>.md`.
+1. Read the report — pasted as input, or (if the context was cleared) read from `specs/reports/<id>.md`,
+   where `/review` stages its last report. Identify `feature_id` from its header; open `specs/<id>.md`.
 2. Append each finding to the spec's **`## Remediation`**, one per line:
    `- [ ] <severity> · <file:line> · <spec-violation|quality|security> · <concrete fix>`
    (Keep prior items; add the new round under a dated/numbered subheading.)
 3. If a finding implies the **contract** must change, update §5 and flag it so the lead re-authors the
    contract file.
 4. Set `status: in-review`. Tell the human to run `/build <id>` to re-dispatch fresh agents.
+   _The spec is the whole handoff — `/clear` before `/build` is safe._
 
 In both modes the spec is the single source of truth; agents are stateless and read only it + the diff.

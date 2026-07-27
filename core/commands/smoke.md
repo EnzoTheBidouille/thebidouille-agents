@@ -44,8 +44,11 @@ through `/fix`). Observe honestly: report what happened, not what should have ha
 ## 4. SMOKE REPORT
 
 - One line per check: ✅/❌ · what was exercised · (on ❌) command → expected vs actual.
+- **Stage the full report to `specs/reports/$ARGUMENTS.md`** (overwrite) — the same gitignored buffer
+  `/review` uses (subfolder ⇒ skipped by the non-recursive `specs/*.md` glob), so a `/fix` after a
+  `/clear` still has the failures.
 - Verdict **PASS** (all green) → tell the human to run `/review $ARGUMENTS`.
   Verdict **FAIL** → the failures are findings: feed them to `/fix $ARGUMENTS`, re-run `/smoke`
-  after.
+  after. _Either way the handoff is on disk — `/clear` before the next command is safe._
 - Append one metrics line to `.claude/pipeline-metrics.jsonl` (see `/build` §4, `phase: "smoke"`).
 - Tear down what you started (kill the dev server); leave shared infra as you found it.
