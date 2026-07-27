@@ -84,4 +84,5 @@ gitignored):
 — this is the evidence SCHEMA.md §Specialization asks for before splitting a surface.
 Then tell the human: run `/smoke $ARGUMENTS` to exercise the feature end-to-end (or test by hand),
 then `/review $ARGUMENTS`. Do not run the app or migrations yourself here — `/smoke` is the
-sanctioned path for that.
+sanctioned path for that. _The spec, contract and diff are all on disk — `/clear` before `/smoke`
+is safe._

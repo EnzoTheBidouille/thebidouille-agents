@@ -45,7 +45,9 @@ Merge the returned reports into **one** REVIEW REPORT (same template): findings 
 re-ordered by severity, counts summed, duplicates collapsed, verdict = the worst returned
 (`BLOCK` > `REVISE` > `SHIP`). Append one line per reviewer to `.claude/pipeline-metrics.jsonl`
 (gitignored): `{"ts":"<ISO>","feature":"$ARGUMENTS","phase":"review","surface":"<key>","seconds":<wall-clock>,"result":"<verdict>:<finding count>"}`.
-Print the report. Then:
+Print the report **and stage it to `specs/reports/$ARGUMENTS.md`** (overwrite) — a gitignored buffer so
+a `/fix` after a `/clear` can still read the findings; the `specs/reports/` subfolder is skipped by the
+non-recursive `specs/*.md` glob, so it's never mistaken for a spec (no phantom card, no bogus stage). Then:
 
 - **SHIP** → a SHIP verdict *is* the pipeline's statement that the feature meets its Definition of
   Done, so **tick the DoD**: in `specs/$ARGUMENTS.md` §`Acceptance criteria / DoD`, flip each `- [ ]`
@@ -58,8 +60,9 @@ Print the report. Then:
   spec front-matter `reviewed_base: $BASE` plus
   `reviewed_digest: $(git diff $BASE -- . ':(exclude)specs/' | sha256sum | cut -c1-16)` — the fingerprint
   of exactly the source you just reviewed (specs excluded, so DoD ticks + the ship status flip don't
-  trip it). Then tell the human they can `/ship`.
+  trip it). Then tell the human they can `/ship` — _the handoff is fully on disk, so `/clear` first is safe._
 - **REVISE / BLOCK**, or any finding of any severity → tell the human to run **`/fix $ARGUMENTS`** —
   it appends the report to the spec's `## Remediation` and re-dispatches ONLY the surfaces with
   findings. The full path (`/spec` Mode B then `/build`) remains for findings that change the
-  contract in ways that ripple into clean surfaces.
+  contract in ways that ripple into clean surfaces. _The report is staged to `specs/reports/$ARGUMENTS.md`,
+  so you can `/clear` before `/fix` — it reads the findings back from disk._

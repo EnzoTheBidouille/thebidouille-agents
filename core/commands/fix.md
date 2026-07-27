@@ -17,8 +17,10 @@ that change the *contract*; `/fix` is for everything else.
 
 ## 1. Ingest the report
 
-- The report is either pasted after the feature id, or the REVIEW REPORT / SMOKE failures from this
-  session's last `/review` / `/smoke`. If you have neither, ask for it and wait.
+- The report is either pasted after the feature id, the REVIEW REPORT / SMOKE failures from this
+  session's last `/review` / `/smoke`, or — if the context was cleared — read from
+  `specs/reports/<id>.md`, where `/review` and `/smoke` stage their last report for exactly this reason.
+  If you have none of these, ask for it and wait.
 - Append each finding to `specs/<id>.md` **`## Remediation`** (same format as `/spec` Mode B, under a
   dated/numbered subheading): `- [ ] <severity> · <file:line> · <type> · <concrete fix>`. Set
   `status: in-review`.
@@ -56,4 +58,5 @@ When the agents return:
   `.claude/pipeline-metrics.jsonl` (see `/build` §4).
 - Tell the human: re-run `/smoke` if the failures were runtime ones, and `/review $ARGUMENTS` for the
   re-verdict — the re-review is what *verifies* the ticked items actually hold (a regression simply
-  reappears as a new finding in the next round).
+  reappears as a new finding in the next round). _All state (spec, checkboxes, staged report) is on
+  disk, so `/clear` before the next command is safe._

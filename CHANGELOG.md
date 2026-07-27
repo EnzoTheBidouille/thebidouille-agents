@@ -3,6 +3,18 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 0.1.24 — 2026-07-27
+
+- **The dev loop is now `/clear`-safe between every stage.** All pipeline state already lives on disk
+  (spec, contract, diff, Remediation checkboxes, freshness stamp), so you can `/clear` between commands
+  to shed the accumulated main-thread context and cut token cost — each command reloads everything from
+  disk. Every command now marks its handoff as safe to `/clear` before the next step.
+- **`/review` and `/smoke` stage their report to `specs/reports/<id>.md`** (a gitignored buffer in its own
+  subfolder, like `specs/design/`) — the one context-coupling that a `/clear` used to break. `/fix` and
+  `/spec` Mode B read the report back from disk when the context was cleared. `/init-pipeline` gitignores
+  the buffer; `/doctor` reports it. The non-recursive `specs/*.md` glob skips the subfolder, so it never
+  shows up as a phantom kanban card or spec.
+
 ## 0.1.23 — 2026-07-26
 
 - **Cheaper dev loop by default — implementers now default to `sonnet`, not the Opus lead.** A surface

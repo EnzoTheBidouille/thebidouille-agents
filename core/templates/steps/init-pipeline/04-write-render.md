@@ -71,8 +71,10 @@
     `commands.install`, then `commands.lint` · `commands.typecheck` · `commands.test` (+ per-surface
     `build_cmd`s that are non-empty). Derive the setup steps from the detected stack — mirror what a
     sibling workflow does if one exists. `/ship` watches these checks before the merge.
-11. **Metrics sink:** add `.claude/pipeline-metrics.jsonl` to `.gitignore` — `/build`, `/review`,
-    `/fix` and `/smoke` append per-dispatch evidence there (SCHEMA §Specialization reads it).
+11. **Metrics sink & report buffer:** add `.claude/pipeline-metrics.jsonl` to `.gitignore` — `/build`,
+    `/review`, `/fix` and `/smoke` append per-dispatch evidence there (SCHEMA §Specialization reads it).
+    Also add `specs/reports/` — `/review` and `/smoke` stage their last report there so a `/fix` (or
+    `/spec` Mode B) survives a `/clear`; it's a derived buffer, not a versioned artifact.
 12. **Design system:** if `design.enabled` with a snapshot dir, note that `/align-ds` is active; else the
     `/align-ds` command will no-op with a clear message.
 13. **Kanban** (only if the human opted in at Phase 2): wire it per SCHEMA.md §Kanban, writing into the
