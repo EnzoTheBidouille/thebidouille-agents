@@ -29,7 +29,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $repoUrl = $env:PIPELINE_REPO
-if (-not $repoUrl) { $repoUrl = 'https://github.com/EnzoTheBidouille/thebidouille-agents' }
+if (-not $repoUrl) { $repoUrl = 'https://github.com/TheBidouilleAgency/cohorte' }
 
 if (-not $Target) { $Target = (Get-Location).Path }
 
@@ -88,7 +88,7 @@ try {
         if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
             throw 'git is required to fetch the pipeline (or run install.ps1 from a checkout).'
         }
-        $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("thebidouille-agents-" + [Guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("cohorte-" + [Guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp | Out-Null
         # PS 5.1 turns redirected native stderr into terminating errors under EAP=Stop;
         # relax it around the clone and rely on the exit code instead.
@@ -141,7 +141,7 @@ try {
         New-Item -ItemType Directory -Force -Path (Join-Path $dest 'pipeline\scripts') | Out-Null
         Copy-Item (Join-Path $src 'profile\PIPELINE.template.md') (Join-Path $dest 'pipeline') -Force
         Copy-Item (Join-Path $src 'profile\SCHEMA.md')            (Join-Path $dest 'pipeline') -Force
-        Copy-Item (Join-Path $src 'profile\thebidouille.config.template.yaml') (Join-Path $dest 'pipeline') -Force
+        Copy-Item (Join-Path $src 'profile\cohorte.config.template.yaml') (Join-Path $dest 'pipeline') -Force
         Copy-Item (Join-Path $src 'scripts\*.template')           (Join-Path $dest 'pipeline\scripts') -Force
         Copy-Item (Join-Path $src 'core\agents\implementer.template.md') (Join-Path $dest 'pipeline') -Force
         if (Test-Path (Join-Path $src 'CHANGELOG.md')) { Copy-Item (Join-Path $src 'CHANGELOG.md') (Join-Path $dest 'pipeline') -Force }
@@ -175,18 +175,30 @@ try {
         }
     }
 
-    # the fixed (non-rendered) agents: dev review/release + the research/questionnaire capability agents
+    # the fixed (non-rendered) agents: the dev review/release pipeline agents
     function Copy-FixedAgents {
         New-Item -ItemType Directory -Force -Path (Join-Path $dest 'agents') | Out-Null
         Copy-Item (Join-Path $src 'core\agents\review.md'),
-                  (Join-Path $src 'core\agents\release.md'),
-                  (Join-Path $src 'core\agents\research-agent.md'),
-                  (Join-Path $src 'core\agents\questionnaire-architect.md'),
-                  (Join-Path $src 'core\agents\questionnaire-writer.md'),
-                  (Join-Path $src 'core\agents\questionnaire-validator.md') (Join-Path $dest 'agents') -Force
+                  (Join-Path $src 'core\agents\release.md') (Join-Path $dest 'agents') -Force
         # 0.1.19 split the bi-mode questionnaire-researcher into research-agent + questionnaire-architect;
         # copy-over never deletes, so scrub the retired agent lest a dead subagent_type linger.
         Remove-Item -LiteralPath (Join-Path $dest 'agents\questionnaire-researcher.md') -Force -ErrorAction SilentlyContinue
+        Clear-ResearchQuestionnaire
+    }
+
+    # The research + questionnaire capability was removed. Older installs have its agents, commands,
+    # templates and template-step dirs on disk; copy-over never deletes, so scrub every orphan.
+    function Clear-ResearchQuestionnaire {
+        foreach ($f in @('agents\research-agent.md', 'agents\questionnaire-architect.md',
+                         'agents\questionnaire-writer.md', 'agents\questionnaire-validator.md',
+                         'commands\research.md', 'commands\questionnaire.md',
+                         'templates\research-brief.md', 'templates\questionnaire-blueprint.md',
+                         'templates\questionnaire-declaration.md', 'templates\questionnaire-verdict.md')) {
+            Remove-Item -LiteralPath (Join-Path $dest $f) -Force -ErrorAction SilentlyContinue
+        }
+        foreach ($d in @('templates\steps\research', 'templates\steps\questionnaire')) {
+            Remove-Item -LiteralPath (Join-Path $dest $d) -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
 
     # pipeline capability config is USER-level (vault, Notion DB, kanban boards) — it lives in
@@ -195,16 +207,19 @@ try {
     # /update-pipeline wire it (npx's installer offers a quick interview instead).
     function Initialize-Config {
         $userClaude = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $HOME '.claude' }
-        $cfg = Join-Path $userClaude 'thebidouille.config.yaml'
-        $legacy = Join-Path $userClaude 'questionnaire.config.yaml'
+        $cfg = Join-Path $userClaude 'cohorte.config.yaml'
+        $legacy = @('thebidouille.config.yaml') |
+            ForEach-Object { Join-Path $userClaude $_ } |
+            Where-Object { Test-Path -LiteralPath $_ } |
+            Select-Object -First 1
         if (Test-Path -LiteralPath $cfg) {
             Write-Host "  - kept your existing $cfg"
-        } elseif (Test-Path -LiteralPath $legacy) {
+        } elseif ($legacy) {
             Write-Host "  - found legacy $legacy — kept as-is (read as a fallback)."
-            Write-Host "    Run /update-pipeline to migrate it into thebidouille.config.yaml + wire the kanban."
+            Write-Host "    Run /update-pipeline to migrate it into cohorte.config.yaml + wire the kanban."
         } else {
             New-Item -ItemType Directory -Force -Path $userClaude | Out-Null
-            Copy-Item (Join-Path $src 'profile\thebidouille.config.template.yaml') $cfg
+            Copy-Item (Join-Path $src 'profile\cohorte.config.template.yaml') $cfg
             Write-Host "  - seeded $cfg (disabled defaults — enable via /init-pipeline or /update-pipeline)"
         }
     }
@@ -289,12 +304,10 @@ Code retrieval (Serena — the default provider /init-pipeline wires per repo):
   Make sure the uv tools dir is on PATH (uv tool update-shell) — otherwise the
   registered MCP server silently fails to start.
 
-Global capabilities config (research / questionnaire / kanban), user-scoped — optional:
-  · One consolidated file: ~/.claude/thebidouille.config.yaml (don't hand-edit it).
-  · /init-pipeline (new project) and /update-pipeline (existing) wire it for you: enabling
-    research/questionnaire, and creating + syncing an Obsidian kanban board of the pipeline.
-  · Research with  store: notion  needs Notion first:
-    claude mcp add --transport http notion https://mcp.notion.com/mcp
+Global kanban config, user-scoped — optional:
+  · One consolidated file: ~/.claude/cohorte.config.yaml (don't hand-edit it).
+  · /init-pipeline (new project) and /update-pipeline (existing) wire it for you: creating +
+    syncing an Obsidian kanban board of the pipeline in your shared vault.
 "@
         return
     }

@@ -1,6 +1,6 @@
 # Dashboard — architecture
 
-A local web cockpit for the pipeline, launched with `npx thebidouille-agents dashboard`
+A local web cockpit for the pipeline, launched with `npx cohorte dashboard`
 (see the [root README](../README.md#dashboard--a-local-web-cockpit) for user-facing docs).
 
 ## Two halves: shipped runtime vs dev build
@@ -26,7 +26,7 @@ dashboard/
 | `versions.js` | installed core vs npm latest (registry fetch → `npm view` fallback, 5-min cache) |
 | `doctor.js` | the `/doctor` checks reimplemented in JS → `/api/state` (profile, agents, gate, hooks, …) |
 | `yaml.js` | minimal block-YAML subset parser (for the `pipeline-profile` block + the config) |
-| `fleet.js` | tracked-project registry (`~/.claude/thebidouille-dashboard.json`) + folder browse |
+| `fleet.js` | tracked-project registry (`~/.claude/cohorte-dashboard.json`) + folder browse |
 | `kanban.js` | linked Obsidian board → columns/cards; PR enrichment + ship-date sort via `gh` |
 
 ## API

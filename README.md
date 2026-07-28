@@ -1,15 +1,17 @@
-# thebidouille-agents
+<div align="center">
 
-[![npm version](https://img.shields.io/npm/v/thebidouille-agents?logo=npm&color=cb3837)](https://www.npmjs.com/package/thebidouille-agents)
-[![npm downloads](https://img.shields.io/npm/dm/thebidouille-agents?logo=npm)](https://www.npmjs.com/package/thebidouille-agents)
-[![Publish to npm](https://github.com/EnzoTheBidouille/thebidouille-agents/actions/workflows/publish.yml/badge.svg)](https://github.com/EnzoTheBidouille/thebidouille-agents/actions/workflows/publish.yml)
-[![node >=18](https://img.shields.io/node/v/thebidouille-agents?logo=node.js&logoColor=white)](https://nodejs.org)
+<img src="https://raw.githubusercontent.com/TheBidouilleAgency/cohorte/main/assets/cohorte-banner.png" alt="Cohorte — portable multi-agent pipeline for Claude Code" width="720">
+
+[![npm version](https://img.shields.io/npm/v/cohorte?logo=npm&color=cb3837)](https://www.npmjs.com/package/cohorte)
+[![npm downloads](https://img.shields.io/npm/dm/cohorte?logo=npm)](https://www.npmjs.com/package/cohorte)
+[![Publish to npm](https://github.com/TheBidouilleAgency/cohorte/actions/workflows/publish.yml/badge.svg)](https://github.com/TheBidouilleAgency/cohorte/actions/workflows/publish.yml)
+[![node >=18](https://img.shields.io/node/v/cohorte?logo=node.js&logoColor=white)](https://nodejs.org)
 [![license: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+
+</div>
 
 A **portable, stack-agnostic multi-agent pipeline** for Claude Code. Install it once globally,
 then one command per project (`/init-pipeline`) adapts it to that project's stack.
-
-Two independent tracks ship with it:
 
 - **The dev pipeline** — a human **lead** drives feature work through gated commands, dispatching
   **stateless agents** that only communicate through a frozen contract:
@@ -18,22 +20,18 @@ Two independent tracks ship with it:
   /brainstorm → /spec → (design) → /build <id> → /smoke → /review → (/fix) → /ship
   ```
 
-- **The research capability** (optional, user-scoped) — `/research` turns a source PDF into an
-  academic-register report archived in Notion; `/questionnaire` optionally derives an original
-  survey from it. See [Global capability](#global-capability--research--optional-questionnaire).
-
 ## How it works — three layers
 
 | Layer | What it holds | Lives in | Scope |
 | --- | --- | --- | --- |
 | **Generic core** | the workflow doctrine: commands, fixed agents, templates, hooks — zero project facts | `~/.claude` (global) — or vendored in a repo's `.claude/` (bundled) | identical everywhere, installed once |
 | **Project profile** | stack, surfaces, commands, conventions, gates | `PIPELINE.md` + rendered surface agents + `gate-config.json`, **committed in each repo** | generated per project by `/init-pipeline` |
-| **User config** | research/questionnaire facts (Notion DB, language) + kanban board links | `~/.claude/thebidouille.config.yaml` | personal, project-independent |
+| **User config** | kanban board links + shared Obsidian vault path | `~/.claude/cohorte.config.yaml` | personal, project-independent |
 
 The core never hardcodes stack facts. Two mechanisms keep it generic:
 
 1. **Runtime indirection** — commands/agents read project facts from `PIPELINE.md` (dev pipeline) or
-   `~/.claude/thebidouille.config.yaml` (research/questionnaire + kanban) at run time — an agent's
+   `~/.claude/cohorte.config.yaml` (kanban board links + shared vault) at run time — an agent's
    _first action_ is to read its config.
 2. **Render-at-init** — things that must be in agent frontmatter (name, `tools:`, surface ownership)
    are rendered per **surface** by `/init-pipeline` from `implementer.template.md`.
@@ -54,7 +52,7 @@ Only one hard requirement — the rest is optional and independent:
 
 ## Install
 
-The pipeline ships as an npm package (`thebidouille-agents`), so releases are semver-tagged and
+The pipeline ships as an npm package (`cohorte`), so releases are semver-tagged and
 `npx` always fetches the latest published version — no clone needed, works on macOS/Linux/Windows.
 
 **Global (recommended)** — install the generic core ONCE into `~/.claude`; it serves every repo on
@@ -62,7 +60,7 @@ your machine. Nothing is copied per project; the gate hook is registered once an
 own `gate-config.json`:
 
 ```sh
-npx thebidouille-agents install --global
+npx cohorte install --global
 ```
 
 The per-project part is NOT the core — it's the **profile** `/init-pipeline` generates and you
@@ -76,7 +74,7 @@ repo; each teammate just runs the same global one-liner once, guided by the comm
 
 ```sh
 # inside your project (or pass its path as an argument)
-npx thebidouille-agents install
+npx cohorte install
 ```
 
 Copies the core into `<project>/.claude`, committed with the repo. Choose this when you want
@@ -93,13 +91,13 @@ duplicated in every repo and each repo updates separately.
 # global (recommended)                    # per-project (bundled)
 sh install.sh --global                    sh install.sh
 # or piped:
-curl -fsSL https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.sh | sh -s -- --global
+curl -fsSL https://raw.githubusercontent.com/TheBidouilleAgency/cohorte/main/install.sh | sh -s -- --global
 ```
 
 ```powershell
 # Windows (PowerShell 5.1+)
 .\install.ps1 -Global         # or without -Global for per-project
-# or:  & ([scriptblock]::Create((irm https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.ps1))) -Global
+# or:  & ([scriptblock]::Create((irm https://raw.githubusercontent.com/TheBidouilleAgency/cohorte/main/install.ps1))) -Global
 ```
 
 Script installs from a git checkout stamp the version as `<semver> (<sha>)`; the npm CLI stamps the
@@ -109,7 +107,7 @@ published semver. Both land in `.claude/pipeline/VERSION` and the `pipeline.json
 
 > **After installing (or updating): restart Claude Code / start a new session.** Slash commands and
 > agents are scanned at session start — in an already-open session the new `/init-pipeline`,
-> `/research`, etc. won't appear until you reload. This is the #1 "the install didn't work" trap.
+> `/build`, etc. won't appear until you reload. This is the #1 "the install didn't work" trap.
 
 Then, in Claude Code (from any repo, once the core is installed either way):
 
@@ -137,15 +135,15 @@ Sanity-check `PIPELINE.md`, commit it, and run `/brainstorm`.
 ## Update
 
 ```sh
-npx thebidouille-agents@latest update --global    # the shared core in ~/.claude (recommended setup)
-npx thebidouille-agents@latest update             # a repo's bundled core in <project>/.claude
+npx cohorte@latest update --global    # the shared core in ~/.claude (recommended setup)
+npx cohorte@latest update             # a repo's bundled core in <project>/.claude
 ```
 
 (Script equivalents: `sh install.sh --update [--global]` / `.\install.ps1 -Update [-Global]`.)
 
 The installer refreshes the generic core (commands, hook, templates) **without** touching your
 `PIPELINE.md`, rendered agents, `gate-config.json`, `settings.json`, or your filled
-`~/.claude/thebidouille.config.yaml`.
+`~/.claude/cohorte.config.yaml`.
 
 From inside Claude Code, prefer **`/update-pipeline`**: it runs the right update invocation for your
 install scope, reports `old → new` — and then **reconciles the repo's generated files to the new
@@ -159,9 +157,9 @@ maintenance command you ever run (`/build` auto-grows surfaces as specs need the
 A browser view of pipeline state, for when a checklist beats scanning files:
 
 ```sh
-npx thebidouille-agents dashboard          # serves http://localhost:4317 (Ctrl-C to stop)
-npx thebidouille-agents dashboard <path>   # start focused on another project
-npx thebidouille-agents dashboard --port=4400 --open   # custom port, open the browser
+npx cohorte dashboard          # serves http://localhost:4317 (Ctrl-C to stop)
+npx cohorte dashboard <path>   # start focused on another project
+npx cohorte dashboard --port=4400 --open   # custom port, open the browser
 ```
 
 **Bound to `127.0.0.1` by default** — the dashboard's actions execute code (install/update/reset,
@@ -172,7 +170,7 @@ those actions.
 
 - **Fleet overview** — the global core version vs npm latest, plus every tracked project's freshness
   and health at a glance. Add a project by absolute path or with the **folder picker** (Browse…); the
-  set is remembered in `~/.claude/thebidouille-dashboard.json`.
+  set is remembered in `~/.claude/cohorte-dashboard.json`.
 - **Per-project drill-down** — Freshness (installed core vs npm), `/doctor` rendered as a live
   ✅/⚠️/❌ checklist (each failure with its fix), the **Surfaces ↔ agents** map from `PIPELINE.md`,
   and one board: a **Kanban** if the project has a linked Obsidian board (columns + cards from the
@@ -202,7 +200,7 @@ a version bump just run the sanity checks.
 `npm version patch --no-git-tag-version`), commit, push — CI does the rest (publish + tag +
 release). No local tagging needed.
 
-`npx thebidouille-agents@latest …` then serves the new version everywhere; installed cores record
+`npx cohorte@latest …` then serves the new version everywhere; installed cores record
 it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.json` pointer.
 
 ## The commands
@@ -222,8 +220,6 @@ it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.
 | `/align-ds`          | Align the code UI kit to the design system (no-op if none configured).                |
 | `/update-pipeline`   | Refresh the installed core (global or bundled) to the latest published version.       |
 | `/doctor`            | Diagnose the installation (core, agents↔surfaces, hooks, gate, retrieval, worktrees). |
-| `/research <pdf>`    | _Global capability._ Deep-research a PDF (URL or local file) into a standalone report, archived in Notion or Obsidian. |
-| `/questionnaire <id>`| _Global capability._ Optional: derive + write + validate a survey from a research run's archived page. |
 
 ### Run the loop cheaply — `/clear` between stages
 
@@ -241,59 +237,6 @@ lever: long sessions (>150k) are expensive even when cached. Each command tells 
 safe to clear. If you'd rather stay in one session, `/compact` mid-task does the lighter version. (Claude
 can't fire `/clear` itself — it's a client-side command; the pipeline just makes it always safe to type.)
 
-## Global capability — research → (optional) questionnaire
-
-A **user-scoped** capability, separate from the dev flow (`/brainstorm…/ship`) and independent of any
-project's `PIPELINE.md` — its config lives in **`~/.claude/thebidouille.config.yaml`** (seeded by the
-installer, never clobbered on update) and it behaves the same in every directory. **The archived page
-IS the run** — a page in a Notion database, or a markdown note in your Obsidian vault, per the
-config's `store:` (Notion is the default; Obsidian needs no MCP, just `obsidian_vault_path`).
-
-```
-/research <pdf-url-or-path> [subject]        →   (optional)  /questionnaire <run-id>
-   standalone research report                       blueprint + ORIGINAL Likert-5 survey + verdict
-   → archived page (Statut « Recherche »)           → same page (« À relire » / « Bloqué »)
-```
-
-- **`/research`** is genuine research, valuable on its own: the read-only **research-agent** — an
-  autonomous research assistant — reads the PDF — **a URL, or a local file** (pass a path to skip
-  CAPTCHAs/paywalls entirely) — and produces a standalone research report that extracts everything
-  important in the source (state of the art, domain analysis, debates, licences, open questions,
-  sources). It stands fully on its own — no questionnaire framing — and never reproduces a proprietary
-  instrument's item bank wholesale. The report lands in the store (under your confirmation) as a page
-  with Statut « Recherche »; a local source file is attached to the page (Notion) or copied to the
-  vault's `_sources/` (Obsidian) for provenance.
-- **`/questionnaire`** exists only if you want a survey out of a research run: the **questionnaire-architect**
-  derives a conceptual **blueprint** from the report, then the **writer** drafts *original* Likert-5
-  items (no tools, so it never sees the source or the report) and the **validator** checks them (loops up
-  to 3×); it **completes the same page** (blueprint + questionnaire + verdict, Statut flipped)
-  **under your confirmation**. Nothing enters the survey engine until you review the page and mark it
-  « Approuvé ».
-
-**Enable it** — best via `/update-pipeline` (it wires the config for you), or in the consolidated
-`~/.claude/thebidouille.config.yaml`:
-
-```yaml
-research:
-  enabled: true        # the Notion database is auto-created on the first /research
-  store: notion        # …or `obsidian` to archive to your vault (obsidian.vault_path asked once)
-questionnaire:
-  enabled: true        # the optional derivation step
-```
-
-(`research.notion_database_id` is filled back automatically; set `research.notion_parent_page_id`
-beforehand for a specific parent page. With `store: obsidian`, research notes live in
-`<vault>/Recherches/` and derived questionnaires as separate wikilinked notes in
-`<vault>/Questionnaires/` (folders configurable), and old Notion runs stay readable — pass their URL to
-`/questionnaire`. `questionnaire.engine_format` and `ui_language` default to `generic` / `French`.)
-
-With the capability `enabled: false` (or the file absent), `/research` and `/questionnaire` refuse
-cleanly and change nothing. The capability requires the Notion MCP (it is the storage):
-
-```sh
-claude mcp add --transport http notion https://mcp.notion.com/mcp
-```
-
 ## License
 
 [AGPL-3.0](LICENSE). Free to use, including commercially — but if you modify it and distribute it
@@ -306,21 +249,19 @@ See `profile/SCHEMA.md` for every field in `PIPELINE.md` and how the pipeline us
 ## Layout of this repo
 
 ```
-package.json            # npm package (thebidouille-agents) — semver source of truth
+package.json            # npm package (cohorte) — semver source of truth
 bin/cli.js              # the npm CLI: install / update / dashboard / version (cross-platform, no deps)
 install.sh              # script installer (fresh + --update) for no-Node environments
 install.ps1             # same installer for Windows PowerShell (fresh + -Update)
 core/                   # copied verbatim into ~/.claude (global) or <project>/.claude (bundled)
   agents/               # implementer.template.md (rendered per surface) + review.md + release.md
-                        #   + research-agent.md + questionnaire-{architect,writer,validator}.md (fixed capability agents)
-  commands/             # init-pipeline + the workflow commands + /update-pipeline, /research, /questionnaire
+  commands/             # init-pipeline + the workflow commands + /update-pipeline
   hooks/                # gate.py (destructive-command gate; branch-aware — git/docker free off the default branch)
   templates/            # handoff / brainstorm-return / design-brief / review-feedback / pr-body / spec
-                        #   + research-brief + questionnaire-{blueprint,declaration,verdict} (frozen contracts)
 profile/
   PIPELINE.template.md  # the profile skeleton /init-pipeline fills
   SCHEMA.md             # field reference
-  thebidouille.config.template.yaml   # seeds ~/.claude/thebidouille.config.yaml (research/questionnaire + kanban)
+  cohorte.config.template.yaml   # seeds ~/.claude/cohorte.config.yaml (kanban)
 scripts/                # new-feature / remove-feature worktree-isolation templates
 dashboard/              # local web cockpit (npx … dashboard) — see dashboard/README.md
   server/               # dependency-free node runtime (serves the built app + JSON/stream API)

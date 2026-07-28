@@ -1,8 +1,7 @@
 'use strict';
-// Read a project's linked Obsidian Kanban board (from ~/.claude/thebidouille.config.yaml) and
+// Read a project's linked Obsidian Kanban board (from ~/.claude/cohorte.config.yaml) and
 // parse it into columns + cards. The board is a plain markdown file in the user's vault, so this
-// stays local + dependency-free. Notion is NOT a kanban source in this pipeline (it only archives
-// /research runs) — the kanban mirror is Obsidian-only by design.
+// stays local + dependency-free. The kanban mirror is Obsidian-only by design.
 
 const fs = require('fs');
 const path = require('path');
@@ -38,8 +37,11 @@ function fetchPRs(repo) {
 }
 
 function readConfig(globalDir) {
-  const p = path.join(globalDir, 'thebidouille.config.yaml');
-  try { return parse(fs.readFileSync(p, 'utf8')); } catch { return null; }
+  // cohorte.config.yaml, then the pre-rename legacy names (read-only fallback).
+  for (const n of ['cohorte.config.yaml', 'thebidouille.config.yaml']) {
+    try { return parse(fs.readFileSync(path.join(globalDir, n), 'utf8')); } catch { /* try next */ }
+  }
+  return null;
 }
 
 // The project's PIPELINE.md `name`, or the directory basename as a fallback (a purged project
@@ -90,7 +92,7 @@ function parseBoard(md, repo) {
 
 function kanban({ projectRoot, globalDir }) {
   const cfg = readConfig(globalDir);
-  if (!cfg) return { enabled: false, reason: 'no thebidouille.config.yaml' };
+  if (!cfg) return { enabled: false, reason: 'no cohorte.config.yaml' };
   const k = cfg.kanban;
   if (!k || k.enabled !== true) return { enabled: false, reason: 'kanban disabled in config' };
   const vault = cfg.obsidian && cfg.obsidian.vault_path;

@@ -13,7 +13,7 @@ feature's kanban card at Finish, when a board is configured.
 > Template paths below (`.claude/templates/…`) resolve to `~/.claude/templates/…` when the core is
 > installed globally — read whichever exists.
 >
-> **Kanban** (SCHEMA.md §Kanban): resolve this project's board from `~/.claude/thebidouille.config.yaml`
+> **Kanban** (SCHEMA.md §Kanban): resolve this project's board from `~/.claude/cohorte.config.yaml`
 > `kanban.boards[<PIPELINE name>]`. Everything kanban below no-ops silently if none resolves.
 
 Idea (may be empty): **$ARGUMENTS**
