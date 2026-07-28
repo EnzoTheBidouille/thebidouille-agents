@@ -12,8 +12,7 @@ const { versions } = require('./versions');
 // Rendered surface agents live alongside these fixed (non-surface) agents; exclude them
 // from the orphan check so they're never mistaken for a stray surface agent.
 const FIXED_AGENTS = new Set([
-  'review', 'release', 'research-agent',
-  'questionnaire-architect', 'questionnaire-writer', 'questionnaire-validator',
+  'review', 'release',
   'implementer.template',
 ]);
 

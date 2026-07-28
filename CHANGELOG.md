@@ -10,6 +10,15 @@ user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per 
 > `~/.claude/thebidouille.config.yaml` and `~/.claude/thebidouille-dashboard.json` are still read as a
 > fallback, so existing installs keep working — `/update-pipeline` migrates them forward on next run.
 
+- **Repo moved to the `TheBidouilleAgency` org** (`github.com/TheBidouilleAgency/cohorte`), with a
+  proper logo/brand kit under `assets/` and a dashboard favicon set.
+
+- **The research + questionnaire capability was removed from the core.** `/research`,
+  `/questionnaire`, their agents, templates and step files are extracted to a separate private repo
+  and will return later as an installable Cohorte **plugin**. `update` scrubs the now-orphaned files
+  from existing installs. The global config keeps only the shared Obsidian vault + the kanban mirror;
+  the `research:`/`questionnaire:` config keys are gone.
+
 - **`/ship` now reliably moves the kanban card to Shipped and writes the PR number.** The
   move-to-Shipped was a parenthetical in the command header, easy to skip — so shipped features could
   leave their card stuck in an earlier column. It is now an explicit, verify-after step (§4): move

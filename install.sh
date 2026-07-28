@@ -121,18 +121,31 @@ if len(kept) != len(pre):
 PY
 }
 
-# the fixed (non-rendered) agents: dev review/release + the research/questionnaire capability agents
+# the fixed (non-rendered) agents: the dev review/release pipeline agents
 copy_fixed_agents() {
   mkdir -p "$dest/agents"
   cp "$src/core/agents/review.md" "$src/core/agents/release.md" \
-     "$src/core/agents/research-agent.md" \
-     "$src/core/agents/questionnaire-architect.md" \
-     "$src/core/agents/questionnaire-writer.md" \
-     "$src/core/agents/questionnaire-validator.md" \
      "$dest/agents/"
   # 0.1.19 split the bi-mode questionnaire-researcher into research-agent + questionnaire-architect;
   # copy-over never deletes, so scrub the retired agent lest a dead subagent_type linger.
   rm -f "$dest/agents/questionnaire-researcher.md"
+  scrub_research_questionnaire
+}
+
+# The research + questionnaire capability was removed. Older installs have its agents, commands,
+# templates and template-step dirs on disk; copy-over never deletes, so scrub every orphan.
+scrub_research_questionnaire() {
+  rm -f "$dest/agents/research-agent.md" \
+        "$dest/agents/questionnaire-architect.md" \
+        "$dest/agents/questionnaire-writer.md" \
+        "$dest/agents/questionnaire-validator.md" \
+        "$dest/commands/research.md" \
+        "$dest/commands/questionnaire.md" \
+        "$dest/templates/research-brief.md" \
+        "$dest/templates/questionnaire-blueprint.md" \
+        "$dest/templates/questionnaire-declaration.md" \
+        "$dest/templates/questionnaire-verdict.md"
+  rm -rf "$dest/templates/steps/research" "$dest/templates/steps/questionnaire"
 }
 
 # pipeline capability config is USER-level (vault, Notion DB, kanban boards) — it lives in
@@ -143,7 +156,7 @@ seed_config() {
   base="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
   cfg="$base/cohorte.config.yaml"
   legacy=""
-  for n in thebidouille.config.yaml questionnaire.config.yaml; do
+  for n in thebidouille.config.yaml; do
     [ -f "$base/$n" ] && { legacy="$base/$n"; break; }
   done
   if [ -f "$cfg" ]; then
@@ -242,12 +255,10 @@ Code retrieval (Serena — the default provider /init-pipeline wires per repo):
   Make sure ~/.local/bin is on PATH (uv tool update-shell) — otherwise the
   registered MCP server silently fails to start.
 
-Global capabilities config (research / questionnaire / kanban), user-scoped — optional:
+Global kanban config, user-scoped — optional:
   · One consolidated file: ~/.claude/cohorte.config.yaml (don't hand-edit it).
-  · /init-pipeline (new project) and /update-pipeline (existing) wire it for you: enabling
-    research/questionnaire, and creating + syncing an Obsidian kanban board of the pipeline.
-  · Research with  store: notion  needs Notion first:
-    claude mcp add --transport http notion https://mcp.notion.com/mcp
+  · /init-pipeline (new project) and /update-pipeline (existing) wire it for you: creating +
+    syncing an Obsidian kanban board of the pipeline in your shared vault.
 EOF
   exit 0
 fi

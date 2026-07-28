@@ -1,39 +1,20 @@
 # ~/.claude/cohorte.config.yaml — GLOBAL, user-scoped config for the Cohorte
 # pipeline capabilities. One machine, every project. NOT tied to any project's PIPELINE.md.
 #
-# Supersedes the older ~/.claude/questionnaire.config.yaml (still read as a FALLBACK when this
-# file is absent, so upgrades don't break). Seeded once by the installer
-# (npx cohorte install) and never clobbered on update. Wired interactively by
-# /init-pipeline (new project) and /update-pipeline (existing project) — you should never
-# need to hand-edit it.
+# Seeded once by the installer (npx cohorte install) and never clobbered on update. Wired
+# interactively by /init-pipeline (new project) and /update-pipeline (existing project) —
+# you should never need to hand-edit it.
 #
 # The `# cfg:<key>` markers below are anchors the installer's interactive prompts write to;
 # leave them in place.
 
 enabled: true                 # cfg:enabled — master switch; false disables every capability below
-ui_language: French           # cfg:ui_language — shared: research reports + questionnaire labels
 
 # ── obsidian ──────────────────────────────────────────────────────────────────
-# Local vault SHARED by research, questionnaire AND kanban — defined here ONCE so no
-# capability ever duplicates the path. Absolute path to the folder you open in Obsidian.
+# Local vault used by the kanban mirror — defined here ONCE so no capability ever duplicates
+# the path. Absolute path to the folder you open in Obsidian.
 obsidian:
   vault_path: ""              # cfg:vault_path
-
-# ── research → questionnaire (global capability) ─────────────────────────────
-# A user-scoped track, separate from the dev flow. See SCHEMA.md §Global capability.
-research:
-  enabled: false              # cfg:research_enabled — false ⇒ /research refuses cleanly
-  store: notion               # cfg:store — notion | obsidian (where each run is archived)
-  folder: "Recherches"        # obsidian store: research notes live here (+ _sources/ for PDFs)
-  # notion store — LEAVE EMPTY: the database is CREATED AUTOMATICALLY on the first /research
-  # and its id is written back here. Fill only to reuse an existing database.
-  notion_database_id: ""
-  notion_parent_page_id: ""   # optional parent page for the auto-created database
-
-questionnaire:
-  enabled: false              # cfg:questionnaire_enabled — the OPTIONAL step after /research
-  folder: "Questionnaires"    # obsidian store: derived questionnaire notes (wikilinked, separate)
-  engine_format: generic      # label of YOUR target survey-engine format (writer/validator context)
 
 # ── kanban (dev pipeline mirror) ─────────────────────────────────────────────
 # Mirrors /brainstorm…/ship onto an Obsidian Kanban board — one board per project. The

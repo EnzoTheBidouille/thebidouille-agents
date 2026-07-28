@@ -1,8 +1,7 @@
 'use strict';
 // Read a project's linked Obsidian Kanban board (from ~/.claude/cohorte.config.yaml) and
 // parse it into columns + cards. The board is a plain markdown file in the user's vault, so this
-// stays local + dependency-free. Notion is NOT a kanban source in this pipeline (it only archives
-// /research runs) — the kanban mirror is Obsidian-only by design.
+// stays local + dependency-free. The kanban mirror is Obsidian-only by design.
 
 const fs = require('fs');
 const path = require('path');
@@ -39,7 +38,7 @@ function fetchPRs(repo) {
 
 function readConfig(globalDir) {
   // cohorte.config.yaml, then the pre-rename legacy names (read-only fallback).
-  for (const n of ['cohorte.config.yaml', 'thebidouille.config.yaml', 'questionnaire.config.yaml']) {
+  for (const n of ['cohorte.config.yaml', 'thebidouille.config.yaml']) {
     try { return parse(fs.readFileSync(path.join(globalDir, n), 'utf8')); } catch { /* try next */ }
   }
   return null;

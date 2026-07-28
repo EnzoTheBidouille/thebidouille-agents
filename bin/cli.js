@@ -135,16 +135,35 @@ function scrubTddGate() {
   }
 }
 
-// the fixed (non-rendered) agents: dev review/release + the research/questionnaire capability agents
+// the fixed (non-rendered) agents: the dev review/release pipeline agents
 function copyFixedAgents() {
   fs.mkdirSync(path.join(dest, 'agents'), { recursive: true });
-  for (const f of ['review.md', 'release.md', 'research-agent.md', 'questionnaire-architect.md',
-                   'questionnaire-writer.md', 'questionnaire-validator.md']) {
+  for (const f of ['review.md', 'release.md']) {
     fs.copyFileSync(path.join(src, 'core', 'agents', f), path.join(dest, 'agents', f));
   }
   // 0.1.19 split the bi-mode questionnaire-researcher into research-agent + questionnaire-architect;
   // copy-over never deletes, so scrub the retired agent lest a dead subagent_type linger.
   fs.rmSync(path.join(dest, 'agents', 'questionnaire-researcher.md'), { force: true });
+  scrubResearchQuestionnaire();
+}
+
+// The research + questionnaire capability was removed. Older installs have its agents, commands,
+// templates and template-step dirs on disk; copy-over never deletes, so scrub every orphan.
+function scrubResearchQuestionnaire() {
+  for (const f of ['research-agent.md', 'questionnaire-architect.md',
+                   'questionnaire-writer.md', 'questionnaire-validator.md']) {
+    fs.rmSync(path.join(dest, 'agents', f), { force: true });
+  }
+  for (const f of ['research.md', 'questionnaire.md']) {
+    fs.rmSync(path.join(dest, 'commands', f), { force: true });
+  }
+  for (const f of ['research-brief.md', 'questionnaire-blueprint.md',
+                   'questionnaire-declaration.md', 'questionnaire-verdict.md']) {
+    fs.rmSync(path.join(dest, 'templates', f), { force: true });
+  }
+  for (const d of ['research', 'questionnaire']) {
+    fs.rmSync(path.join(dest, 'templates', 'steps', d), { recursive: true, force: true });
+  }
 }
 
 // --- interactive config helpers ---------------------------------------------
@@ -168,23 +187,13 @@ function setCfg(text, cfgKey, value) {
   }).join('\n');
 }
 
-// Fill the seeded config from a short TTY interview (research/questionnaire + shared vault).
+// Fill the seeded config from a short TTY interview (shared Obsidian vault for the kanban mirror).
 // Kanban is per-project, so it is wired later by /init-pipeline — not asked here.
 async function promptConfig(text) {
-  console.log('\n  Quick setup (Enter to skip any of these — you can also wire them later via');
+  console.log('\n  Quick setup (Enter to skip — you can also wire this later via');
   console.log('  /init-pipeline or /update-pipeline):');
-  const lang = await ask('    · UI language for research/questionnaire [French]: ');
-  if (lang) text = setCfg(text, 'ui_language', lang);
-  if (yes(await ask('    · Enable the research / questionnaire capability now? [y/N]: '))) {
-    text = setCfg(text, 'research_enabled', 'true');
-    text = setCfg(text, 'questionnaire_enabled', 'true');
-    const store = (await ask('        store — notion or obsidian? [notion]: ')).toLowerCase();
-    if (store === 'obsidian') {
-      text = setCfg(text, 'store', 'obsidian');
-      const vault = await ask('        absolute path to your Obsidian vault: ');
-      if (vault) text = setCfg(text, 'vault_path', `"${vault}"`);
-    }
-  }
+  const vault = await ask('    · absolute path to your shared Obsidian vault (for the kanban mirror): ');
+  if (vault) text = setCfg(text, 'vault_path', `"${vault}"`);
   return text;
 }
 
@@ -194,7 +203,7 @@ async function promptConfig(text) {
 async function seedConfig() {
   const cfg = path.join(globalDir, 'cohorte.config.yaml');
   // Pre-rename names, newest first — read as a fallback so upgrades don't lose the config.
-  const legacy = ['thebidouille.config.yaml', 'questionnaire.config.yaml']
+  const legacy = ['thebidouille.config.yaml']
     .map((n) => path.join(globalDir, n)).find(fs.existsSync);
   if (fs.existsSync(cfg)) { console.log(`  · kept your existing ${cfg}`); return; }
   if (legacy) {
@@ -292,11 +301,10 @@ Per repo:
 
 Update later with:  npx cohorte@latest update --global
 
-Global capabilities config (research / questionnaire / kanban), user-scoped — optional:
+Global kanban config, user-scoped — optional:
   · One consolidated file: ${path.join(globalDir, 'cohorte.config.yaml')}
   · Don't hand-edit it — /init-pipeline (new project) and /update-pipeline (existing) wire it
-    for you: enabling research/questionnaire, and creating + syncing an Obsidian kanban board.
-  · Research needs Notion (store: notion):  claude mcp add --transport http notion https://mcp.notion.com/mcp`);
+    for you: creating + syncing an Obsidian kanban board of the pipeline in your shared vault.`);
 } else if (mode === 'install') {
   console.log(`→ installing pipeline core into ${dest}`);
   copyFixedAgents();

@@ -154,10 +154,9 @@ gate:
 
 ```
 
-> **Note.** The **research/questionnaire capability** (`/research` + `/questionnaire`) and the
-> **kanban** board link are **user-scoped** — NOT configured here. Their facts live in the consolidated
-> `~/.claude/cohorte.config.yaml`, read at runtime (the kanban board is keyed by this profile's
-> `name`). This project profile only governs the dev pipeline (`/brainstorm…/ship`).
+> **Note.** The **kanban** board link is **user-scoped** — NOT configured here. Its facts live in the
+> consolidated `~/.claude/cohorte.config.yaml`, read at runtime (the kanban board is keyed by this
+> profile's `name`). This project profile only governs the dev pipeline (`/brainstorm…/ship`).
 
 ---
 

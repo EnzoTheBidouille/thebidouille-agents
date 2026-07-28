@@ -236,66 +236,14 @@ files automatically. It works because every generated artifact is a **determinis
    provider whose MCP server isn't registered yet), run its wiring step from `/init-pipeline` Phase 4.
    Even when nothing new was added, re-run the provider's health check (§Code retrieval) — wiring
    rots (PATH changes, uninstalls, hand-edits) — and repair whatever fails.
-5. **Global config migration.** If `~/.claude/cohorte.config.yaml` is absent but the legacy
-   `~/.claude/questionnaire.config.yaml` exists, migrate it: seed the consolidated file from the
-   template and carry every filled legacy value into its new home (`enabled`→`research.enabled`
-   +`questionnaire.enabled`, `store`→`research.store`, `notion_*`→`research.notion_*`,
-   `obsidian_vault_path`→`obsidian.vault_path`, `obsidian_research_folder`→`research.folder`,
-   `obsidian_questionnaire_folder`→`questionnaire.folder`, `engine_format`→`questionnaire.engine_format`,
-   `ui_language` stays top-level). Keep the legacy file in place (the commands still read it as a
-   fallback); report the migration.
+5. **Global config seed.** If `~/.claude/cohorte.config.yaml` is absent, seed it from the template
+   (`profile/cohorte.config.template.yaml`) so the kanban + shared-vault config has a home. Never
+   clobber an existing filled file; report what was seeded.
 6. **Kanban sync.** Run the §Kanban reconcile: link/create the project's board if configured, verify
    its columns, and backfill/sync cards from `specs/*.md`. See §Kanban.
 
 Re-running `/init-pipeline` remains possible (it reconciles too) but is only *needed* when the stack
 itself changes in ways `/build` §1.5 can't auto-grow (e.g. package manager or contract mechanism swap).
-
-## Global capability — research → (optional) questionnaire
-
-A **user-scoped** track, separate from the dev flow and NOT configured in `PIPELINE.md`. Its facts live
-in the **consolidated global config `~/.claude/cohorte.config.yaml`** (template:
-`profile/cohorte.config.template.yaml`, seeded by the installer, never clobbered on update) — the
-older flat `~/.claude/questionnaire.config.yaml` is still read as a **fallback** when the consolidated
-file is absent. A run is archived in the chosen `store`: **notion** (a page in a database auto-created
-on the first `/research`) or **obsidian** (a note in the shared vault, `obsidian.vault_path`).
-
-| Field                            | Used by                   | Meaning                                                         |
-| -------------------------------- | ------------------------- | --------------------------------------------------------------- |
-| `research.enabled`               | /research                 | `false`/absent ⇒ /research refuses cleanly.                     |
-| `questionnaire.enabled`          | /questionnaire            | `false`/absent ⇒ /questionnaire refuses cleanly.                |
-| `research.store`                 | /research, /questionnaire | `notion` \| `obsidian` — where each run is archived.            |
-| `research.notion_database_id`    | /research, /questionnaire | The archive database. Empty ⇒ auto-created on first run, id written back. |
-| `research.notion_parent_page_id` | /research (setup)         | Optional parent page for the auto-created database.             |
-| `research.folder` · `questionnaire.folder` | /research, /questionnaire | obsidian store: the vault sub-folders for research + questionnaire notes. |
-| `obsidian.vault_path`            | /research, /questionnaire, kanban | Shared vault path (see §Kanban).                        |
-| `questionnaire.engine_format`    | writer, validator         | Label of the user's target survey-engine format.                |
-| `ui_language`                    | research-agent, architect, writer | Language of the reports + all questionnaire labels.     |
-
-- `/research <pdf-url-or-path> [subject]` → drives `research-agent` (read-only) to produce a
-  **standalone research report** (state of the art, domain analysis, debates, licences, open questions,
-  sources) — genuine research that extracts everything important in the source, never questionnaire-shaped.
-  **Large local PDFs go multi-pass:** a `map` pass builds a reading plan, one `analyse-segment` pass runs
-  **per segment in parallel**, a `synthesise` pass writes the cross-cutting sections, and the orchestrator
-  assembles one report — so length scales with the source (no fixed word cap). Small sources / URLs take a
-  single `analyse-full` pass. A **local file** is read via the Read tool (no internet dependency) and
-  attached to the page for provenance; a URL goes through WebFetch. The report becomes a Notion page
-  (Statut « Recherche ») **under human confirmation**. No local artifact.
-- `/questionnaire <run-id-or-url>` → the OPTIONAL derivation, only if the human wants a survey: loads
-  the research from its Notion page, dispatches `questionnaire-architect` (derives the conceptual skeleton
-  from the report), then `questionnaire-writer` and `questionnaire-validator`
-  (both stateless, no tools; JSON inlined so the writer never sees the source or the report), loops
-  max 3, and **completes the same Notion page** (blueprint + questionnaire + verdict appended, Statut →
-  « À relire »/« Bloqué ») **under human confirmation**. Frozen contracts:
-  `templates/research-brief.md` + `templates/questionnaire-{blueprint,declaration,verdict}.md`.
-
-The two tracks are decoupled: `/research` stands alone (its `research-agent` never mentions a
-questionnaire), and the questionnaire is an opt-in consumer of the report. Guarantees the workflow
-preserves: the research report faithfully reports the source (including any thresholds/norms the source
-documents, attributed); the `questionnaire-architect` structures but never drafts items; the writer
-drafts original Likert-5 items but never sees the source; the **questionnaire** carries no interpretation
-(no thresholds/levels); agents are read-only, the orchestrator does all Notion writes, each write is
-confirmation-gated; nothing enters the survey engine until the human flips the page's Statut to
-« Approuvé ».
 
 ## Kanban — mirroring the pipeline onto an Obsidian board
 

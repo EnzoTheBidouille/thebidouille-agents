@@ -72,10 +72,9 @@ missing, say so. This is why `/init-pipeline` never needs re-running for a core 
 
 Two of the §Reconcile steps matter specifically here:
 
-- **Global config migration** (§Reconcile step 5): if `~/.claude/cohorte.config.yaml` is absent
-  but the legacy `~/.claude/questionnaire.config.yaml` exists, seed the consolidated file from the
-  template and carry every filled legacy value into its nested home. Keep the legacy file (still read
-  as a fallback). Report the migration.
+- **Global config seed** (§Reconcile step 5): if `~/.claude/cohorte.config.yaml` is absent, seed it
+  from the template so the kanban + shared-vault config has a home. Never clobber an existing filled
+  file. Report what was seeded.
 - **Kanban sync** (§Reconcile step 6): resolve this project's board from `kanban.boards[<PIPELINE
   name>]`. **Not linked** → offer to link/create a board (confirm the vault + `<folder>/Tasks.md`,
   write the `boards` entry, create the board file per §Kanban). **Linked** → verify the board file
@@ -92,6 +91,6 @@ Two of the §Reconcile steps matter specifically here:
 - **Other repos using the global core:** their core is already fresh, but reconcile is per-repo — run
   `/update-pipeline` inside each (it will skip the already-done core update and just reconcile).
 - **Commit** the reconciled files (`PIPELINE.md`, `.claude/`, `.mcp.json` if added) so teammates get them.
-- The research/questionnaire + kanban config is global and user-scoped
+- The kanban config is global and user-scoped
   (`~/.claude/cohorte.config.yaml`) — never committed. The core update never touches it; only the
-  reconcile above migrates the legacy file and writes kanban board links (into that global file, not the repo).
+  reconcile above seeds the file and writes kanban board links (into that global file, not the repo).

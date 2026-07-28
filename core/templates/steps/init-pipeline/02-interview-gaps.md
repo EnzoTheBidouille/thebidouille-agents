@@ -37,7 +37,5 @@ Prefer sensible defaults from Phase 1 as the first (Recommended) option in each 
   `~/.claude/cohorte.config.yaml`; ask if empty) and the board's location inside it (default
   `<ProjectName>/Tasks.md`). Phase 4 creates the board and records the link. Default: no.
 
-> The **research/questionnaire capability** (`/research`, `/questionnaire`) is user-scoped and lives in
-> the same global config but is NOT wired here — enable it via `/update-pipeline`. The **kanban** link,
-> though also user-scoped (it points at a personal vault, so it never goes in the committed
-> `PIPELINE.md`), IS wired here because it is per-project — see Phase 4.
+> The **kanban** link is user-scoped (it points at a personal vault, so it never goes in the committed
+> `PIPELINE.md`), but IS wired here because it is per-project — see Phase 4.

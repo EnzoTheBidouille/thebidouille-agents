@@ -13,8 +13,6 @@
 A **portable, stack-agnostic multi-agent pipeline** for Claude Code. Install it once globally,
 then one command per project (`/init-pipeline`) adapts it to that project's stack.
 
-Two independent tracks ship with it:
-
 - **The dev pipeline** — a human **lead** drives feature work through gated commands, dispatching
   **stateless agents** that only communicate through a frozen contract:
 
@@ -22,22 +20,18 @@ Two independent tracks ship with it:
   /brainstorm → /spec → (design) → /build <id> → /smoke → /review → (/fix) → /ship
   ```
 
-- **The research capability** (optional, user-scoped) — `/research` turns a source PDF into an
-  academic-register report archived in Notion; `/questionnaire` optionally derives an original
-  survey from it. See [Global capability](#global-capability--research--optional-questionnaire).
-
 ## How it works — three layers
 
 | Layer | What it holds | Lives in | Scope |
 | --- | --- | --- | --- |
 | **Generic core** | the workflow doctrine: commands, fixed agents, templates, hooks — zero project facts | `~/.claude` (global) — or vendored in a repo's `.claude/` (bundled) | identical everywhere, installed once |
 | **Project profile** | stack, surfaces, commands, conventions, gates | `PIPELINE.md` + rendered surface agents + `gate-config.json`, **committed in each repo** | generated per project by `/init-pipeline` |
-| **User config** | research/questionnaire facts (Notion DB, language) + kanban board links | `~/.claude/cohorte.config.yaml` | personal, project-independent |
+| **User config** | kanban board links + shared Obsidian vault path | `~/.claude/cohorte.config.yaml` | personal, project-independent |
 
 The core never hardcodes stack facts. Two mechanisms keep it generic:
 
 1. **Runtime indirection** — commands/agents read project facts from `PIPELINE.md` (dev pipeline) or
-   `~/.claude/cohorte.config.yaml` (research/questionnaire + kanban) at run time — an agent's
+   `~/.claude/cohorte.config.yaml` (kanban board links + shared vault) at run time — an agent's
    _first action_ is to read its config.
 2. **Render-at-init** — things that must be in agent frontmatter (name, `tools:`, surface ownership)
    are rendered per **surface** by `/init-pipeline` from `implementer.template.md`.
@@ -113,7 +107,7 @@ published semver. Both land in `.claude/pipeline/VERSION` and the `pipeline.json
 
 > **After installing (or updating): restart Claude Code / start a new session.** Slash commands and
 > agents are scanned at session start — in an already-open session the new `/init-pipeline`,
-> `/research`, etc. won't appear until you reload. This is the #1 "the install didn't work" trap.
+> `/build`, etc. won't appear until you reload. This is the #1 "the install didn't work" trap.
 
 Then, in Claude Code (from any repo, once the core is installed either way):
 
@@ -226,8 +220,6 @@ it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.
 | `/align-ds`          | Align the code UI kit to the design system (no-op if none configured).                |
 | `/update-pipeline`   | Refresh the installed core (global or bundled) to the latest published version.       |
 | `/doctor`            | Diagnose the installation (core, agents↔surfaces, hooks, gate, retrieval, worktrees). |
-| `/research <pdf>`    | _Global capability._ Deep-research a PDF (URL or local file) into a standalone report, archived in Notion or Obsidian. |
-| `/questionnaire <id>`| _Global capability._ Optional: derive + write + validate a survey from a research run's archived page. |
 
 ### Run the loop cheaply — `/clear` between stages
 
@@ -244,59 +236,6 @@ every boundary**:
 lever: long sessions (>150k) are expensive even when cached. Each command tells you when its handoff is
 safe to clear. If you'd rather stay in one session, `/compact` mid-task does the lighter version. (Claude
 can't fire `/clear` itself — it's a client-side command; the pipeline just makes it always safe to type.)
-
-## Global capability — research → (optional) questionnaire
-
-A **user-scoped** capability, separate from the dev flow (`/brainstorm…/ship`) and independent of any
-project's `PIPELINE.md` — its config lives in **`~/.claude/cohorte.config.yaml`** (seeded by the
-installer, never clobbered on update) and it behaves the same in every directory. **The archived page
-IS the run** — a page in a Notion database, or a markdown note in your Obsidian vault, per the
-config's `store:` (Notion is the default; Obsidian needs no MCP, just `obsidian_vault_path`).
-
-```
-/research <pdf-url-or-path> [subject]        →   (optional)  /questionnaire <run-id>
-   standalone research report                       blueprint + ORIGINAL Likert-5 survey + verdict
-   → archived page (Statut « Recherche »)           → same page (« À relire » / « Bloqué »)
-```
-
-- **`/research`** is genuine research, valuable on its own: the read-only **research-agent** — an
-  autonomous research assistant — reads the PDF — **a URL, or a local file** (pass a path to skip
-  CAPTCHAs/paywalls entirely) — and produces a standalone research report that extracts everything
-  important in the source (state of the art, domain analysis, debates, licences, open questions,
-  sources). It stands fully on its own — no questionnaire framing — and never reproduces a proprietary
-  instrument's item bank wholesale. The report lands in the store (under your confirmation) as a page
-  with Statut « Recherche »; a local source file is attached to the page (Notion) or copied to the
-  vault's `_sources/` (Obsidian) for provenance.
-- **`/questionnaire`** exists only if you want a survey out of a research run: the **questionnaire-architect**
-  derives a conceptual **blueprint** from the report, then the **writer** drafts *original* Likert-5
-  items (no tools, so it never sees the source or the report) and the **validator** checks them (loops up
-  to 3×); it **completes the same page** (blueprint + questionnaire + verdict, Statut flipped)
-  **under your confirmation**. Nothing enters the survey engine until you review the page and mark it
-  « Approuvé ».
-
-**Enable it** — best via `/update-pipeline` (it wires the config for you), or in the consolidated
-`~/.claude/cohorte.config.yaml`:
-
-```yaml
-research:
-  enabled: true        # the Notion database is auto-created on the first /research
-  store: notion        # …or `obsidian` to archive to your vault (obsidian.vault_path asked once)
-questionnaire:
-  enabled: true        # the optional derivation step
-```
-
-(`research.notion_database_id` is filled back automatically; set `research.notion_parent_page_id`
-beforehand for a specific parent page. With `store: obsidian`, research notes live in
-`<vault>/Recherches/` and derived questionnaires as separate wikilinked notes in
-`<vault>/Questionnaires/` (folders configurable), and old Notion runs stay readable — pass their URL to
-`/questionnaire`. `questionnaire.engine_format` and `ui_language` default to `generic` / `French`.)
-
-With the capability `enabled: false` (or the file absent), `/research` and `/questionnaire` refuse
-cleanly and change nothing. The capability requires the Notion MCP (it is the storage):
-
-```sh
-claude mcp add --transport http notion https://mcp.notion.com/mcp
-```
 
 ## License
 
@@ -316,15 +255,13 @@ install.sh              # script installer (fresh + --update) for no-Node enviro
 install.ps1             # same installer for Windows PowerShell (fresh + -Update)
 core/                   # copied verbatim into ~/.claude (global) or <project>/.claude (bundled)
   agents/               # implementer.template.md (rendered per surface) + review.md + release.md
-                        #   + research-agent.md + questionnaire-{architect,writer,validator}.md (fixed capability agents)
-  commands/             # init-pipeline + the workflow commands + /update-pipeline, /research, /questionnaire
+  commands/             # init-pipeline + the workflow commands + /update-pipeline
   hooks/                # gate.py (destructive-command gate; branch-aware — git/docker free off the default branch)
   templates/            # handoff / brainstorm-return / design-brief / review-feedback / pr-body / spec
-                        #   + research-brief + questionnaire-{blueprint,declaration,verdict} (frozen contracts)
 profile/
   PIPELINE.template.md  # the profile skeleton /init-pipeline fills
   SCHEMA.md             # field reference
-  cohorte.config.template.yaml   # seeds ~/.claude/cohorte.config.yaml (research/questionnaire + kanban)
+  cohorte.config.template.yaml   # seeds ~/.claude/cohorte.config.yaml (kanban)
 scripts/                # new-feature / remove-feature worktree-isolation templates
 dashboard/              # local web cockpit (npx … dashboard) — see dashboard/README.md
   server/               # dependency-free node runtime (serves the built app + JSON/stream API)
