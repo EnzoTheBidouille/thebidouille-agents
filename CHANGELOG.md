@@ -3,6 +3,15 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 0.1.27 — 2026-07-28
+
+- **README gains a Prerequisites section.** Spells out what a new machine actually needs: Node ≥ 18 + npm
+  (the only hard requirement, for the `npx` installer) versus `uv` + the Serena CLI (optional, the default
+  retrieval provider — installed separately, independent of the `npx` core install, order irrelevant, and
+  the pipeline still runs without it by falling back to Grep/Read). Also documents the cloned-repo case
+  (Serena registration travels in the committed `.mcp.json`; just install the CLI + restart + `/doctor`).
+  The mechanics were already in `SCHEMA.md` §Code retrieval, but not in the human-facing onboarding doc.
+
 ## 0.1.26 — 2026-07-28
 
 - **The design step now references designs by full link, not a stored project id + bare filename.** A
