@@ -25,8 +25,9 @@ function usage(code) {
   console.log(`thebidouille-agents v${VERSION}
 
 Usage:
-  thebidouille-agents install [target] [--global]
-  thebidouille-agents update  [target] [--global]
+  thebidouille-agents install   [target] [--global]
+  thebidouille-agents update    [target] [--global]
+  thebidouille-agents dashboard [target] [--port=N] [--host=ADDR] [--open]
   thebidouille-agents version
 
 Commands:
@@ -36,6 +37,11 @@ Commands:
   update    Refresh the stack-agnostic core only. PIPELINE.md, rendered surface
             agents, gate-config.json, settings.json and your filled
             ~/.claude/thebidouille.config.yaml are never touched.
+  dashboard Serve a local web cockpit for the pipeline (freshness, /doctor
+            health, specs board, install/update actions). Binds 127.0.0.1:4317
+            by default (loopback only — its actions execute code). --host=ADDR
+            to expose (e.g. --host=0.0.0.0, prints a security warning). --open
+            to launch the browser.
   version   Print the installed CLI version.`);
   process.exit(code);
 }
@@ -45,16 +51,33 @@ const args = process.argv.slice(2);
 let mode = null;
 let scope = 'project';
 let target = process.cwd();
+let port = parseInt(process.env.THEBIDOUILLE_DASHBOARD_PORT, 10) || 4317;
+// Bind to loopback by default — the dashboard's action endpoints execute code (install/update/
+// reset/claude), so it must NOT be reachable from the network unless the user explicitly opts in.
+let host = process.env.THEBIDOUILLE_DASHBOARD_HOST || '127.0.0.1';
+let openBrowser = false;
 
 for (const a of args) {
-  if (a === 'install' || a === 'update') mode = a;
+  if (a === 'install' || a === 'update' || a === 'dashboard') mode = a;
   else if (a === 'version' || a === '--version' || a === '-v') { console.log(VERSION); process.exit(0); }
   else if (a === '--global' || a === '-g') scope = 'global';
+  else if (a.startsWith('--port=')) { port = parseInt(a.slice(7), 10); }
+  else if (a.startsWith('--host=')) { host = a.slice(7); }
+  else if (a === '--open') { openBrowser = true; }
   else if (a === 'help' || a === '--help' || a === '-h') usage(0);
   else if (a.startsWith('-')) { console.error(`error: unknown flag: ${a}`); usage(2); }
   else target = path.resolve(a);
 }
 if (!mode) usage(args.length ? 2 : 0);
+
+// --- dashboard: local web cockpit -------------------------------------------
+// Short-circuits before the install/update machinery (CommonJS wraps the module,
+// so a top-level return is valid here). Runtime is dependency-free node `http`.
+if (mode === 'dashboard') {
+  const globalDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
+  require('../dashboard/server')({ projectRoot: target, globalDir, port, host, openBrowser, pkgRoot, version: VERSION });
+  return;
+}
 
 // --- paths -------------------------------------------------------------------
 const globalDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');

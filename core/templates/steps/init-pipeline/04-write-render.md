@@ -13,7 +13,8 @@
    (`<SURFACE_EXTRA_NEVER>`, `<SURFACE_DESIGN_INPUT>`, `<SURFACE_TDD_STEP1>` — fill design-related ones
    only when `uses_design`).
    Leave `review.md` + `release.md` as-is (generic).
-4. **Generate `.claude/gate-config.json`** from the `gate` block: `{"deny": [...], "ask": [...]}`.
+4. **Generate `.claude/gate-config.json`** from the `gate` block — copy all four keys verbatim:
+   `{"deny": [...], "ask": [...], "ask_on_default_branch": [...], "default_branch": "<vcs.default_branch>"}`.
 5. **Write `.claude/settings.json`** permissions (`ask`/`deny` lists mirroring the gate, **plus an
    `allow` list of the project's read-only / verification commands** so agents don't stall on
    permission prompts: the detected per-surface `test_cmd`/`lint_cmd`/`typecheck_cmd`/`build_cmd`

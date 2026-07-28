@@ -7,8 +7,10 @@ You are the **lead**. Ship feature **$ARGUMENTS**. This is the outward-facing ga
 
 > Read `PIPELINE.md` §`vcs` (host, remote, default_branch, feature_branch_prefix).
 >
-> **Kanban** (SCHEMA.md §Kanban): once the human confirms in §1, move card `#$ARGUMENTS` → **Ship**;
-> after the PR is open (§5), move it → **Shipped**. No-op silently if no board.
+> **Kanban** (SCHEMA.md §Kanban) is mirrored in **explicit steps** below, not as an afterthought:
+> §1 moves the card → **Ship**; §4 moves it → **Shipped** and writes the PR number. No-op silently if
+> no board. Do not skip §4's move — a shipped feature whose card is stuck in an earlier column is the
+> bug this ordering prevents.
 
 ## 1. Pre-flight (confirm before doing anything irreversible)
 
@@ -26,6 +28,7 @@ You are the **lead**. Ship feature **$ARGUMENTS**. This is the outward-facing ga
   All `- [x]` ⇒ proceed silently.
 - Show `git status` + `git diff --stat`; confirm the branch is `<feature_branch_prefix>$ARGUMENTS`.
 - **Ask the human to confirm** they want to commit, push, and open the PR. Wait for yes.
+- After the yes: **move card `#$ARGUMENTS` → the `ship` column** (SCHEMA.md §Kanban "Move a card"). No-op if no board.
 
 ## 2. Mark the spec shipped (BEFORE dispatch, so it ships in the same commit)
 
@@ -42,10 +45,18 @@ Spawn one agent (`subagent_type: release`): "Release feature `$ARGUMENTS` on bra
 Stage **all** the feature's changes including `specs/$ARGUMENTS.md`. Never edit source, never force-push,
 never run migrations."
 
-## 4. Relay
+## 4. Relay + move the card to Shipped (do not skip)
 
 Print the release agent's report: commit SHA(s), pushed branch, PR URL (or compare URL + drafted body).
 Confirm `specs/$ARGUMENTS.md` was committed as `status: shipped` (part of the release commit).
+
+**Move the card to Shipped — required, and verify it actually moved.** Move card `#$ARGUMENTS` → the
+`shipped` column (SCHEMA.md §Kanban "Move a card") and **append the PR number** so the line reads
+`- [ ] <title> #$ARGUMENTS — PR #<num>`. Take `<num>` from the PR URL (`…/pull/13` ⇒ `13`); **always write
+it when a PR was created** (the `gh` path) — it is what the dashboard turns into a PR link. If only a
+compare URL was emitted (no PR yet), move the card without a number. Then **re-read the board** and confirm
+the card sits under the `shipped` heading with no stale copy left under its previous column. No board ⇒
+skip silently.
 
 ## 5. After the PR — CI gate + teardown
 
