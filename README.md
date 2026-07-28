@@ -38,6 +38,20 @@ The core never hardcodes stack facts. Two mechanisms keep it generic:
 2. **Render-at-init** — things that must be in agent frontmatter (name, `tools:`, surface ownership)
    are rendered per **surface** by `/init-pipeline` from `implementer.template.md`.
 
+## Prerequisites
+
+Only one hard requirement — the rest is optional and independent:
+
+- **Node ≥ 18 + npm** — _required_, for the `npx` installer that lays down the core. Nothing else needs it.
+- **[`uv`](https://docs.astral.sh/uv/) + the Serena CLI** — _optional_, the default code-retrieval
+  provider. Install it separately (`uv tool install -p 3.13 serena-agent && uv tool update-shell`); the
+  `npx` install neither needs nor touches it, so the order between the two is irrelevant. Without Serena
+  the pipeline still runs — agents just fall back to Grep/Read. Having it installed **before**
+  `/init-pipeline` lets init wire it in one pass (otherwise `/update-pipeline` wires it later).
+- **On a new machine cloning a repo that's already pipeline-ised:** the Serena registration is committed
+  in the repo's `.mcp.json` (project scope, portable) — you don't re-wire. Just install the Serena CLI,
+  restart the session, and run `/doctor` to confirm it connects.
+
 ## Install
 
 The pipeline ships as an npm package (`thebidouille-agents`), so releases are semver-tagged and
