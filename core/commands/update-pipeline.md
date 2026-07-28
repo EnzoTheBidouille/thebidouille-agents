@@ -41,7 +41,7 @@ the human's choices — so `/init-pipeline` never needs re-running for an upgrad
 - If npm/npx is unavailable, fall back to piping the installer from the repo's latest `main`:
 
   ```sh
-  curl -fsSL https://raw.githubusercontent.com/EnzoTheBidouille/cohorte/main/install.sh | sh -s -- --update --global
+  curl -fsSL https://raw.githubusercontent.com/TheBidouilleAgency/cohorte/main/install.sh | sh -s -- --update --global
   # bundled:  … | sh -s -- --update
   ```
 

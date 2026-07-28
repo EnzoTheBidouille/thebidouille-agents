@@ -19,7 +19,7 @@ const pkgRoot = path.resolve(__dirname, '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(pkgRoot, 'package.json'), 'utf8'));
 const VERSION = pkg.version;
 
-const REPO_URL = 'https://github.com/EnzoTheBidouille/cohorte';
+const REPO_URL = 'https://github.com/TheBidouilleAgency/cohorte';
 
 function usage(code) {
   console.log(`cohorte v${VERSION}

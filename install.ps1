@@ -29,7 +29,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $repoUrl = $env:PIPELINE_REPO
-if (-not $repoUrl) { $repoUrl = 'https://github.com/EnzoTheBidouille/cohorte' }
+if (-not $repoUrl) { $repoUrl = 'https://github.com/TheBidouilleAgency/cohorte' }
 
 if (-not $Target) { $Target = (Get-Location).Path }
 

@@ -25,9 +25,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/EnzoTheBidouille/cohorte.git"
+    "url": "git+https://github.com/TheBidouilleAgency/cohorte.git"
   },
-  "homepage": "https://github.com/EnzoTheBidouille/cohorte#readme",
+  "homepage": "https://github.com/TheBidouilleAgency/cohorte#readme",
   "author": "Enzo Viry",
   "license": "AGPL-3.0-only",
   "keywords": [

@@ -23,7 +23,7 @@
 
 set -eu
 
-REPO_URL="${PIPELINE_REPO:-https://github.com/EnzoTheBidouille/cohorte}"
+REPO_URL="${PIPELINE_REPO:-https://github.com/TheBidouilleAgency/cohorte}"
 
 mode="install"
 scope="project"

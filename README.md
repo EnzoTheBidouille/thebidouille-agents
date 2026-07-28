@@ -1,10 +1,14 @@
-# cohorte
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/TheBidouilleAgency/cohorte/main/assets/cohorte-banner.png" alt="Cohorte — portable multi-agent pipeline for Claude Code" width="720">
 
 [![npm version](https://img.shields.io/npm/v/cohorte?logo=npm&color=cb3837)](https://www.npmjs.com/package/cohorte)
 [![npm downloads](https://img.shields.io/npm/dm/cohorte?logo=npm)](https://www.npmjs.com/package/cohorte)
-[![Publish to npm](https://github.com/EnzoTheBidouille/cohorte/actions/workflows/publish.yml/badge.svg)](https://github.com/EnzoTheBidouille/cohorte/actions/workflows/publish.yml)
+[![Publish to npm](https://github.com/TheBidouilleAgency/cohorte/actions/workflows/publish.yml/badge.svg)](https://github.com/TheBidouilleAgency/cohorte/actions/workflows/publish.yml)
 [![node >=18](https://img.shields.io/node/v/cohorte?logo=node.js&logoColor=white)](https://nodejs.org)
 [![license: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+
+</div>
 
 A **portable, stack-agnostic multi-agent pipeline** for Claude Code. Install it once globally,
 then one command per project (`/init-pipeline`) adapts it to that project's stack.
@@ -93,13 +97,13 @@ duplicated in every repo and each repo updates separately.
 # global (recommended)                    # per-project (bundled)
 sh install.sh --global                    sh install.sh
 # or piped:
-curl -fsSL https://raw.githubusercontent.com/EnzoTheBidouille/cohorte/main/install.sh | sh -s -- --global
+curl -fsSL https://raw.githubusercontent.com/TheBidouilleAgency/cohorte/main/install.sh | sh -s -- --global
 ```
 
 ```powershell
 # Windows (PowerShell 5.1+)
 .\install.ps1 -Global         # or without -Global for per-project
-# or:  & ([scriptblock]::Create((irm https://raw.githubusercontent.com/EnzoTheBidouille/cohorte/main/install.ps1))) -Global
+# or:  & ([scriptblock]::Create((irm https://raw.githubusercontent.com/TheBidouilleAgency/cohorte/main/install.ps1))) -Global
 ```
 
 Script installs from a git checkout stamp the version as `<semver> (<sha>)`; the npm CLI stamps the

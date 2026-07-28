@@ -62,7 +62,7 @@
    `{ "pipeline": "cohorte", "mode": "<bundled|global>", "core_version": "<contents of the
    installer's pipeline/VERSION>", "install": "<per mode: bundled ⇒ \"npx cohorte install\"
    note that the core is committed under .claude/; global ⇒ \"npx cohorte install --global\"
-   (or, without npm: curl -fsSL https://raw.githubusercontent.com/EnzoTheBidouille/cohorte/main/install.sh | sh -s -- --global;
+   (or, without npm: curl -fsSL https://raw.githubusercontent.com/TheBidouilleAgency/cohorte/main/install.sh | sh -s -- --global;
    Windows: install.ps1 -Global from the same repo)> " }`.
    In **global** mode also add, near the top of `CLAUDE.md`, a one-liner:
    `> Pipeline: global core — run the installer above if /brainstorm etc. are missing.`
