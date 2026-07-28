@@ -1,9 +1,9 @@
 {
-  "name": "thebidouille-agents-dashboard-app",
+  "name": "cohorte-dashboard-app",
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "React (Vite) front-end for the thebidouille-agents pipeline dashboard. Built to ../dist and served by the dependency-free node server.",
+  "description": "React (Vite) front-end for the cohorte pipeline dashboard. Built to ../dist and served by the dependency-free node server.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

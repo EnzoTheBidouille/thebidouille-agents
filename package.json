@@ -1,9 +1,9 @@
 {
-  "name": "thebidouille-agents",
-  "version": "0.1.27",
+  "name": "cohorte",
+  "version": "1.0.0",
   "description": "Portable, stack-agnostic multi-agent development pipeline for Claude Code — install the core, run /init-pipeline, and it adapts to your project's stack.",
   "bin": {
-    "thebidouille-agents": "bin/cli.js"
+    "cohorte": "bin/cli.js"
   },
   "scripts": {
     "build:dashboard": "npm --prefix dashboard/app ci && npm --prefix dashboard/app run build"
@@ -25,9 +25,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/EnzoTheBidouille/thebidouille-agents.git"
+    "url": "git+https://github.com/TheBidouilleAgency/cohorte.git"
   },
-  "homepage": "https://github.com/EnzoTheBidouille/thebidouille-agents#readme",
+  "homepage": "https://github.com/TheBidouilleAgency/cohorte#readme",
   "author": "Enzo Viry",
   "license": "AGPL-3.0-only",
   "keywords": [

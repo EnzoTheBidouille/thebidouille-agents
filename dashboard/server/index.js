@@ -18,6 +18,7 @@ const MIME = {
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
+  '.png': 'image/png',
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
   '.map': 'application/json; charset=utf-8',
@@ -275,7 +276,7 @@ function start({ projectRoot, globalDir, port, host, openBrowser, pkgRoot, versi
   server.listen(port, bindHost, () => {
     const shownHost = LOOPBACK.has(bindHost) ? 'localhost' : bindHost;
     const url = `http://${shownHost}:${port}`;
-    console.log(`\n  thebidouille-agents dashboard  v${version}`);
+    console.log(`\n  cohorte dashboard  v${version}`);
     console.log(`  ┌${'─'.repeat(url.length + 10)}┐`);
     console.log(`  │  open  ${url}  │`);
     console.log(`  └${'─'.repeat(url.length + 10)}┘`);

@@ -32,7 +32,7 @@ export default function App() {
       <header className="topbar">
         <div className="brand" onClick={() => setSelected(null)} style={{ cursor: 'pointer' }}>
           <span className="dot" />
-          thebidouille-agents <span className="muted">· dashboard</span>
+          cohorte <span className="muted">· dashboard</span>
         </div>
         {selected && (
           <button className="ghost" onClick={() => setSelected(null)}>← all projects</button>

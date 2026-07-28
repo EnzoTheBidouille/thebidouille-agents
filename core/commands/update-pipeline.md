@@ -1,11 +1,11 @@
 ---
-description: Refresh the pipeline core (global ~/.claude, or a repo's bundled .claude) to the latest published thebidouille-agents version, then reconcile this repo's generated files to it — /init-pipeline stays one-time.
+description: Refresh the pipeline core (global ~/.claude, or a repo's bundled .claude) to the latest published cohorte version, then reconcile this repo's generated files to it — /init-pipeline stays one-time.
 argument-hint: [path-to-local-checkout]
 ---
 
 You are the **pipeline updater**. Refresh the installed pipeline core to the latest version of the pipeline
 repo. The installer's `--update` mode never touches generated files: `PIPELINE.md`, rendered surface agents,
-`gate-config.json`, `settings.json`, and the filled `~/.claude/thebidouille.config.yaml` are all preserved.
+`gate-config.json`, `settings.json`, and the filled `~/.claude/cohorte.config.yaml` are all preserved.
 YOU then bring those generated files up to the new core yourself (§3.5) — additively, never clobbering
 the human's choices — so `/init-pipeline` never needs re-running for an upgrade.
 
@@ -34,14 +34,14 @@ the human's choices — so `/init-pipeline` never needs re-running for an upgrad
 - Otherwise use the published npm package (preferred — installs the latest tagged release):
 
   ```sh
-  npx thebidouille-agents@latest update --global   # global core
-  npx thebidouille-agents@latest update            # bundled core of the current repo
+  npx cohorte@latest update --global   # global core
+  npx cohorte@latest update            # bundled core of the current repo
   ```
 
 - If npm/npx is unavailable, fall back to piping the installer from the repo's latest `main`:
 
   ```sh
-  curl -fsSL https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.sh | sh -s -- --update --global
+  curl -fsSL https://raw.githubusercontent.com/TheBidouilleAgency/cohorte/main/install.sh | sh -s -- --update --global
   # bundled:  … | sh -s -- --update
   ```
 
@@ -72,10 +72,9 @@ missing, say so. This is why `/init-pipeline` never needs re-running for a core 
 
 Two of the §Reconcile steps matter specifically here:
 
-- **Global config migration** (§Reconcile step 5): if `~/.claude/thebidouille.config.yaml` is absent
-  but the legacy `~/.claude/questionnaire.config.yaml` exists, seed the consolidated file from the
-  template and carry every filled legacy value into its nested home. Keep the legacy file (still read
-  as a fallback). Report the migration.
+- **Global config seed** (§Reconcile step 5): if `~/.claude/cohorte.config.yaml` is absent, seed it
+  from the template so the kanban + shared-vault config has a home. Never clobber an existing filled
+  file. Report what was seeded.
 - **Kanban sync** (§Reconcile step 6): resolve this project's board from `kanban.boards[<PIPELINE
   name>]`. **Not linked** → offer to link/create a board (confirm the vault + `<folder>/Tasks.md`,
   write the `boards` entry, create the board file per §Kanban). **Linked** → verify the board file
@@ -92,6 +91,6 @@ Two of the §Reconcile steps matter specifically here:
 - **Other repos using the global core:** their core is already fresh, but reconcile is per-repo — run
   `/update-pipeline` inside each (it will skip the already-done core update and just reconcile).
 - **Commit** the reconciled files (`PIPELINE.md`, `.claude/`, `.mcp.json` if added) so teammates get them.
-- The research/questionnaire + kanban config is global and user-scoped
-  (`~/.claude/thebidouille.config.yaml`) — never committed. The core update never touches it; only the
-  reconcile above migrates the legacy file and writes kanban board links (into that global file, not the repo).
+- The kanban config is global and user-scoped
+  (`~/.claude/cohorte.config.yaml`) — never committed. The core update never touches it; only the
+  reconcile above seeds the file and writes kanban board links (into that global file, not the repo).

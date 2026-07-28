@@ -12,8 +12,7 @@ const { versions } = require('./versions');
 // Rendered surface agents live alongside these fixed (non-surface) agents; exclude them
 // from the orphan check so they're never mistaken for a stray surface agent.
 const FIXED_AGENTS = new Set([
-  'review', 'release', 'research-agent',
-  'questionnaire-architect', 'questionnaire-writer', 'questionnaire-validator',
+  'review', 'release',
   'implementer.template',
 ]);
 
@@ -39,18 +38,18 @@ function mk(id, label, status, detail, fix) {
 function checkCore(v) {
   if (v.installMode === 'none') {
     return mk('core', 'Core & pointer', 'bad', 'no pipeline core installed for this project',
-      'npx thebidouille-agents install   (or --global)');
+      'npx cohorte install   (or --global)');
   }
   if (v.pointer.present && v.pointer.core_version && v.installedVersion &&
       v.pointer.core_version !== v.installedVersion) {
     return mk('core', 'Core & pointer', 'warn',
       `pointer says core ${v.pointer.core_version} but installed core is ${v.installedVersion}`,
-      'npx thebidouille-agents update   (reconcile the pointer)');
+      'npx cohorte update   (reconcile the pointer)');
   }
   if (v.freshness === -1) {
     return mk('core', 'Core & pointer', 'warn',
       `core ${v.installedVersion} installed (${v.installMode}); npm latest is ${v.latest}`,
-      '/update-pipeline   (or  npx thebidouille-agents update)');
+      '/update-pipeline   (or  npx cohorte update)');
   }
   const tail = v.latest ? `, npm latest ${v.latest}` : ', npm unreachable';
   return mk('core', 'Core & pointer', 'ok', `core ${v.installedVersion} (${v.installMode})${tail}`);
@@ -138,7 +137,7 @@ function checkHooks(projectRoot, globalDir, installMode) {
   if (regs.length === 0) {
     return mk('hooks', 'Gate hook', 'warn', `gate.py not registered in ${installMode} settings.json`,
       installMode === 'global'
-        ? 'npx thebidouille-agents install --global   (re-registers the hook)'
+        ? 'npx cohorte install --global   (re-registers the hook)'
         : '/init-pipeline   (register the PreToolUse gate hook)');
   }
   if (regs.length > 1) {

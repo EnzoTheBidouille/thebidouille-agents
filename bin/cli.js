@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// thebidouille-agents — installer CLI for the portable multi-agent pipeline.
+// cohorte — installer CLI for the portable multi-agent pipeline.
 // Cross-platform, dependency-free port of install.sh / install.ps1.
 //
-//   npx thebidouille-agents install              # bundle the core into <cwd>/.claude (committable)
-//   npx thebidouille-agents install [target]     # same, into another project
-//   npx thebidouille-agents install --global     # one shared core in ~/.claude
-//   npx thebidouille-agents update [--global]    # refresh the core, keep every generated file
-//   npx thebidouille-agents version
+//   npx cohorte install              # bundle the core into <cwd>/.claude (committable)
+//   npx cohorte install [target]     # same, into another project
+//   npx cohorte install --global     # one shared core in ~/.claude
+//   npx cohorte update [--global]    # refresh the core, keep every generated file
+//   npx cohorte version
 
 'use strict';
 
@@ -19,16 +19,16 @@ const pkgRoot = path.resolve(__dirname, '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(pkgRoot, 'package.json'), 'utf8'));
 const VERSION = pkg.version;
 
-const REPO_URL = 'https://github.com/EnzoTheBidouille/thebidouille-agents';
+const REPO_URL = 'https://github.com/TheBidouilleAgency/cohorte';
 
 function usage(code) {
-  console.log(`thebidouille-agents v${VERSION}
+  console.log(`cohorte v${VERSION}
 
 Usage:
-  thebidouille-agents install   [target] [--global]
-  thebidouille-agents update    [target] [--global]
-  thebidouille-agents dashboard [target] [--port=N] [--host=ADDR] [--open]
-  thebidouille-agents version
+  cohorte install   [target] [--global]
+  cohorte update    [target] [--global]
+  cohorte dashboard [target] [--port=N] [--host=ADDR] [--open]
+  cohorte version
 
 Commands:
   install   Fresh install. Default: bundle the core into <target>/.claude
@@ -36,7 +36,7 @@ Commands:
             available to every project on this machine.
   update    Refresh the stack-agnostic core only. PIPELINE.md, rendered surface
             agents, gate-config.json, settings.json and your filled
-            ~/.claude/thebidouille.config.yaml are never touched.
+            ~/.claude/cohorte.config.yaml are never touched.
   dashboard Serve a local web cockpit for the pipeline (freshness, /doctor
             health, specs board, install/update actions). Binds 127.0.0.1:4317
             by default (loopback only — its actions execute code). --host=ADDR
@@ -51,10 +51,10 @@ const args = process.argv.slice(2);
 let mode = null;
 let scope = 'project';
 let target = process.cwd();
-let port = parseInt(process.env.THEBIDOUILLE_DASHBOARD_PORT, 10) || 4317;
+let port = parseInt(process.env.COHORTE_DASHBOARD_PORT, 10) || 4317;
 // Bind to loopback by default — the dashboard's action endpoints execute code (install/update/
 // reset/claude), so it must NOT be reachable from the network unless the user explicitly opts in.
-let host = process.env.THEBIDOUILLE_DASHBOARD_HOST || '127.0.0.1';
+let host = process.env.COHORTE_DASHBOARD_HOST || '127.0.0.1';
 let openBrowser = false;
 
 for (const a of args) {
@@ -99,7 +99,7 @@ function copyCore() {
   fs.rmSync(path.join(dest, 'templates', 'questionnaire-domain-brief.md'), { force: true });
   const pipelineDir = path.join(dest, 'pipeline');
   fs.mkdirSync(path.join(pipelineDir, 'scripts'), { recursive: true });
-  for (const f of ['PIPELINE.template.md', 'SCHEMA.md', 'thebidouille.config.template.yaml']) {
+  for (const f of ['PIPELINE.template.md', 'SCHEMA.md', 'cohorte.config.template.yaml']) {
     fs.copyFileSync(path.join(src, 'profile', f), path.join(pipelineDir, f));
   }
   for (const f of fs.readdirSync(path.join(src, 'scripts'))) {
@@ -135,16 +135,35 @@ function scrubTddGate() {
   }
 }
 
-// the fixed (non-rendered) agents: dev review/release + the research/questionnaire capability agents
+// the fixed (non-rendered) agents: the dev review/release pipeline agents
 function copyFixedAgents() {
   fs.mkdirSync(path.join(dest, 'agents'), { recursive: true });
-  for (const f of ['review.md', 'release.md', 'research-agent.md', 'questionnaire-architect.md',
-                   'questionnaire-writer.md', 'questionnaire-validator.md']) {
+  for (const f of ['review.md', 'release.md']) {
     fs.copyFileSync(path.join(src, 'core', 'agents', f), path.join(dest, 'agents', f));
   }
   // 0.1.19 split the bi-mode questionnaire-researcher into research-agent + questionnaire-architect;
   // copy-over never deletes, so scrub the retired agent lest a dead subagent_type linger.
   fs.rmSync(path.join(dest, 'agents', 'questionnaire-researcher.md'), { force: true });
+  scrubResearchQuestionnaire();
+}
+
+// The research + questionnaire capability was removed. Older installs have its agents, commands,
+// templates and template-step dirs on disk; copy-over never deletes, so scrub every orphan.
+function scrubResearchQuestionnaire() {
+  for (const f of ['research-agent.md', 'questionnaire-architect.md',
+                   'questionnaire-writer.md', 'questionnaire-validator.md']) {
+    fs.rmSync(path.join(dest, 'agents', f), { force: true });
+  }
+  for (const f of ['research.md', 'questionnaire.md']) {
+    fs.rmSync(path.join(dest, 'commands', f), { force: true });
+  }
+  for (const f of ['research-brief.md', 'questionnaire-blueprint.md',
+                   'questionnaire-declaration.md', 'questionnaire-verdict.md']) {
+    fs.rmSync(path.join(dest, 'templates', f), { force: true });
+  }
+  for (const d of ['research', 'questionnaire']) {
+    fs.rmSync(path.join(dest, 'templates', 'steps', d), { recursive: true, force: true });
+  }
 }
 
 // --- interactive config helpers ---------------------------------------------
@@ -168,23 +187,13 @@ function setCfg(text, cfgKey, value) {
   }).join('\n');
 }
 
-// Fill the seeded config from a short TTY interview (research/questionnaire + shared vault).
+// Fill the seeded config from a short TTY interview (shared Obsidian vault for the kanban mirror).
 // Kanban is per-project, so it is wired later by /init-pipeline — not asked here.
 async function promptConfig(text) {
-  console.log('\n  Quick setup (Enter to skip any of these — you can also wire them later via');
+  console.log('\n  Quick setup (Enter to skip — you can also wire this later via');
   console.log('  /init-pipeline or /update-pipeline):');
-  const lang = await ask('    · UI language for research/questionnaire [French]: ');
-  if (lang) text = setCfg(text, 'ui_language', lang);
-  if (yes(await ask('    · Enable the research / questionnaire capability now? [y/N]: '))) {
-    text = setCfg(text, 'research_enabled', 'true');
-    text = setCfg(text, 'questionnaire_enabled', 'true');
-    const store = (await ask('        store — notion or obsidian? [notion]: ')).toLowerCase();
-    if (store === 'obsidian') {
-      text = setCfg(text, 'store', 'obsidian');
-      const vault = await ask('        absolute path to your Obsidian vault: ');
-      if (vault) text = setCfg(text, 'vault_path', `"${vault}"`);
-    }
-  }
+  const vault = await ask('    · absolute path to your shared Obsidian vault (for the kanban mirror): ');
+  if (vault) text = setCfg(text, 'vault_path', `"${vault}"`);
   return text;
 }
 
@@ -192,16 +201,18 @@ async function promptConfig(text) {
 // ~/.claude regardless of install scope. Seed it only if the user has no copy (consolidated OR
 // legacy). On a TTY, offer a quick interview to fill it; otherwise seed disabled defaults.
 async function seedConfig() {
-  const cfg = path.join(globalDir, 'thebidouille.config.yaml');
-  const legacy = path.join(globalDir, 'questionnaire.config.yaml');
+  const cfg = path.join(globalDir, 'cohorte.config.yaml');
+  // Pre-rename names, newest first — read as a fallback so upgrades don't lose the config.
+  const legacy = ['thebidouille.config.yaml']
+    .map((n) => path.join(globalDir, n)).find(fs.existsSync);
   if (fs.existsSync(cfg)) { console.log(`  · kept your existing ${cfg}`); return; }
-  if (fs.existsSync(legacy)) {
+  if (legacy) {
     console.log(`  · found legacy ${legacy} — kept as-is (still read as a fallback).`);
-    console.log('    Run /update-pipeline to migrate it into thebidouille.config.yaml + wire the kanban.');
+    console.log('    Run /update-pipeline to migrate it into cohorte.config.yaml + wire the kanban.');
     return;
   }
   fs.mkdirSync(path.dirname(cfg), { recursive: true });
-  let text = fs.readFileSync(path.join(src, 'profile', 'thebidouille.config.template.yaml'), 'utf8');
+  let text = fs.readFileSync(path.join(src, 'profile', 'cohorte.config.template.yaml'), 'utf8');
   if (process.stdin.isTTY && process.stdout.isTTY) {
     text = await promptConfig(text);
     fs.writeFileSync(cfg, text);
@@ -288,13 +299,12 @@ Per repo:
      teammates know to install the global core (${REPO_URL}).
   3. Commit PIPELINE.md + .claude/, then  /brainstorm  to start a feature.
 
-Update later with:  npx thebidouille-agents@latest update --global
+Update later with:  npx cohorte@latest update --global
 
-Global capabilities config (research / questionnaire / kanban), user-scoped — optional:
-  · One consolidated file: ${path.join(globalDir, 'thebidouille.config.yaml')}
+Global kanban config, user-scoped — optional:
+  · One consolidated file: ${path.join(globalDir, 'cohorte.config.yaml')}
   · Don't hand-edit it — /init-pipeline (new project) and /update-pipeline (existing) wire it
-    for you: enabling research/questionnaire, and creating + syncing an Obsidian kanban board.
-  · Research needs Notion (store: notion):  claude mcp add --transport http notion https://mcp.notion.com/mcp`);
+    for you: creating + syncing an Obsidian kanban board of the pipeline in your shared vault.`);
 } else if (mode === 'install') {
   console.log(`→ installing pipeline core into ${dest}`);
   copyFixedAgents();
@@ -314,7 +324,7 @@ Next:
      PIPELINE.md + renders one implementer agent per surface.
   3. Commit PIPELINE.md, then  /brainstorm  to start a feature.
 
-Update later with:  npx thebidouille-agents@latest update
+Update later with:  npx cohorte@latest update
 Prefer one shared core across all your repos?  Re-run with  --global.`);
 } else {
   console.log(`→ updating pipeline core in ${dest} (keeping your PIPELINE.md + rendered agents)`);
