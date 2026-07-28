@@ -6,7 +6,7 @@ branch: <feature_branch_prefix><slug>
 created: <YYYY-MM-DD>
 reviewed_base: # merge-base sha at the last SHIP verdict — freshness-gate anchor (written by /review)
 reviewed_digest: # sha256 (16 hex) of the reviewed source diff vs reviewed_base, specs excluded — /ship re-checks
-design_files: [] # design page links (full URLs — each carries its own project) or bare file names resolved in the profile's design_project — blank until designed; omit if no UI
+design_files: [] # design page links — full URLs of the form https://claude.ai/design/p/<projectId>?file=<file> (each carries its own project + page); blank until designed; omit if no UI
 ---
 
 # <Feature title>

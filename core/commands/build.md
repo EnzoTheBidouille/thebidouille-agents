@@ -19,10 +19,12 @@ You are the **lead**. Build feature **$ARGUMENTS** from its frozen spec.
 - Read `specs/$ARGUMENTS.md`. If missing or `status` not `frozen`/`in-review`, stop — tell the human to
   run `/spec` first.
 - **Design gate** — only if `design.enabled` and the feature has UI (some surface `uses_design`): if the
-  spec front-matter `design_files` is empty, ask the human for the feature's design page link(s) and
-  store them in `design_files`, then continue. Then **resolve the feature's design project**: a full
-  link carries its own project — extract the project id from the URL (it wins over the profile);
-  a bare file name falls back to `design.design_project`. If neither yields a project, ask the human.
+  spec front-matter `design_files` is empty, ask the human for the feature's design **links** and store
+  them in `design_files`, then continue. Each entry is a full self-contained link of the form
+  `https://claude.ai/design/p/<projectId>?file=<file>` — it carries its own project (the `/p/<projectId>`
+  path segment) and page (the `?file=` query), so nothing needs a stored project id and the reference
+  survives a design-system rebuild (a new DS ⇒ just paste the new links, no profile change). _Legacy bare
+  file names still resolve against the optional `design.design_project` fallback, but new specs use links._
   Skip if the feature is backend-only / no UI.
 - If this is a fix loop (`## Remediation` has unchecked items), note them — they go to every agent.
 
@@ -71,7 +73,8 @@ the batch wall-clock. For each surface in `surfaces`:
 > `subagent_type: <surface.agent>` — "Implement the **<surface.key>** surface for feature `$ARGUMENTS`.
 > Read `PIPELINE.md` first. Spec: `specs/$ARGUMENTS.md`. Contract: `<contract.path>/$ARGUMENTS.<ext>`
 > (import read-only). Work test-first. Touch only `<surface.path>`. [If a `uses_design` surface: design
-> > files = the spec's `design_files` in project `<resolved design project id>` (from §1's design gate);
+> > files = the spec's `design_files` links — each `https://claude.ai/design/p/<projectId>?file=<file>`
+> > carries its own project + page, fetch read-only via `DesignSync get_file(<projectId>, <file>)`;
 > > build mobile-first.] [If fix loop: address the
 > > `## Remediation` items; current diff: …]. Return the handoff per `.claude/templates/agent-handoff.md`."
 

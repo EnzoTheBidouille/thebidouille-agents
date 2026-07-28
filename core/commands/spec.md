@@ -46,8 +46,9 @@ Detect the mode from the pasted content:
      artifact that mirrors §8 — overwrite it on every freeze so it never drifts from the spec.
    - Then print the same content in a copy-paste block and tell the human: paste it into the design tool
      (if any — typically a fresh design project for this feature) or just open `specs/design/<id>.md`,
-     then run `/build <id>` and hand its design gate the resulting page link(s) — a full link carries its
-     own project, no profile change needed. (They can also paste the links into the spec's `design_files`
+     then run `/build <id>` and hand its design gate the resulting page link(s) — a full
+     `https://claude.ai/design/p/<projectId>?file=<file>` link carries its own project + page, no profile
+     change needed. (They can also paste the links into the spec's `design_files`
      themselves.) _The frozen spec + `specs/design/<id>.md` are the whole handoff — `/clear` before
      `/build` is safe._
 

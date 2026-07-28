@@ -38,7 +38,7 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
 | `design.enabled`                     | bool         | build, frontend, align-ds         | `false` ⇒ design steps are no-ops.                            |
 | `design.provider`                    | enum         | frontend, align-ds                | `claude-design`/`figma`/`none`.                               |
 | `design.design_system_project`       | id           | align-ds, frontend                | UI-kit source of truth.                                       |
-| `design.design_project`              | id           | build, frontend                   | Fallback project for per-feature screens; a full link in spec `design_files` wins. |
+| `design.design_project`              | id           | build, frontend                   | Legacy fallback for bare-filename `design_files` only; default `none`. New specs use full `…/design/p/<projectId>?file=<file>` links that carry their own project + page (nothing to go stale on a DS rebuild). |
 | `design.snapshot_dir`                | path         | align-ds                          | Committed DS snapshot for diffing.                            |
 | `design.ui_kit_path` `.tokens_path`  | path         | align-ds, frontend                | Where the kit + tokens live in code.                          |
 | `isolation.enabled`                  | bool         | new-feature script                | `false` ⇒ build in main checkout.                             |
@@ -188,8 +188,20 @@ this exact procedure so a surface is always defined the same way. To add surface
 2. **Render the agent file** `.claude/agents/<agent>.md` from `pipeline/implementer.template.md`
    (resolve bundled `.claude/` vs global `~/.claude/`), substituting `<SURFACE_AGENT>`, `<SURFACE_LABEL>`,
    `<SURFACE_PATH>`, `<SURFACE_TOOLS>`, `<SURFACE_MODEL>`, `<PROJECT_NAME>`, and the surface-specific
-   blocks (`<SURFACE_EXTRA_NEVER>`, `<SURFACE_DESIGN_INPUT>`, `<SURFACE_TDD_STEP1>` — fill the design
-   ones only when `uses_design`).
+   blocks (`<SURFACE_EXTRA_NEVER>`, `<SURFACE_DESIGN_INPUT>`, `<SURFACE_TDD_STEP1>` — leave the design
+   ones empty unless `uses_design`). For a `uses_design` surface, fill them **link-based** (never with a
+   stored `design_project` id — that goes stale on a DS rebuild):
+   - `<SURFACE_DESIGN_INPUT>` — a 4th input bullet: _"The **feature design** — the pages this feature
+     touches, listed in the spec front-matter `design_files` as full links
+     (`https://claude.ai/design/p/<projectId>?file=<file>`). For each, extract the `<projectId>` (the
+     `/p/…` segment) and `<file>` (the `?file=` query) from the URL and read it read-only via `DesignSync
+     get_file(<projectId>, <file>)`; `list_files(<projectId>)` to catch linked pages (shared nav/modals)
+     this feature also changes. The link is self-contained — no stored project id. Build with the code UI
+     kit (the `design_system_project`'s materialization: `@/components/ui/*` + tokens); read a primitive
+     via `get_file` only if it's missing/stale in code. Mobile-first."_
+   - `<SURFACE_TDD_STEP1>` — _"**Pull the feature design first:** `DesignSync get_file(<projectId>,
+     <file>)` for each `design_files` link and translate each into the code design system
+     (`@/components/ui/*`, `cn()` + CVA), mobile-first — never ad-hoc CSS. Then:"_
 3. **Add a §Conventions + §Testing stanza** for `S` in `PIPELINE.md` (mirror a sibling surface; keep it
    rule-shaped). If `S` is a shared-code surface, its convention is "single owner of shared X; slices
    consume, never redefine."

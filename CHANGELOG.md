@@ -3,6 +3,20 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 0.1.26 — 2026-07-28
+
+- **The design step now references designs by full link, not a stored project id + bare filename.** A
+  `design_files` entry is a self-contained `https://claude.ai/design/p/<projectId>?file=<file>` link that
+  carries its own project (`/p/<projectId>`) and page (`?file=`); agents extract both and read it via
+  `DesignSync get_file(<projectId>, <file>)`. No stored `design_project` id means a design-system rebuild
+  (which mints a new project id) no longer breaks every spec — you just paste the new links. `design_project`
+  becomes an optional legacy fallback (default `none`) for old bare-filename specs. Updated across `/build`
+  (design gate + dispatch), `/smoke`, `/spec` + the spec template, `PIPELINE.md` (§design + conventions),
+  `SCHEMA.md`, and `/doctor`. Crucially, the surface-agent render step now specifies the link-based
+  `<SURFACE_DESIGN_INPUT>`/`<SURFACE_TDD_STEP1>` — so `/update-pipeline` re-renders design agents to resolve
+  from the link instead of the stale `get_file(design_project, <file>)`. Existing specs keep their bare
+  filenames until you replace them with links.
+
 ## 0.1.25 — 2026-07-27
 
 - **`research-agent` defaults to `sonnet`** instead of silently inheriting the session model (Opus). Its

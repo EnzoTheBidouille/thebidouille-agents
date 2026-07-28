@@ -32,8 +32,9 @@ fix only with the human's go-ahead (or hand them the command).
    `.serena/` gitignored, server actually connects.
 5. **Design** (if `design.enabled`). `snapshot_dir` exists and is committed; `ui_kit_path` +
    `tokens_path` exist; if `provider: claude-design`, `DesignSync` responds (`list_projects`) and
-   `design_system_project` is reachable. Recall: `design_project` is only a fallback — spec
-   `design_files` links carry their own project.
+   `design_system_project` is reachable. Recall: spec `design_files` are full
+   `…/design/p/<projectId>?file=<file>` links that carry their own project + page; `design_project` is
+   only a legacy fallback for old bare-filename specs (default `none`).
 6. **Isolation** (if `isolation.enabled`). `scripts/new-feature.sh` + `scripts/remove-feature.sh`
    rendered (no `__TOKEN__` placeholders left). `.worktrees/slots.tsv` coherent with
    `git worktree list` — flag **stale slots** (registered but no worktree) and **zombie worktrees**
