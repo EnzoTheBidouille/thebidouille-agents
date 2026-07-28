@@ -1,6 +1,6 @@
 'use strict';
 // Fleet registry — the set of projects the dashboard tracks. Persisted in
-// ~/.claude/thebidouille-dashboard.json (user-scoped, machine-wide). Each /api/fleet call
+// ~/.claude/cohorte-dashboard.json (user-scoped, machine-wide). Each /api/fleet call
 // runs a compact doctor pass per project so the overview shows freshness + health at a glance.
 
 const fs = require('fs');
@@ -20,16 +20,19 @@ function normalizeDir(dir) {
 }
 
 function registryPath(globalDir) {
-  return path.join(globalDir, 'thebidouille-dashboard.json');
+  return path.join(globalDir, 'cohorte-dashboard.json');
 }
 
 function read(globalDir) {
-  try {
-    const data = JSON.parse(fs.readFileSync(registryPath(globalDir), 'utf8'));
-    return Array.isArray(data.projects) ? data.projects : [];
-  } catch {
-    return [];
+  // cohorte-dashboard.json, then the pre-rename legacy name (read-only fallback; the next
+  // write() migrates the registry forward to the new path).
+  for (const n of ['cohorte-dashboard.json', 'thebidouille-dashboard.json']) {
+    try {
+      const data = JSON.parse(fs.readFileSync(path.join(globalDir, n), 'utf8'));
+      if (Array.isArray(data.projects)) return data.projects;
+    } catch { /* try next */ }
   }
+  return [];
 }
 
 function write(globalDir, projects) {

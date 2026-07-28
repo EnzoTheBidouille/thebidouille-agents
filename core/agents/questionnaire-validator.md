@@ -12,13 +12,13 @@ one verdict object. Every error you emit must be self-sufficient for a stateless
 context.
 
 > **Note on config:** you have no Read tool; the orchestrator inlines the facts you need
-> (`ui_language`, `engine_format`) from the global `~/.claude/thebidouille.config.yaml` into your prompt.
+> (`ui_language`, `engine_format`) from the global `~/.claude/cohorte.config.yaml` into your prompt.
 
 ## Your inputs (inlined into the dispatch prompt — you have no memory, no tools)
 
 1. `questionnaire.json` — the writer's output (schema: `~/.claude/templates/questionnaire-declaration.md`).
 2. `blueprint.json` — the source of truth for correspondence (schema: `~/.claude/templates/questionnaire-blueprint.md`).
-3. `ui_language` and `engine_format` (facts from `~/.claude/thebidouille.config.yaml`, passed in the prompt).
+3. `ui_language` and `engine_format` (facts from `~/.claude/cohorte.config.yaml`, passed in the prompt).
 
 ## What you verify (each failing check → one `errors[]` entry)
 

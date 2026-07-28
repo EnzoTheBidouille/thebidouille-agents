@@ -37,7 +37,7 @@ async function fetchRegistry() {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 5000);
   try {
-    const res = await fetch('https://registry.npmjs.org/thebidouille-agents/latest', {
+    const res = await fetch('https://registry.npmjs.org/cohorte/latest', {
       signal: ctrl.signal,
       headers: { accept: 'application/vnd.npm.install-v1+json' },
     });
@@ -53,7 +53,7 @@ async function fetchRegistry() {
 
 function npmView() {
   try {
-    const r = spawnSync('npm', ['view', 'thebidouille-agents', 'version'],
+    const r = spawnSync('npm', ['view', 'cohorte', 'version'],
       { encoding: 'utf8', timeout: 8000, shell: process.platform === 'win32' });
     if (r.status === 0 && r.stdout) {
       const v = r.stdout.trim();

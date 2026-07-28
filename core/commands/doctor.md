@@ -13,7 +13,7 @@ fix only with the human's go-ahead (or hand them the command).
 
 1. **Core & pointer.** A core exists (`~/.claude/pipeline/VERSION` global, and/or
    `.claude/pipeline/VERSION` bundled); `.claude/pipeline.json` names a mode + `core_version`
-   coherent with the VERSION file. Compare against `npm view thebidouille-agents version` — behind ⇒
+   coherent with the VERSION file. Compare against `npm view cohorte version` — behind ⇒
    suggest `/update-pipeline`. Read `pipeline/CHANGELOG.md` for what they're missing. The router
    commands' step files are present — `templates/steps/{research,init-pipeline,questionnaire}/` each
    non-empty (a router whose `templates/steps/<cmd>/` dir is missing is a partial/stale install ⇒

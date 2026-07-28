@@ -3,10 +3,12 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
-## Unreleased
+## 1.0.0 — 2026-07-28
 
-> Landed on `main` but not published — the next release (a package rename + `1.0.0`) will carry these.
-> Rename this heading to `## 1.0.0 — <date>` at that release.
+> **Renamed `thebidouille-agents` → `cohorte`** and cut the first stable release. The npm package,
+> the CLI (`npx cohorte …`), the repo, and the user config file are all renamed. The pre-rename
+> `~/.claude/thebidouille.config.yaml` and `~/.claude/thebidouille-dashboard.json` are still read as a
+> fallback, so existing installs keep working — `/update-pipeline` migrates them forward on next run.
 
 - **`/ship` now reliably moves the kanban card to Shipped and writes the PR number.** The
   move-to-Shipped was a parenthetical in the command header, easy to skip — so shipped features could
@@ -26,12 +28,12 @@ user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per 
   `/update-pipeline` to regenerate `gate-config.json` with the new tier.
 
 - **New `dashboard` subcommand — a local web cockpit for the pipeline.** Run
-  `npx thebidouille-agents dashboard` to open a browser view of pipeline state: a **Fleet**
+  `npx cohorte dashboard` to open a browser view of pipeline state: a **Fleet**
   overview (global core version vs npm latest + every tracked project's freshness and health
   at a glance), a per-project drill-down that renders `/doctor` as a live checklist, the
   **Surfaces ↔ agents** map from `PIPELINE.md`, and a **Specs board** (kanban by
   `draft·frozen·in-review·shipped`). Install/update actions run the CLI and stream their output
-  live. Add projects by path — the set is remembered in `~/.claude/thebidouille-dashboard.json`.
+  live. Add projects by path — the set is remembered in `~/.claude/cohorte-dashboard.json`.
   The runtime is dependency-free (node's built-in `http` serves a prebuilt React app); the
   `/doctor` checks are reimplemented in JS so they run without a Claude session. Point it at any
   pipeline-ised repo, or at nothing (it seeds the launch directory). A **folder picker** browses
@@ -178,7 +180,7 @@ user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per 
 ## 0.1.18 — 2026-07-22
 
 - **Consolidated global config** — the research/questionnaire settings move from
-  `~/.claude/questionnaire.config.yaml` into one `~/.claude/thebidouille.config.yaml` with
+  `~/.claude/questionnaire.config.yaml` into one `~/.claude/cohorte.config.yaml` with
   `obsidian` / `research` / `questionnaire` / `kanban` sections and a shared `obsidian.vault_path`.
   The old file is still read as a fallback; `/update-pipeline` migrates it for you. The `npx`
   installer now offers a quick interactive setup on a TTY.

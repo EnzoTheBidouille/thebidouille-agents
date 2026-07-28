@@ -34,7 +34,7 @@ Prefer sensible defaults from Phase 1 as the first (Recommended) option in each 
 
 - **Kanban** (optional) — mirror this project's pipeline (`/brainstorm`…`/ship`) onto an Obsidian
   Kanban board? If the human says yes: confirm the shared vault path (`obsidian.vault_path` in
-  `~/.claude/thebidouille.config.yaml`; ask if empty) and the board's location inside it (default
+  `~/.claude/cohorte.config.yaml`; ask if empty) and the board's location inside it (default
   `<ProjectName>/Tasks.md`). Phase 4 creates the board and records the link. Default: no.
 
 > The **research/questionnaire capability** (`/research`, `/questionnaire`) is user-scoped and lives in

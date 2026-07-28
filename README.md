@@ -1,9 +1,9 @@
-# thebidouille-agents
+# cohorte
 
-[![npm version](https://img.shields.io/npm/v/thebidouille-agents?logo=npm&color=cb3837)](https://www.npmjs.com/package/thebidouille-agents)
-[![npm downloads](https://img.shields.io/npm/dm/thebidouille-agents?logo=npm)](https://www.npmjs.com/package/thebidouille-agents)
-[![Publish to npm](https://github.com/EnzoTheBidouille/thebidouille-agents/actions/workflows/publish.yml/badge.svg)](https://github.com/EnzoTheBidouille/thebidouille-agents/actions/workflows/publish.yml)
-[![node >=18](https://img.shields.io/node/v/thebidouille-agents?logo=node.js&logoColor=white)](https://nodejs.org)
+[![npm version](https://img.shields.io/npm/v/cohorte?logo=npm&color=cb3837)](https://www.npmjs.com/package/cohorte)
+[![npm downloads](https://img.shields.io/npm/dm/cohorte?logo=npm)](https://www.npmjs.com/package/cohorte)
+[![Publish to npm](https://github.com/EnzoTheBidouille/cohorte/actions/workflows/publish.yml/badge.svg)](https://github.com/EnzoTheBidouille/cohorte/actions/workflows/publish.yml)
+[![node >=18](https://img.shields.io/node/v/cohorte?logo=node.js&logoColor=white)](https://nodejs.org)
 [![license: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
 A **portable, stack-agnostic multi-agent pipeline** for Claude Code. Install it once globally,
@@ -28,12 +28,12 @@ Two independent tracks ship with it:
 | --- | --- | --- | --- |
 | **Generic core** | the workflow doctrine: commands, fixed agents, templates, hooks — zero project facts | `~/.claude` (global) — or vendored in a repo's `.claude/` (bundled) | identical everywhere, installed once |
 | **Project profile** | stack, surfaces, commands, conventions, gates | `PIPELINE.md` + rendered surface agents + `gate-config.json`, **committed in each repo** | generated per project by `/init-pipeline` |
-| **User config** | research/questionnaire facts (Notion DB, language) + kanban board links | `~/.claude/thebidouille.config.yaml` | personal, project-independent |
+| **User config** | research/questionnaire facts (Notion DB, language) + kanban board links | `~/.claude/cohorte.config.yaml` | personal, project-independent |
 
 The core never hardcodes stack facts. Two mechanisms keep it generic:
 
 1. **Runtime indirection** — commands/agents read project facts from `PIPELINE.md` (dev pipeline) or
-   `~/.claude/thebidouille.config.yaml` (research/questionnaire + kanban) at run time — an agent's
+   `~/.claude/cohorte.config.yaml` (research/questionnaire + kanban) at run time — an agent's
    _first action_ is to read its config.
 2. **Render-at-init** — things that must be in agent frontmatter (name, `tools:`, surface ownership)
    are rendered per **surface** by `/init-pipeline` from `implementer.template.md`.
@@ -54,7 +54,7 @@ Only one hard requirement — the rest is optional and independent:
 
 ## Install
 
-The pipeline ships as an npm package (`thebidouille-agents`), so releases are semver-tagged and
+The pipeline ships as an npm package (`cohorte`), so releases are semver-tagged and
 `npx` always fetches the latest published version — no clone needed, works on macOS/Linux/Windows.
 
 **Global (recommended)** — install the generic core ONCE into `~/.claude`; it serves every repo on
@@ -62,7 +62,7 @@ your machine. Nothing is copied per project; the gate hook is registered once an
 own `gate-config.json`:
 
 ```sh
-npx thebidouille-agents install --global
+npx cohorte install --global
 ```
 
 The per-project part is NOT the core — it's the **profile** `/init-pipeline` generates and you
@@ -76,7 +76,7 @@ repo; each teammate just runs the same global one-liner once, guided by the comm
 
 ```sh
 # inside your project (or pass its path as an argument)
-npx thebidouille-agents install
+npx cohorte install
 ```
 
 Copies the core into `<project>/.claude`, committed with the repo. Choose this when you want
@@ -93,13 +93,13 @@ duplicated in every repo and each repo updates separately.
 # global (recommended)                    # per-project (bundled)
 sh install.sh --global                    sh install.sh
 # or piped:
-curl -fsSL https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.sh | sh -s -- --global
+curl -fsSL https://raw.githubusercontent.com/EnzoTheBidouille/cohorte/main/install.sh | sh -s -- --global
 ```
 
 ```powershell
 # Windows (PowerShell 5.1+)
 .\install.ps1 -Global         # or without -Global for per-project
-# or:  & ([scriptblock]::Create((irm https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.ps1))) -Global
+# or:  & ([scriptblock]::Create((irm https://raw.githubusercontent.com/EnzoTheBidouille/cohorte/main/install.ps1))) -Global
 ```
 
 Script installs from a git checkout stamp the version as `<semver> (<sha>)`; the npm CLI stamps the
@@ -137,15 +137,15 @@ Sanity-check `PIPELINE.md`, commit it, and run `/brainstorm`.
 ## Update
 
 ```sh
-npx thebidouille-agents@latest update --global    # the shared core in ~/.claude (recommended setup)
-npx thebidouille-agents@latest update             # a repo's bundled core in <project>/.claude
+npx cohorte@latest update --global    # the shared core in ~/.claude (recommended setup)
+npx cohorte@latest update             # a repo's bundled core in <project>/.claude
 ```
 
 (Script equivalents: `sh install.sh --update [--global]` / `.\install.ps1 -Update [-Global]`.)
 
 The installer refreshes the generic core (commands, hook, templates) **without** touching your
 `PIPELINE.md`, rendered agents, `gate-config.json`, `settings.json`, or your filled
-`~/.claude/thebidouille.config.yaml`.
+`~/.claude/cohorte.config.yaml`.
 
 From inside Claude Code, prefer **`/update-pipeline`**: it runs the right update invocation for your
 install scope, reports `old → new` — and then **reconciles the repo's generated files to the new
@@ -159,9 +159,9 @@ maintenance command you ever run (`/build` auto-grows surfaces as specs need the
 A browser view of pipeline state, for when a checklist beats scanning files:
 
 ```sh
-npx thebidouille-agents dashboard          # serves http://localhost:4317 (Ctrl-C to stop)
-npx thebidouille-agents dashboard <path>   # start focused on another project
-npx thebidouille-agents dashboard --port=4400 --open   # custom port, open the browser
+npx cohorte dashboard          # serves http://localhost:4317 (Ctrl-C to stop)
+npx cohorte dashboard <path>   # start focused on another project
+npx cohorte dashboard --port=4400 --open   # custom port, open the browser
 ```
 
 **Bound to `127.0.0.1` by default** — the dashboard's actions execute code (install/update/reset,
@@ -172,7 +172,7 @@ those actions.
 
 - **Fleet overview** — the global core version vs npm latest, plus every tracked project's freshness
   and health at a glance. Add a project by absolute path or with the **folder picker** (Browse…); the
-  set is remembered in `~/.claude/thebidouille-dashboard.json`.
+  set is remembered in `~/.claude/cohorte-dashboard.json`.
 - **Per-project drill-down** — Freshness (installed core vs npm), `/doctor` rendered as a live
   ✅/⚠️/❌ checklist (each failure with its fix), the **Surfaces ↔ agents** map from `PIPELINE.md`,
   and one board: a **Kanban** if the project has a linked Obsidian board (columns + cards from the
@@ -202,7 +202,7 @@ a version bump just run the sanity checks.
 `npm version patch --no-git-tag-version`), commit, push — CI does the rest (publish + tag +
 release). No local tagging needed.
 
-`npx thebidouille-agents@latest …` then serves the new version everywhere; installed cores record
+`npx cohorte@latest …` then serves the new version everywhere; installed cores record
 it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.json` pointer.
 
 ## The commands
@@ -244,7 +244,7 @@ can't fire `/clear` itself — it's a client-side command; the pipeline just mak
 ## Global capability — research → (optional) questionnaire
 
 A **user-scoped** capability, separate from the dev flow (`/brainstorm…/ship`) and independent of any
-project's `PIPELINE.md` — its config lives in **`~/.claude/thebidouille.config.yaml`** (seeded by the
+project's `PIPELINE.md` — its config lives in **`~/.claude/cohorte.config.yaml`** (seeded by the
 installer, never clobbered on update) and it behaves the same in every directory. **The archived page
 IS the run** — a page in a Notion database, or a markdown note in your Obsidian vault, per the
 config's `store:` (Notion is the default; Obsidian needs no MCP, just `obsidian_vault_path`).
@@ -271,7 +271,7 @@ config's `store:` (Notion is the default; Obsidian needs no MCP, just `obsidian_
   « Approuvé ».
 
 **Enable it** — best via `/update-pipeline` (it wires the config for you), or in the consolidated
-`~/.claude/thebidouille.config.yaml`:
+`~/.claude/cohorte.config.yaml`:
 
 ```yaml
 research:
@@ -306,7 +306,7 @@ See `profile/SCHEMA.md` for every field in `PIPELINE.md` and how the pipeline us
 ## Layout of this repo
 
 ```
-package.json            # npm package (thebidouille-agents) — semver source of truth
+package.json            # npm package (cohorte) — semver source of truth
 bin/cli.js              # the npm CLI: install / update / dashboard / version (cross-platform, no deps)
 install.sh              # script installer (fresh + --update) for no-Node environments
 install.ps1             # same installer for Windows PowerShell (fresh + -Update)
@@ -320,7 +320,7 @@ core/                   # copied verbatim into ~/.claude (global) or <project>/.
 profile/
   PIPELINE.template.md  # the profile skeleton /init-pipeline fills
   SCHEMA.md             # field reference
-  thebidouille.config.template.yaml   # seeds ~/.claude/thebidouille.config.yaml (research/questionnaire + kanban)
+  cohorte.config.template.yaml   # seeds ~/.claude/cohorte.config.yaml (research/questionnaire + kanban)
 scripts/                # new-feature / remove-feature worktree-isolation templates
 dashboard/              # local web cockpit (npx … dashboard) — see dashboard/README.md
   server/               # dependency-free node runtime (serves the built app + JSON/stream API)

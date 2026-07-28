@@ -59,10 +59,10 @@
 8. **Ensure `specs/_template.md`** exists (copy from the installer's `templates/spec.template.md` if missing).
 9. **Write the pointer** `.claude/pipeline.json` (committed — this is how a teammate who clones the repo
    knows which core to install):
-   `{ "pipeline": "thebidouille-agents", "mode": "<bundled|global>", "core_version": "<contents of the
-   installer's pipeline/VERSION>", "install": "<per mode: bundled ⇒ \"npx thebidouille-agents install\"
-   note that the core is committed under .claude/; global ⇒ \"npx thebidouille-agents install --global\"
-   (or, without npm: curl -fsSL https://raw.githubusercontent.com/EnzoTheBidouille/thebidouille-agents/main/install.sh | sh -s -- --global;
+   `{ "pipeline": "cohorte", "mode": "<bundled|global>", "core_version": "<contents of the
+   installer's pipeline/VERSION>", "install": "<per mode: bundled ⇒ \"npx cohorte install\"
+   note that the core is committed under .claude/; global ⇒ \"npx cohorte install --global\"
+   (or, without npm: curl -fsSL https://raw.githubusercontent.com/EnzoTheBidouille/cohorte/main/install.sh | sh -s -- --global;
    Windows: install.ps1 -Global from the same repo)> " }`.
    In **global** mode also add, near the top of `CLAUDE.md`, a one-liner:
    `> Pipeline: global core — run the installer above if /brainstorm etc. are missing.`
@@ -79,8 +79,8 @@
 12. **Design system:** if `design.enabled` with a snapshot dir, note that `/align-ds` is active; else the
     `/align-ds` command will no-op with a clear message.
 13. **Kanban** (only if the human opted in at Phase 2): wire it per SCHEMA.md §Kanban, writing into the
-    **global** `~/.claude/thebidouille.config.yaml` (never into this repo — the board points at a
-    personal vault). Create the file from `pipeline/thebidouille.config.template.yaml` if absent; set
+    **global** `~/.claude/cohorte.config.yaml` (never into this repo — the board points at a
+    personal vault). Create the file from `pipeline/cohorte.config.template.yaml` if absent; set
     `kanban.enabled: true` and `obsidian.vault_path` if it was empty. Add a `kanban.boards[<PIPELINE
     name>]` entry with `board: <folder>/Tasks.md`. Then **create the board file**
     `<vault>/<folder>/Tasks.md` (per §Kanban) if it doesn't exist — one column per `kanban.columns`

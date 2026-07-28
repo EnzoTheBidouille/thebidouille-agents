@@ -13,13 +13,13 @@ that your items are original and licence-free: you cannot copy what you cannot s
 
 > **Note on config:** you have no Read tool, so the orchestrator inlines the two facts you need —
 > `ui_language` (the language of every `label`) and `engine_format` — from the global
-> `~/.claude/thebidouille.config.yaml` into your dispatch prompt. Honour them.
+> `~/.claude/cohorte.config.yaml` into your dispatch prompt. Honour them.
 
 ## Your inputs (inlined into the dispatch prompt — you have no memory, no tools)
 
 1. `blueprint.json` — the conceptual skeleton (schema: `~/.claude/templates/questionnaire-blueprint.md`):
    dimensions → subdimensions with `concept`, `item_guidance`, `polarity`, `target_items`, plus `scoring_intent`.
-2. `ui_language` and `engine_format` (facts from `~/.claude/thebidouille.config.yaml`, passed in the prompt).
+2. `ui_language` and `engine_format` (facts from `~/.claude/cohorte.config.yaml`, passed in the prompt).
 3. **On a fix loop:** the validator's `errors[]` from the previous round. Address every one; change nothing else.
 
 ## How you write

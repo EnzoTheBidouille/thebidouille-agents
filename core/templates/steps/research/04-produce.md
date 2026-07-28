@@ -3,7 +3,7 @@
 ### 3. Produce the report — single-pass or multi-pass (all via `research-agent`, read-only)
 
 The `research-agent` never touches the store; the orchestrator routes every artifact between passes and
-holds them in memory. Each dispatch begins: "Read `~/.claude/thebidouille.config.yaml` (or legacy
+holds them in memory. Each dispatch begins: "Read `~/.claude/cohorte.config.yaml` (or legacy
 `questionnaire.config.yaml`) first for `ui_language`." The orchestrator does the one-time text
 **extraction** below (a mechanical Bash step — it never loads the source *content* into its own
 context); every actual *reading* of the source still goes through a `research-agent` pass.

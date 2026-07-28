@@ -236,7 +236,7 @@ files automatically. It works because every generated artifact is a **determinis
    provider whose MCP server isn't registered yet), run its wiring step from `/init-pipeline` Phase 4.
    Even when nothing new was added, re-run the provider's health check (§Code retrieval) — wiring
    rots (PATH changes, uninstalls, hand-edits) — and repair whatever fails.
-5. **Global config migration.** If `~/.claude/thebidouille.config.yaml` is absent but the legacy
+5. **Global config migration.** If `~/.claude/cohorte.config.yaml` is absent but the legacy
    `~/.claude/questionnaire.config.yaml` exists, migrate it: seed the consolidated file from the
    template and carry every filled legacy value into its new home (`enabled`→`research.enabled`
    +`questionnaire.enabled`, `store`→`research.store`, `notion_*`→`research.notion_*`,
@@ -253,8 +253,8 @@ itself changes in ways `/build` §1.5 can't auto-grow (e.g. package manager or c
 ## Global capability — research → (optional) questionnaire
 
 A **user-scoped** track, separate from the dev flow and NOT configured in `PIPELINE.md`. Its facts live
-in the **consolidated global config `~/.claude/thebidouille.config.yaml`** (template:
-`profile/thebidouille.config.template.yaml`, seeded by the installer, never clobbered on update) — the
+in the **consolidated global config `~/.claude/cohorte.config.yaml`** (template:
+`profile/cohorte.config.template.yaml`, seeded by the installer, never clobbered on update) — the
 older flat `~/.claude/questionnaire.config.yaml` is still read as a **fallback** when the consolidated
 file is absent. A run is archived in the chosen `store`: **notion** (a page in a database auto-created
 on the first `/research`) or **obsidian** (a note in the shared vault, `obsidian.vault_path`).
@@ -301,7 +301,7 @@ confirmation-gated; nothing enters the survey engine until the human flips the p
 
 An **optional, user-scoped** mirror of the dev flow: each pipeline stage moves a card across an
 [Obsidian Kanban](https://github.com/mgmeyers/obsidian-kanban) board, one board per project. Config
-lives in the consolidated global config `~/.claude/thebidouille.config.yaml` §`kanban` (NOT in
+lives in the consolidated global config `~/.claude/cohorte.config.yaml` §`kanban` (NOT in
 `PIPELINE.md` — the board path points at the user's personal vault, so it is machine-specific and must
 not be committed). Everything below **no-ops silently** when the config is absent, `kanban.enabled` is
 false, no board is configured for the current project, or the board file is missing — the pipeline never

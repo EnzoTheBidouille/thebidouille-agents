@@ -23,7 +23,7 @@
 
 set -eu
 
-REPO_URL="${PIPELINE_REPO:-https://github.com/EnzoTheBidouille/thebidouille-agents}"
+REPO_URL="${PIPELINE_REPO:-https://github.com/EnzoTheBidouille/cohorte}"
 
 mode="install"
 scope="project"
@@ -83,7 +83,7 @@ copy_core() {
   mkdir -p "$dest/pipeline/scripts"
   cp "$src/profile/PIPELINE.template.md" "$dest/pipeline/"
   cp "$src/profile/SCHEMA.md"            "$dest/pipeline/"
-  cp "$src/profile/thebidouille.config.template.yaml" "$dest/pipeline/"
+  cp "$src/profile/cohorte.config.template.yaml" "$dest/pipeline/"
   cp "$src"/scripts/*.template           "$dest/pipeline/scripts/"
   cp "$src/core/agents/implementer.template.md" "$dest/pipeline/"
   [ -f "$src/CHANGELOG.md" ] && cp "$src/CHANGELOG.md" "$dest/pipeline/"
@@ -141,16 +141,19 @@ copy_fixed_agents() {
 # /init-pipeline + /update-pipeline wire it (npx's installer offers a quick interview instead).
 seed_config() {
   base="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-  cfg="$base/thebidouille.config.yaml"
-  legacy="$base/questionnaire.config.yaml"
+  cfg="$base/cohorte.config.yaml"
+  legacy=""
+  for n in thebidouille.config.yaml questionnaire.config.yaml; do
+    [ -f "$base/$n" ] && { legacy="$base/$n"; break; }
+  done
   if [ -f "$cfg" ]; then
     echo "  · kept your existing $cfg"
-  elif [ -f "$legacy" ]; then
+  elif [ -n "$legacy" ]; then
     echo "  · found legacy $legacy — kept as-is (read as a fallback)."
-    echo "    Run /update-pipeline to migrate it into thebidouille.config.yaml + wire the kanban."
+    echo "    Run /update-pipeline to migrate it into cohorte.config.yaml + wire the kanban."
   else
     mkdir -p "$base"
-    cp "$src/profile/thebidouille.config.template.yaml" "$cfg"
+    cp "$src/profile/cohorte.config.template.yaml" "$cfg"
     echo "  · seeded $cfg (disabled defaults — enable via /init-pipeline or /update-pipeline)"
   fi
 }
@@ -240,7 +243,7 @@ Code retrieval (Serena — the default provider /init-pipeline wires per repo):
   registered MCP server silently fails to start.
 
 Global capabilities config (research / questionnaire / kanban), user-scoped — optional:
-  · One consolidated file: ~/.claude/thebidouille.config.yaml (don't hand-edit it).
+  · One consolidated file: ~/.claude/cohorte.config.yaml (don't hand-edit it).
   · /init-pipeline (new project) and /update-pipeline (existing) wire it for you: enabling
     research/questionnaire, and creating + syncing an Obsidian kanban board of the pipeline.
   · Research with  store: notion  needs Notion first:

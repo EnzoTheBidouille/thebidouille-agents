@@ -10,7 +10,7 @@ only because the human asked for one; research runs are valuable without this st
 > **Bootstrap (applies to every step):**
 >
 > **First action, always:** read the consolidated global config
-> **`~/.claude/thebidouille.config.yaml`**; if absent, fall back to the legacy flat
+> **`~/.claude/cohorte.config.yaml`**; if absent, fall back to the legacy flat
 > **`~/.claude/questionnaire.config.yaml`**. If neither exists, or `questionnaire.enabled` (legacy:
 > `enabled`) is not `true`, **stop** and say how to enable (via `/update-pipeline`). Otherwise read
 > these values (nested in the consolidated file, flat in the legacy one), referred to below by the

@@ -9,7 +9,7 @@ You are the **orchestrator** of a research run: turning a source PDF into a genu
 > **Bootstrap (applies to every step):**
 >
 > **First action, always:** read the consolidated global config
-> **`~/.claude/thebidouille.config.yaml`**; if it's absent, fall back to the legacy flat
+> **`~/.claude/cohorte.config.yaml`**; if it's absent, fall back to the legacy flat
 > **`~/.claude/questionnaire.config.yaml`**. If neither exists, or `research.enabled` (legacy:
 > `enabled`) is not `true`, **stop**: tell the human to enable it via `/update-pipeline` (or set
 > `research.enabled: true`). Otherwise read these values — nested in the consolidated file, flat in

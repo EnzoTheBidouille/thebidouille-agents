@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// thebidouille-agents — installer CLI for the portable multi-agent pipeline.
+// cohorte — installer CLI for the portable multi-agent pipeline.
 // Cross-platform, dependency-free port of install.sh / install.ps1.
 //
-//   npx thebidouille-agents install              # bundle the core into <cwd>/.claude (committable)
-//   npx thebidouille-agents install [target]     # same, into another project
-//   npx thebidouille-agents install --global     # one shared core in ~/.claude
-//   npx thebidouille-agents update [--global]    # refresh the core, keep every generated file
-//   npx thebidouille-agents version
+//   npx cohorte install              # bundle the core into <cwd>/.claude (committable)
+//   npx cohorte install [target]     # same, into another project
+//   npx cohorte install --global     # one shared core in ~/.claude
+//   npx cohorte update [--global]    # refresh the core, keep every generated file
+//   npx cohorte version
 
 'use strict';
 
@@ -19,16 +19,16 @@ const pkgRoot = path.resolve(__dirname, '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(pkgRoot, 'package.json'), 'utf8'));
 const VERSION = pkg.version;
 
-const REPO_URL = 'https://github.com/EnzoTheBidouille/thebidouille-agents';
+const REPO_URL = 'https://github.com/EnzoTheBidouille/cohorte';
 
 function usage(code) {
-  console.log(`thebidouille-agents v${VERSION}
+  console.log(`cohorte v${VERSION}
 
 Usage:
-  thebidouille-agents install   [target] [--global]
-  thebidouille-agents update    [target] [--global]
-  thebidouille-agents dashboard [target] [--port=N] [--host=ADDR] [--open]
-  thebidouille-agents version
+  cohorte install   [target] [--global]
+  cohorte update    [target] [--global]
+  cohorte dashboard [target] [--port=N] [--host=ADDR] [--open]
+  cohorte version
 
 Commands:
   install   Fresh install. Default: bundle the core into <target>/.claude
@@ -36,7 +36,7 @@ Commands:
             available to every project on this machine.
   update    Refresh the stack-agnostic core only. PIPELINE.md, rendered surface
             agents, gate-config.json, settings.json and your filled
-            ~/.claude/thebidouille.config.yaml are never touched.
+            ~/.claude/cohorte.config.yaml are never touched.
   dashboard Serve a local web cockpit for the pipeline (freshness, /doctor
             health, specs board, install/update actions). Binds 127.0.0.1:4317
             by default (loopback only — its actions execute code). --host=ADDR
@@ -51,10 +51,10 @@ const args = process.argv.slice(2);
 let mode = null;
 let scope = 'project';
 let target = process.cwd();
-let port = parseInt(process.env.THEBIDOUILLE_DASHBOARD_PORT, 10) || 4317;
+let port = parseInt(process.env.COHORTE_DASHBOARD_PORT, 10) || 4317;
 // Bind to loopback by default — the dashboard's action endpoints execute code (install/update/
 // reset/claude), so it must NOT be reachable from the network unless the user explicitly opts in.
-let host = process.env.THEBIDOUILLE_DASHBOARD_HOST || '127.0.0.1';
+let host = process.env.COHORTE_DASHBOARD_HOST || '127.0.0.1';
 let openBrowser = false;
 
 for (const a of args) {
@@ -99,7 +99,7 @@ function copyCore() {
   fs.rmSync(path.join(dest, 'templates', 'questionnaire-domain-brief.md'), { force: true });
   const pipelineDir = path.join(dest, 'pipeline');
   fs.mkdirSync(path.join(pipelineDir, 'scripts'), { recursive: true });
-  for (const f of ['PIPELINE.template.md', 'SCHEMA.md', 'thebidouille.config.template.yaml']) {
+  for (const f of ['PIPELINE.template.md', 'SCHEMA.md', 'cohorte.config.template.yaml']) {
     fs.copyFileSync(path.join(src, 'profile', f), path.join(pipelineDir, f));
   }
   for (const f of fs.readdirSync(path.join(src, 'scripts'))) {
@@ -192,16 +192,18 @@ async function promptConfig(text) {
 // ~/.claude regardless of install scope. Seed it only if the user has no copy (consolidated OR
 // legacy). On a TTY, offer a quick interview to fill it; otherwise seed disabled defaults.
 async function seedConfig() {
-  const cfg = path.join(globalDir, 'thebidouille.config.yaml');
-  const legacy = path.join(globalDir, 'questionnaire.config.yaml');
+  const cfg = path.join(globalDir, 'cohorte.config.yaml');
+  // Pre-rename names, newest first — read as a fallback so upgrades don't lose the config.
+  const legacy = ['thebidouille.config.yaml', 'questionnaire.config.yaml']
+    .map((n) => path.join(globalDir, n)).find(fs.existsSync);
   if (fs.existsSync(cfg)) { console.log(`  · kept your existing ${cfg}`); return; }
-  if (fs.existsSync(legacy)) {
+  if (legacy) {
     console.log(`  · found legacy ${legacy} — kept as-is (still read as a fallback).`);
-    console.log('    Run /update-pipeline to migrate it into thebidouille.config.yaml + wire the kanban.');
+    console.log('    Run /update-pipeline to migrate it into cohorte.config.yaml + wire the kanban.');
     return;
   }
   fs.mkdirSync(path.dirname(cfg), { recursive: true });
-  let text = fs.readFileSync(path.join(src, 'profile', 'thebidouille.config.template.yaml'), 'utf8');
+  let text = fs.readFileSync(path.join(src, 'profile', 'cohorte.config.template.yaml'), 'utf8');
   if (process.stdin.isTTY && process.stdout.isTTY) {
     text = await promptConfig(text);
     fs.writeFileSync(cfg, text);
@@ -288,10 +290,10 @@ Per repo:
      teammates know to install the global core (${REPO_URL}).
   3. Commit PIPELINE.md + .claude/, then  /brainstorm  to start a feature.
 
-Update later with:  npx thebidouille-agents@latest update --global
+Update later with:  npx cohorte@latest update --global
 
 Global capabilities config (research / questionnaire / kanban), user-scoped — optional:
-  · One consolidated file: ${path.join(globalDir, 'thebidouille.config.yaml')}
+  · One consolidated file: ${path.join(globalDir, 'cohorte.config.yaml')}
   · Don't hand-edit it — /init-pipeline (new project) and /update-pipeline (existing) wire it
     for you: enabling research/questionnaire, and creating + syncing an Obsidian kanban board.
   · Research needs Notion (store: notion):  claude mcp add --transport http notion https://mcp.notion.com/mcp`);
@@ -314,7 +316,7 @@ Next:
      PIPELINE.md + renders one implementer agent per surface.
   3. Commit PIPELINE.md, then  /brainstorm  to start a feature.
 
-Update later with:  npx thebidouille-agents@latest update
+Update later with:  npx cohorte@latest update
 Prefer one shared core across all your repos?  Re-run with  --global.`);
 } else {
   console.log(`→ updating pipeline core in ${dest} (keeping your PIPELINE.md + rendered agents)`);

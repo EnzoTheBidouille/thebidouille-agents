@@ -11,7 +11,7 @@ service; the orchestrator persists your output (to the configured store — Noti
 is stored elsewhere) and routes data between passes (stateless agents never talk to each other). You
 have no memory; work only from your dispatch inputs.
 
-> **First action, always:** read **`~/.claude/thebidouille.config.yaml`** (or, if absent, the legacy
+> **First action, always:** read **`~/.claude/cohorte.config.yaml`** (or, if absent, the legacy
 > flat `~/.claude/questionnaire.config.yaml`) — note `ui_language`, the language of everything you write.
 
 Your report is a **standalone research deliverable**, valuable on its own — never a questionnaire
