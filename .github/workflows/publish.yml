@@ -26,8 +26,13 @@ jobs:
         with:
           node-version: 24
 
-      - name: Syntax-check CLI
-        run: node --check bin/cli.js
+      - name: Syntax-check CLI + dashboard server
+        run: |
+          node --check bin/cli.js
+          for f in dashboard/server/*.js; do node --check "$f"; done
+
+      - name: Build dashboard (produces dashboard/dist for the tarball)
+        run: npm run build:dashboard
 
       - name: Verify package contents
         run: npm pack --dry-run
@@ -82,6 +87,9 @@ jobs:
         run: |
           npm install -g npm@latest
           npm --version
+
+      - name: Build dashboard (produces dashboard/dist for the tarball)
+        run: npm run build:dashboard
 
       - name: Publish to npm
         run: npm publish --provenance --access public

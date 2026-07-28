@@ -3,6 +3,53 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## Unreleased
+
+> Landed on `main` but not published — the next release (a package rename + `1.0.0`) will carry these.
+> Rename this heading to `## 1.0.0 — <date>` at that release.
+
+- **`/ship` now reliably moves the kanban card to Shipped and writes the PR number.** The
+  move-to-Shipped was a parenthetical in the command header, easy to skip — so shipped features could
+  leave their card stuck in an earlier column. It is now an explicit, verify-after step (§4): move
+  card `#<id>` → `shipped` **and append `PR #<num>`** (from the PR URL), then re-read the board to
+  confirm. The bare `#<num>` is what the dashboard renders as a clickable PR link. SCHEMA.md §Kanban
+  documents the shipped-card format. (`/ship` also moves the card → `ship` on confirm, in §1.)
+
+- **Branch-aware gate — git + docker run freely on feature branches, gated only on the default
+  branch.** The `gate` block gains two keys: `ask_on_default_branch` (patterns confirmed *only* when
+  the checked-out branch is `default_branch`) and `default_branch` (default `main`). `gate.py`
+  resolves the current branch at run time (`git rev-parse`); an unknown branch (no repo / detached)
+  is treated conservatively as gated. The default profile moves git (commit/push/merge/rebase/reset)
+  and `docker compose` into this tier, so agents move fast on feature branches while `main` stays
+  protected; DB commands (`migration:run`, `db:`, `psql`) remain always-`ask`, destructive migrations
+  always-`deny`. Existing gate-configs without the new keys keep working unchanged. Re-run
+  `/update-pipeline` to regenerate `gate-config.json` with the new tier.
+
+- **New `dashboard` subcommand — a local web cockpit for the pipeline.** Run
+  `npx thebidouille-agents dashboard` to open a browser view of pipeline state: a **Fleet**
+  overview (global core version vs npm latest + every tracked project's freshness and health
+  at a glance), a per-project drill-down that renders `/doctor` as a live checklist, the
+  **Surfaces ↔ agents** map from `PIPELINE.md`, and a **Specs board** (kanban by
+  `draft·frozen·in-review·shipped`). Install/update actions run the CLI and stream their output
+  live. Add projects by path — the set is remembered in `~/.claude/thebidouille-dashboard.json`.
+  The runtime is dependency-free (node's built-in `http` serves a prebuilt React app); the
+  `/doctor` checks are reimplemented in JS so they run without a Claude session. Point it at any
+  pipeline-ised repo, or at nothing (it seeds the launch directory). A **folder picker** browses
+  the filesystem to add projects (dirs with a `PIPELINE.md` are flagged), and a **Reset pipeline**
+  action wipes a project's entire pipeline footprint (`.claude/`, `PIPELINE.md`, optionally
+  `specs/`) — backed up first to `.claude.bak-<ts>/`, the shared `~/.claude` core untouched — so a
+  project riddled with old-version relics can be brought back to a clean, pipeline-managed state
+  (then `/init-pipeline` regenerates the profile). **Init-pipeline / Update-pipeline** buttons run
+  those Claude Code commands headless (`claude -p … --dangerously-skip-permissions`) in the project
+  and stream the output. The server **binds `127.0.0.1` by default** (its actions execute code);
+  `--host=ADDR` exposes it with a printed security warning, `--open` launches the browser.
+  Projects with a linked **Obsidian Kanban board** (config `kanban.boards`) get it rendered inline —
+  columns + cards read straight from the vault markdown (local, no token; Notion is not a kanban
+  source in this pipeline, only /research archival). PR references become clickable links, enriched
+  with **live PR status** (open/merged/closed/draft) + date via the user's `gh` CLI (cached 60s), and
+  the **Shipped** column is sorted by ship date. Cards missing an explicit `#<num>` have their PR
+  **inferred from the branch** (`…/<feature_id>`), so historical boards light up too.
+
 ## 0.1.27 — 2026-07-28
 
 - **README gains a Prerequisites section.** Spells out what a new machine actually needs: Node ≥ 18 + npm

@@ -46,8 +46,10 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
 | `isolation.db_name_pattern`          | string       | new-feature script                | `<name>_<id>`.                                                |
 | `isolation.port_base`                | map          | new-feature script                | `api`/`web` base ports; +slot per worktree.                   |
 | `isolation.compose_file` `.registry` | path         | new-feature script                | Docker stack + slot registry.                                 |
-| `gate.deny[]`                        | list         | hooks/gate.py, settings           | Command substrings hard-denied.                               |
-| `gate.ask[]`                         | list         | hooks/gate.py, settings           | Command substrings that require confirm.                      |
+| `gate.deny[]`                        | list         | hooks/gate.py, settings           | Command substrings hard-denied, on any branch.                |
+| `gate.ask[]`                         | list         | hooks/gate.py, settings           | Command substrings that require confirm, on any branch.       |
+| `gate.ask_on_default_branch[]`       | list         | hooks/gate.py                     | Confirm ONLY on `default_branch`; free on feature branches.   |
+| `gate.default_branch`                | string       | hooks/gate.py                     | Protected branch (default `main`); gate resolves via git.     |
 
 ## Prose sections
 
@@ -62,7 +64,9 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
   §Commands / §Conventions / §Surfaces first._ They have `Read`, so they load it live.
 - **Commands** (`/build`, `/review`, …) parse the `yaml pipeline-profile` block to know how
   many surfaces to dispatch, the contract mechanism, the commands, and the capability flags.
-- **Hook** (`gate.py`) reads `gate.deny`/`gate.ask` from a generated `.claude/gate-config.json`.
+- **Hook** (`gate.py`) reads `gate.deny`/`gate.ask`/`gate.ask_on_default_branch`/`gate.default_branch`
+  from a generated `.claude/gate-config.json`. The last two make git + docker free on feature branches
+  but confirm-gated on the default branch (branch resolved at run time via `git rev-parse`).
 - **Scripts** (`new-feature.sh`) read the `isolation` block (rendered in at init).
 
 ## Code retrieval — `retrieval.provider`
@@ -314,6 +318,10 @@ present else `kanban.columns`. Not found ⇒ kanban off for this project.
 notes a human writes as sub-bullets under an Ideas card are seed context for `/brainstorm`. Never touch
 the trailing `%% kanban:settings … %%` block or the `kanban-plugin: board` front-matter.
 
+Once shipped, `/ship` appends the **PR number** to the card — `- [ ] <title> #<feature_id> — PR #<num>`.
+The bare `#<num>` is what the dashboard renders as a clickable link to the GitHub PR, so `/ship` always
+writes it when a PR was actually created.
+
 **Move a card (the core op).** To move card `#<id>` to a stage's column: find the list item carrying
 `#<id>` under its current `## <column>` heading, delete it there, and append it (whole line, tag
 preserved) under the target `## <column>` heading. If no card carries `#<id>` (feature started outside
@@ -332,7 +340,7 @@ duplicates exist, keep the first and drop the rest.
 | `/smoke` · `/review`                    | `review`        |
 | `/fix`                                  | `fix`           |
 | `/ship` starts                          | `ship`          |
-| PR opened (`status: shipped`)           | `shipped`       |
+| PR opened (`status: shipped`)           | `shipped` (+ `PR #<num>` on the card) |
 
 **Backfill / sync from specs (reconcile).** `specs/*.md` is the source of truth. For each spec, read its
 `feature_id` (front-matter or filename) and `status`, map `status`→column — `frozen`→`ready`,

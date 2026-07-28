@@ -5,11 +5,17 @@
   "bin": {
     "thebidouille-agents": "bin/cli.js"
   },
+  "scripts": {
+    "build:dashboard": "npm --prefix dashboard/app ci && npm --prefix dashboard/app run build"
+  },
   "files": [
     "bin",
     "core",
     "profile",
     "scripts",
+    "dashboard/server",
+    "dashboard/dist",
+    "dashboard/README.md",
     "install.sh",
     "install.ps1",
     "CHANGELOG.md"

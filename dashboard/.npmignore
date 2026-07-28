@@ -1,0 +1,5 @@
+# For PACKAGING only. Its mere presence makes npm use this file instead of
+# dashboard/.gitignore for this directory — so the built `dist/` (git-ignored, but
+# rebuilt at publish time) ships in the npm tarball. The React source stays out.
+app/
+node_modules/

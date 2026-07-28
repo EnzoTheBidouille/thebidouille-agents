@@ -23,6 +23,7 @@ of "deny" or "ask" on a match; otherwise exits 0 silently.
 import json
 import os
 import re
+import subprocess
 import sys
 
 SPLIT = re.compile(r"&&|\|\||[;|\n]")
@@ -32,16 +33,38 @@ WS = re.compile(r"\s+")
 def load_config() -> dict:
     root = os.environ.get("CLAUDE_PROJECT_DIR", ".")
     path = os.path.join(root, ".claude", "gate-config.json")
+    empty = {"deny": [], "ask": [], "ask_on_default_branch": [], "default_branch": "main"}
     try:
         with open(path, "r", encoding="utf-8") as fh:
             cfg = json.load(fh)
     except Exception:
-        return {"deny": [], "ask": []}
-    return {"deny": list(cfg.get("deny", [])), "ask": list(cfg.get("ask", []))}
+        return empty
+    return {
+        "deny": list(cfg.get("deny", [])),
+        "ask": list(cfg.get("ask", [])),
+        # Patterns gated ONLY on the default branch — allowed freely on feature branches.
+        "ask_on_default_branch": list(cfg.get("ask_on_default_branch", [])),
+        "default_branch": cfg.get("default_branch", "main") or "main",
+    }
 
 
 def norm(s: str) -> str:
     return WS.sub(" ", s.strip())
+
+
+def current_branch():
+    """The checked-out branch of CLAUDE_PROJECT_DIR, or None (not a repo / detached / git absent)."""
+    root = os.environ.get("CLAUDE_PROJECT_DIR", ".")
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=root, capture_output=True, text=True, timeout=3,
+        )
+        if out.returncode == 0:
+            return out.stdout.strip() or None
+    except Exception:
+        pass
+    return None
 
 
 def main() -> int:
@@ -55,9 +78,18 @@ def main() -> int:
 
     command = (payload.get("tool_input") or {}).get("command", "") or ""
     cfg = load_config()
-    deny, ask = cfg["deny"], cfg["ask"]
-    if not deny and not ask:
+    deny, ask, branch_gated = cfg["deny"], cfg["ask"], cfg["ask_on_default_branch"]
+    default = cfg["default_branch"]
+    if not deny and not ask and not branch_gated:
         return 0
+
+    # Branch-conditional patterns (e.g. git/docker) are gated only on the default branch;
+    # on a feature branch they run freely. Unknown branch (no repo / detached / no git) ⇒
+    # be conservative and gate. Resolve the branch once, lazily.
+    on_default = False
+    if branch_gated:
+        branch = current_branch()
+        on_default = branch is None or branch == default
 
     for raw in SPLIT.split(command):
         seg = norm(raw)
@@ -69,6 +101,11 @@ def main() -> int:
         for pat in ask:
             if norm(pat) in seg:
                 return decide("ask", f"`{pat}` is a gated command — confirm first (PIPELINE.md gate).")
+        if on_default:
+            for pat in branch_gated:
+                if norm(pat) in seg:
+                    return decide("ask", f"`{pat}` is gated on the default branch `{default}` — confirm "
+                                         f"(PIPELINE.md gate). It runs freely on feature branches.")
 
     return 0
 

@@ -129,20 +129,27 @@ isolation:
 # Confirm-first or hard-deny on dangerous Bash, inspecting the FULL command
 # string (so chained `cd x && …` forms are caught).
 gate:
-  deny:                                       # hard block — never allowed
+  # Three tiers. `deny` = always hard-blocked. `ask` = always confirm (branch-independent risk).
+  # `ask_on_default_branch` = confirm ONLY when the checked-out branch is `default_branch`; on
+  # feature branches these run freely. gate.py resolves the branch at run time (git rev-parse);
+  # unknown branch (no repo / detached) ⇒ gated, to stay safe. Keep git + docker here so agents
+  # move fast on feature branches but main stays protected.
+  default_branch: main                        # the protected branch (mirror vcs.default_branch)
+  deny:                                       # never allowed, on any branch
     - "node ace migration:fresh"
     - "node ace migration:reset"
     - "node ace migration:rollback"
     - "node ace db:wipe"
-  ask:                                         # must confirm with the human first
+  ask:                                         # always confirm, on any branch
+    - "node ace migration:run"
+    - "node ace db:"
+    - "psql"
+  ask_on_default_branch:                        # free on feature branches, confirm on default_branch
     - "git commit"
     - "git push"
     - "git merge"
     - "git rebase"
     - "git reset"
-    - "node ace migration:run"
-    - "node ace db:"
-    - "psql"
     - "docker compose"
 
 ```
