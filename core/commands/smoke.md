@@ -35,9 +35,10 @@ through `/fix`). Observe honestly: report what happened, not what should have ha
 
 - Drive the spec §8 flows against the running app, **mobile viewport first** (375px), then desktop.
 - If a browser/screenshot tool is available (a project driver, playwright, an agent browser), capture
-  each §8 screen and compare against the feature's design pages (`design_files` — fetch via
-  `DesignSync` read-only, or the project resolved at `/build`'s design gate): layout, states
-  (empty/loading/error/suppressed…), copy language. Note deviations as findings.
+  each §8 screen and compare against the feature's design pages: each `design_files` entry is a full
+  `https://claude.ai/design/p/<projectId>?file=<file>` link — extract its `<projectId>` (the `/p/…`
+  segment) + `<file>` (the `?file=` query) and fetch read-only via `DesignSync get_file(<projectId>,
+  <file>)`. Compare layout, states (empty/loading/error/suppressed…), copy language. Note deviations.
 - No browser tooling available ⇒ **say so and skip the visual diff** — never claim a visual check
   you didn't perform.
 

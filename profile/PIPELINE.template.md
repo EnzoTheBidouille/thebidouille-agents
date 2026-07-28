@@ -109,7 +109,7 @@ design:
   enabled: <true | false>                     # false ⇒ /align-ds + design gates are no-ops
   provider: <claude-design | figma | none>
   design_system_project: <uuid-or-id>         # the UI-kit source of truth
-  design_project: <uuid-or-id | none>         # fallback for per-feature screens — a full link in a spec's design_files carries its own project and wins
+  design_project: none                        # legacy fallback for bare-filename design_files only; keep `none` — new specs use full links that carry their own project, so nothing here goes stale on a DS rebuild
   snapshot_dir: apps/web/design-reference     # committed DS snapshot for /align-ds diff
   direction: design-to-code                   # NEVER push code→design for a curated DS
   ui_kit_path: apps/web/src/components/ui
@@ -182,9 +182,11 @@ gate:
 ## Design brief note (feeds `/spec` §8 and Claude Design)
 
 - <design system name + primitives to use · mobile-first · copy language · brand/theming constraints>
-- A feature lists its design pages in the spec front-matter `design_files`: full design-tool links
-  (each carries its own project — the usual flow: one design project per feature, paste the link at
-  `/build`'s design gate) or bare file names resolved in the fallback `design_project`.
+- A feature lists its design pages in the spec front-matter `design_files` as **full links** of the form
+  `https://claude.ai/design/p/<projectId>?file=<file>` — each carries its own project (`/p/<projectId>`)
+  and page (`?file=`), so an agent extracts both and reads it via `DesignSync get_file(<projectId>,
+  <file>)`. Paste the link at `/build`'s design gate. No stored project id ⇒ a design-system rebuild
+  (new project) just means pasting the new links. (Bare file names are legacy, resolved in `design_project`.)
 
 ---
 
