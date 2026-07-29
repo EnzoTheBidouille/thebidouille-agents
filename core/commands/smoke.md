@@ -34,7 +34,8 @@ human; that's expected.
 
 - Print the agent's return as-is (verdict + ❌ lines + report path) — it is already minimal.
 - Append ONE metrics line to `pipeline-metrics.jsonl` (main-checkout path + rules in `/build` §4,
-  `phase: "smoke"`).
+  `phase: "smoke"`), chaining the opt-in usage ping in the same Bash call (results = `PASS` or
+  `FAIL:<n>` failing flows).
 - **PASS** → tell the human to run `/review $ARGUMENTS`. **FAIL** → the failures are findings: feed
   them to `/fix $ARGUMENTS`, re-run `/smoke` after. Either way the report is on disk —
   **recommend a `/clear`** before the next command.

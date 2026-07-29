@@ -18,7 +18,12 @@ fix only with the human's go-ahead (or hand them the command).
    suggest `/update-pipeline`. Read `pipeline/CHANGELOG.md` for what they're missing. The router
    commands' step files are present — `templates/steps/init-pipeline/` non-empty (a router whose
    `templates/steps/<cmd>/` dir is missing is a partial/stale install ⇒
-   re-run install/update).
+   re-run install/update). **Shipped scripts present and executable** in `<core>/pipeline/scripts/`:
+   `kanban-move.sh`, `telemetry-send.sh`, `new-feature.sh.template`, `remove-feature.sh.template`
+   — ❌ any missing one. Every caller chains these with `|| true`, so an absent script is a **silent**
+   no-op (no kanban card moves, no telemetry ping, no error anywhere) — this check is the only thing
+   that sees it. Also flag ❌ a `VERSION` **newer than** the other `pipeline/` files (compare mtimes):
+   a version bumped without a full re-copy is a half-done update ⇒ re-run install/update.
 2. **Profile.** `PIPELINE.md` exists and its `yaml pipeline-profile` block parses. Every
    `surfaces[].agent` has its `.claude/agents/<agent>.md` and every agent file has its `surfaces[]`
    entry — **no orphans either way** (SCHEMA.md rule). Each rendered agent's frontmatter `tools`

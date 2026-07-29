@@ -325,9 +325,28 @@ Cohorte can send the maintainers anonymous usage pings so the pipeline improves 
 slow. **Nothing is ever sent without explicit consent**: `/init-pipeline` (and `/update-pipeline` on
 pre-telemetry installs) ask ONE question, once per machine, default **No**, and record the answer in
 `~/.claude/cohorte.config.yaml` §`telemetry` (`enabled`, `install_id`, `consent_date`). The sender —
-`pipeline/scripts/telemetry-send.sh`, chained by each phase after its metrics line — is a silent
-no-op unless `enabled: true` AND `install_id` AND `endpoint` are all set, times out at 2s, and never
-fails the pipeline.
+`pipeline/scripts/telemetry-send.sh` — is a silent no-op unless `enabled: true` AND `install_id` AND
+`endpoint` are all set, times out at 2s, and never fails the pipeline. Callers chain it with
+`|| true`, so a **missing** script is equally silent: `/doctor` check 1 verifies `pipeline/scripts/`
+is fully populated.
+
+**Which commands ping** — the seven that make up the feature funnel, and only those. The point is to
+see where features stall, so every stage of `idea → PR` reports and nothing else does:
+
+| phase | fired when | `seconds` | `results` |
+| --- | --- | --- | --- |
+| `brainstorm` | the return is staged | `0` | — |
+| `spec` | a freeze lands (Mode A only) | `0` | `frozen` |
+| `build` | after the batch metrics line | wall-clock | `ok,ok` / `error` |
+| `smoke` | after the verdict | wall-clock | `PASS` / `FAIL:<n>` |
+| `review` | after the merged verdict | wall-clock | `<verdict>:<count>` |
+| `fix` | after the batch metrics line | wall-clock | `<fixed>/<found>` |
+| `ship` | the release agent succeeded | `0` | `pr` / `compare` |
+
+`seconds: 0` marks a phase whose duration is human thinking time, not pipeline wall-clock — the
+funnel signal there is the event, not how long it took. `/doctor`, `/audit`, `/refactor`,
+`/align-ds`, `/init-pipeline` and `/update-pipeline` **never** ping: they sit outside the funnel, and
+keeping them out is what holds the collected set to what the consent text describes.
 
 **What one event contains** (strict allowlist, ~200 bytes):
 

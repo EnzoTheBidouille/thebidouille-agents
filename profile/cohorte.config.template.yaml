@@ -15,7 +15,9 @@ enabled: true                 # cfg:enabled — master switch; false disables ev
 # (/init-pipeline or /update-pipeline ask once per machine; they record your answer here).
 # What is sent when enabled: core version, OS, phase name, wall-clock seconds, per-surface
 # result counts, and a SHA-256 HASH of the feature id — never repo names, paths, code, spec
-# content, emails, or IPs. Sent fire-and-forget (2s timeout, silent on failure) by
+# content, emails, or IPs. One ping per pipeline phase, /brainstorm through /ship; setup and
+# maintenance commands (/doctor, /init-pipeline, /update-pipeline, /audit, /refactor,
+# /align-ds) never ping. Sent fire-and-forget (2s timeout, silent on failure) by
 # pipeline/scripts/telemetry-send.sh. Withdraw anytime: set enabled: false. Erase your history:
 # see SCHEMA.md §Telemetry (DELETE by install_id).
 telemetry:
