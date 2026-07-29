@@ -3,6 +3,15 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 1.1.1 — 2026-07-29
+
+- **Fix: pipeline metrics survive worktree teardown.** With `isolation.enabled` the lead session
+  runs inside the feature worktree, so metrics lines landed in the worktree's `.claude/` and were
+  deleted with it — defeating their purpose (cross-feature evidence for surface splits, dashboard
+  history). All phases now append to the **main checkout's** `.claude/pipeline-metrics.jsonl`,
+  resolved from anywhere via `git rev-parse --git-common-dir`; `/doctor` flags a stray metrics file
+  inside a worktree as a stale-core sign.
+
 ## 1.1.0 — 2026-07-29
 
 > **The token-economy release.** A full audit of the core (40 verified fixes) cuts the pipeline's
