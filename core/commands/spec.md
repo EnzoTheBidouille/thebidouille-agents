@@ -24,6 +24,13 @@ Detect the mode from the pasted content:
    `/brainstorm` stages its output); one match ⇒ read it and confirm, several ⇒ ask which. None ⇒
    ask the human to paste the return (or describe the feature) and wait.
 2. Derive a `feature_id` (kebab-case slug). Confirm it.
+2b. **Size budget — a spec is a contract, not a novel.** Target ≤ ~300 lines; hard-think at 500.
+   Every implementer re-reads the whole spec on every first build, so each extra line is paid
+   `surfaces × dispatches` times. If the feature genuinely needs more, that's the signal it is TWO
+   features: propose a split (e.g. `<id>-core` + `<id>-admin`, each independently shippable, the
+   second consuming the first's contract) and let the human pick. Trim the usual bloat before
+   writing: exhaustive UI walkthroughs (the design brief carries those), restated conventions
+   (PIPELINE.md carries those), speculative edge cases nobody asked for.
 3. Walk the human through each section of `specs/_template.md`, **section by section**, with focused
    questions. The critical one is **§5 API CONTRACT** — pin down every endpoint/interface (method, path,
    auth/role, request fields with types/validation, success envelope + data shape, and every error case),

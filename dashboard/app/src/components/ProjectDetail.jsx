@@ -5,6 +5,7 @@ import Health from './Health.jsx';
 import Surfaces from './Surfaces.jsx';
 import SpecsBoard from './SpecsBoard.jsx';
 import KanbanBoard from './KanbanBoard.jsx';
+import MetricsPanel from './MetricsPanel.jsx';
 import ResetModal from './ResetModal.jsx';
 import ActionRunner from './ActionRunner.jsx';
 
@@ -31,23 +32,27 @@ const UPDATE_WARNING = (
 export default function ProjectDetail({ project }) {
   const [state, setState] = useState(null);
   const [kanban, setKanban] = useState(null);
+  const [metrics, setMetrics] = useState(null);
   const [error, setError] = useState(null);
   const [resetting, setResetting] = useState(false);
   const [runner, setRunner] = useState(null); // { title, command, confirmText }
 
   async function refresh() {
     const q = encodeURIComponent(project);
-    const [st, kb] = await Promise.allSettled([
+    const [st, kb, mt] = await Promise.allSettled([
       getJson(`/api/state?project=${q}`),
       getJson(`/api/kanban?project=${q}`),
+      getJson(`/api/metrics?project=${q}`),
     ]);
     if (st.status === 'fulfilled') { setState(st.value); setError(null); } else setError(st.reason.message);
     setKanban(kb.status === 'fulfilled' ? kb.value : { enabled: false });
+    setMetrics(mt.status === 'fulfilled' ? mt.value : { present: false, features: [], batches: 0 });
   }
 
   useEffect(() => {
     setState(null);
     setKanban(null);
+    setMetrics(null);
     refresh();
     const id = setInterval(refresh, 15000);
     return () => clearInterval(id);
@@ -88,6 +93,7 @@ export default function ProjectDetail({ project }) {
       <KanbanBoard data={kanban} />
       {/* Kanban supersedes the specs board — only show specs when there's no linked board. */}
       {kanban && !kanban.enabled && <SpecsBoard specs={state && state.specs} />}
+      <MetricsPanel data={metrics} />
 
       {resetting && (
         <ResetModal project={project} onClose={() => setResetting(false)} onChanged={refresh} />

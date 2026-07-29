@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    name: Validate core
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Structural invariants (commands, agents, pins, cross-refs, installers)
+        run: node scripts/validate-core.mjs
+
+      - name: Syntax-check CLI + dashboard server
+        run: |
+          node --check bin/cli.js
+          for f in dashboard/server/*.js; do node --check "$f"; done
+
+      - name: Syntax-check gate hook
+        run: python3 -m py_compile core/hooks/gate.py
+
+      - name: Shell-check installers (syntax)
+        run: bash -n install.sh && sh -n install.sh
+
+      - name: Dry-run install into a scratch HOME
+        run: |
+          scratch=$(mktemp -d)
+          # ./ is load-bearing: without a slash in $0 the installer clones
+          # GitHub main instead of installing the checked-out working tree
+          HOME="$scratch" sh ./install.sh --global
+          test -f "$scratch/.claude/pipeline/VERSION"
+          test -f "$scratch/.claude/agents/smoke.md"
+          test -f "$scratch/.claude/commands/build.md"
+          grep -q "^model: sonnet" "$scratch/.claude/commands/build.md"
+
+      - name: Build dashboard
+        run: npm run build:dashboard

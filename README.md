@@ -237,6 +237,38 @@ lever: long sessions (>150k) are expensive even when cached. Each command tells 
 safe to clear. If you'd rather stay in one session, `/compact` mid-task does the lighter version. (Claude
 can't fire `/clear` itself — it's a client-side command; the pipeline just makes it always safe to type.)
 
+### Run features in parallel — one session per feature
+
+With `isolation.enabled`, every feature already gets its own worktree, ports, and database
+(`scripts/new-feature.sh <id>` — slots tracked in `.worktrees/slots.tsv`). That isolation is exactly
+what makes **parallel features** safe, and it's the real throughput multiplier when you're rate-limited:
+while feature A's `/build` runs its agents (minutes of wall-clock you'd otherwise spend waiting), a
+second Claude Code session can `/spec` or `/review` feature B.
+
+The pattern:
+
+```
+session 1 (main checkout):   /spec feat-a → /build feat-a  (agents run…)
+session 2 (main checkout):   /spec feat-b → /build feat-b  (agents run…)
+session 1:                   /smoke feat-a → /review feat-a → /ship feat-a
+session 2:                   /smoke feat-b → …
+```
+
+Rules that make it safe:
+
+- **One feature per session.** All lead-side state is keyed by feature id on disk
+  (`specs/<id>.md`, `<contract.path>/<id>.*`, `specs/reports/<id>*`), so sessions never share state —
+  but a single session interleaving two features accumulates both in its context, paying for both.
+- **Disjoint surfaces per feature are guaranteed** (each worktree is a full checkout), and each
+  feature's DB/ports come from its slot — `/smoke` runs collide on neither.
+- **The contract package is the one shared tree.** Two features editing
+  `<contract.path>/<their-own-id>.<ext>` never conflict (one file per feature); merge order only
+  matters if a later feature *imports* an earlier one's contract — ship the dependency first.
+- `/ship` one at a time: it commits from the feature's branch and the freshness gate keeps a stale
+  verdict from shipping; after each merge, rebase the other live worktrees (`git rebase main`) so
+  their eventual reviews diff against reality.
+- `/doctor` check 6 shows the live slot table (feature ↔ worktree ↔ ports) when you lose track.
+
 ## License
 
 [AGPL-3.0](LICENSE). Free to use, including commercially — but if you modify it and distribute it
