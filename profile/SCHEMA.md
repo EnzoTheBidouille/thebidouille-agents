@@ -348,9 +348,9 @@ work without revealing what is being built.
   the next phase, no restart.
 - **Erasure** — `/doctor` prints your `install_id`; send
   `curl -X DELETE <endpoint-origin>/v1/install/<install_id>` and the collector drops every event
-  for that id (the reference collector in `telemetry/` implements this and stores no IPs).
+  for that id (the deployed collector implements this and stores no IPs).
 - **Access/portability** — events are keyed by your `install_id`; ask the operator for an export.
 
-**Collector contract** (implement your own, or deploy `telemetry/collector.mjs`):
+**Collector contract** (any implementation must honor it):
 `POST /v1/events` (one JSON event, allowlisted fields) · `DELETE /v1/install/<id>` (erasure) ·
 `GET /healthz`. Operators must not retain IP-bearing access logs for the ingest vhost.
