@@ -44,6 +44,26 @@ jobs:
           # is a silent no-op on the user's machine, never an error. Assert them.
           test -x "$scratch/.claude/pipeline/scripts/telemetry-send.sh"
           test -x "$scratch/.claude/pipeline/scripts/kanban-move.sh"
+          test -f "$scratch/.claude/pipeline/CHANGELOG.md"
+
+      # bin/cli.js is what `npx cohorte install/update` actually runs — a
+      # hand-written port of install.sh, so it drifts silently (until 1.2.4 it
+      # copied neither shipped script nor the CHANGELOG). Assert the same
+      # postconditions against the port, not just the shell original.
+      - name: Dry-run the npx CLI into a scratch HOME
+        run: |
+          scratch=$(mktemp -d)
+          # CLAUDE_CONFIG_DIR, not HOME: the CLI honours it on every platform,
+          # while HOME is ignored on Windows (os.homedir reads USERPROFILE there).
+          CLAUDE_CONFIG_DIR="$scratch/.claude" node bin/cli.js install --global
+          test -f "$scratch/.claude/pipeline/VERSION"
+          test -f "$scratch/.claude/commands/build.md"
+          test -x "$scratch/.claude/pipeline/scripts/telemetry-send.sh"
+          test -x "$scratch/.claude/pipeline/scripts/kanban-move.sh"
+          test -f "$scratch/.claude/pipeline/CHANGELOG.md"
+          # The per-project rendered scripts must NOT ship — only their templates.
+          test ! -e "$scratch/.claude/pipeline/scripts/new-feature.sh"
+          test -f "$scratch/.claude/pipeline/scripts/new-feature.sh.template"
 
       - name: Build dashboard
         run: npm run build:dashboard

@@ -3,3 +3,9 @@
 __pycache__/
 node_modules/
 *.tgz
+
+# This repo dogfoods its own /init-pipeline: these are its rendered isolation
+# scripts, with THIS repo's ports and paths baked in. The shipped artifacts are
+# the scripts/*.sh.template files beside them (see package.json `files`).
+scripts/new-feature.sh
+scripts/remove-feature.sh

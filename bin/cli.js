@@ -102,13 +102,31 @@ function copyCore() {
   for (const f of ['PIPELINE.template.md', 'SCHEMA.md', 'cohorte.config.template.yaml']) {
     fs.copyFileSync(path.join(src, 'profile', f), path.join(pipelineDir, f));
   }
-  for (const f of fs.readdirSync(path.join(src, 'scripts'))) {
-    if (f.endsWith('.template')) {
-      fs.copyFileSync(path.join(src, 'scripts', f), path.join(pipelineDir, 'scripts', f));
+  // Copy the *.template files AND the shipped executables (kanban-move.sh,
+  // telemetry-send.sh). Until 1.2.4 this loop took only `.template`, so every
+  // `npx cohorte install/update` produced a core missing both scripts — and since
+  // every caller chains them with `|| true`, the result was silent: no kanban card
+  // moves, no telemetry pings, no error. The shell installers named them explicitly
+  // and this port drifted. The rule below needs no list to keep in sync: a `<x>.sh`
+  // with an `<x>.sh.template` sibling is rendered per-project by /init-pipeline, so
+  // only the template ships; every other `.sh` is a shipped executable.
+  const scriptFiles = fs.readdirSync(path.join(src, 'scripts'));
+  for (const f of scriptFiles) {
+    const isTemplate = f.endsWith('.template');
+    const isShipped = f.endsWith('.sh') && !scriptFiles.includes(`${f}.template`);
+    if (!isTemplate && !isShipped) continue;
+    const target = path.join(pipelineDir, 'scripts', f);
+    fs.copyFileSync(path.join(src, 'scripts', f), target);
+    if (isShipped && process.platform !== 'win32') {
+      try { fs.chmodSync(target, 0o755); } catch { /* optional */ }
     }
   }
   fs.copyFileSync(path.join(src, 'core', 'agents', 'implementer.template.md'),
                   path.join(pipelineDir, 'implementer.template.md'));
+  // /doctor reads this to tell the human what they're missing; the shell installers
+  // have always copied it, this port never did.
+  const changelog = path.join(src, 'CHANGELOG.md');
+  if (fs.existsSync(changelog)) fs.copyFileSync(changelog, path.join(pipelineDir, 'CHANGELOG.md'));
   fs.writeFileSync(path.join(pipelineDir, 'VERSION'), VERSION + '\n');
   if (process.platform !== 'win32') {
     try { fs.chmodSync(path.join(dest, 'hooks', 'gate.py'), 0o755); } catch { /* optional */ }
