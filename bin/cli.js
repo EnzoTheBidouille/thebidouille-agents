@@ -156,8 +156,15 @@ function scrubTddGate() {
 // the fixed (non-rendered) agents: the dev review/release pipeline agents
 function copyFixedAgents() {
   fs.mkdirSync(path.join(dest, 'agents'), { recursive: true });
-  for (const f of ['review.md', 'release.md']) {
-    fs.copyFileSync(path.join(src, 'core', 'agents', f), path.join(dest, 'agents', f));
+  // Every agent in core/agents/ EXCEPT the *.template.md ones, which /init-pipeline renders
+  // per-surface. Until 1.2.6 this was a hardcoded ['review.md', 'release.md'] that never grew
+  // the `smoke.md` the shell installers copy, so `npx cohorte install` shipped the /smoke
+  // command with no `smoke` agent to dispatch — the run reported /smoke as not installed.
+  // Reading the directory needs no list to keep in sync with the shell installers.
+  const agentDir = path.join(src, 'core', 'agents');
+  for (const f of fs.readdirSync(agentDir)) {
+    if (!f.endsWith('.md') || f.endsWith('.template.md')) continue;
+    fs.copyFileSync(path.join(agentDir, f), path.join(dest, 'agents', f));
   }
   // 0.1.19 split the bi-mode questionnaire-researcher into research-agent + questionnaire-architect;
   // copy-over never deletes, so scrub the retired agent lest a dead subagent_type linger.
