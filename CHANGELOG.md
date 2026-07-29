@@ -3,6 +3,47 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 1.1.0 — 2026-07-29
+
+> **The token-economy release.** A full audit of the core (40 verified fixes) cuts the pipeline's
+> consumption by an estimated 40–60% per feature, and the pipeline no longer inherits your session's
+> model for orchestration. Plus: pipeline metrics in the dashboard, CI on the core, and a documented
+> parallel-features workflow.
+
+- **Byte-stable dispatches.** One dispatch template for builds AND fix loops; variable parts
+  (design links, open Remediation items inlined verbatim) sit at the end so repeats hit the prompt
+  cache. The lead never pastes a diff — agents compute their own, scoped to their tree. On fix
+  loops, implementers no longer re-read the spec at all.
+- **Reviewers read hunks, not whole files.** `/review` stages each surface's diff to
+  `specs/reports/<id>.<key>.diff`; tiny re-reviews skip the dispatch entirely (fast path); the
+  merged report is staged to disk with only a verdict summary printed; LOW-only findings defer to
+  the refactor backlog instead of forcing a fix cycle.
+- **`/smoke` is now an agent.** A new pinned `smoke` agent runs infra/curl/UI checks so logs,
+  response bodies, and screenshots never enter (and re-bill in) your session's history.
+- **Model pins everywhere.** The `review` agent and the 10 mechanical commands
+  (build/review/fix/smoke/ship/audit/refactor/doctor/align-ds/update-pipeline) are pinned
+  `model: sonnet` — orchestration runs on Sonnet even if your session runs Opus/Fable. `/doctor`
+  checks agent AND command pins; the profile template's frontend example no longer suggests
+  `inherit`.
+- **Leaner outputs.** Handoff + review-report formats are inlined in the agent bodies (no template
+  probe), templates de-boilerplated, the design brief is authored once to `specs/design/<id>.md`,
+  metrics collapsed to one JSONL line per phase, and every command's closing now *recommends*
+  `/clear` (all state is on disk by design).
+- **Pipeline metrics in the dashboard.** New per-project panel: wall-clock per phase, fix rounds,
+  and per-surface results from `.claude/pipeline-metrics.jsonl` — see which phase/surface dominates
+  before tuning anything.
+- **`kanban-move.sh`.** Card moves (move/create/dedupe/`--pr`) now run as a script outside the
+  agent's context; installed to `<core>/pipeline/scripts/`, with the manual grep-based op as
+  fallback.
+- **Spec size budget.** `/spec` targets ≤~300 lines and proposes a feature split beyond that —
+  every spec line is paid `surfaces × dispatches` times.
+- **Parallel features documented.** README: one session per feature, worktree isolation as the
+  safety mechanism, ship-then-rebase rule; `/doctor` prints the live slot table when ≥2 features
+  run in parallel.
+- **CI on the core.** `scripts/validate-core.mjs` + GitHub Actions: frontmatter/pin invariants,
+  render placeholders, cross-references, installer coverage (would have caught the smoke-agent
+  install gap this release also fixes), plus an end-to-end install dry-run.
+
 ## 1.0.0 — 2026-07-28
 
 > **Renamed `thebidouille-agents` → `cohorte`** and cut the first stable release. The npm package,

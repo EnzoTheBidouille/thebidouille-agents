@@ -10,6 +10,7 @@ const { spawn } = require('child_process');
 const { versions } = require('./versions');
 const { state } = require('./doctor');
 const { kanban } = require('./kanban');
+const { metrics } = require('./metrics');
 const fleet = require('./fleet');
 
 const MIME = {
@@ -240,6 +241,11 @@ function start({ projectRoot, globalDir, port, host, openBrowser, pkgRoot, versi
         const q = new URL(req.url, 'http://localhost').searchParams.get('project');
         const root = q ? path.resolve(q) : projectRoot;
         return sendJson(res, 200, kanban({ projectRoot: root, globalDir }));
+      }
+      if (url === '/api/metrics') {
+        const q = new URL(req.url, 'http://localhost').searchParams.get('project');
+        const root = q ? path.resolve(q) : projectRoot;
+        return sendJson(res, 200, metrics({ projectRoot: root }));
       }
       if (url === '/api/projects') {
         const body = await readBody(req);

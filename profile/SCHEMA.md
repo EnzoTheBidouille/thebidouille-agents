@@ -280,13 +280,16 @@ Once shipped, `/ship` appends the **PR number** to the card — `- [ ] <title> #
 The bare `#<num>` is what the dashboard renders as a clickable link to the GitHub PR, so `/ship` always
 writes it when a PR was actually created.
 
-**Move a card (the core op).** To move card `#<id>` to a stage's column: find the list item carrying
-`#<id>` under its current `## <column>` heading, delete it there, and append it (whole line, tag
-preserved) under the target `## <column>` heading. If no card carries `#<id>` (feature started outside
-the board), create the card in the target column instead of erroring. One card per `#<id>`; if
-duplicates exist, keep the first and drop the rest. **Never read the whole board into context** — it
-grows with every feature ever tracked: `grep -n` for `#<id>` and the `## ` headings to locate lines,
-then use offset-limited Reads + targeted Edits around the matches.
+**Move a card (the core op).** Use the shipped script — it does the whole op outside the agent's
+context (find, dedupe, sub-notes carried along, settings block preserved):
+`<core>/pipeline/scripts/kanban-move.sh <board.md> <id> <column> [--pr <num>] [--title <title>]`
+where `<core>` is `~/.claude` (global install) or `.claude` (bundled) — probe with `test -x`. It
+creates the card in the target column when none exists, keeps the first and drops duplicates, and
+appends ` — PR #<num>` with `--pr`. **Fallback when the script is absent** (older core): do it by
+hand, but never read the whole board into context — it grows with every feature ever tracked:
+`grep -n` for `#<id>` and the `## ` headings to locate lines, then use offset-limited Reads +
+targeted Edits around the matches. Either way: one card per `#<id>`, whole line moved tag-preserved,
+card created in the target column if missing.
 
 **Stage → column**, used both by each pipeline command (to move its card live) and by backfill:
 

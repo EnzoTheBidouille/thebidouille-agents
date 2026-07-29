@@ -50,6 +50,9 @@ fix only with the human's go-ahead (or hand them the command).
    rendered (no `__TOKEN__` placeholders left). `.worktrees/slots.tsv` coherent with
    `git worktree list` — flag **stale slots** (registered but no worktree) and **zombie worktrees**
    (worktree but no slot / spec already `shipped`) ⇒ suggest `scripts/remove-feature.sh <id>`.
+   When ≥2 slots are live, print the parallel-feature table (feature · worktree · ports · db ·
+   branch behind main by N commits) — a worktree far behind main means its next review will diff
+   against stale code ⇒ suggest rebasing it.
 7. **Specs & metrics.** Every `specs/*.md` front-matter `status` is a valid stage; `shipped` specs
    with a live worktree flagged (see 6). `.claude/pipeline-metrics.jsonl` and `specs/reports/` (the
    `/review`·`/smoke` report buffer that lets a `/fix` survive a `/clear`) are gitignored.

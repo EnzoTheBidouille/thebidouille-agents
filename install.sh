@@ -85,6 +85,8 @@ copy_core() {
   cp "$src/profile/SCHEMA.md"            "$dest/pipeline/"
   cp "$src/profile/cohorte.config.template.yaml" "$dest/pipeline/"
   cp "$src"/scripts/*.template           "$dest/pipeline/scripts/"
+  cp "$src/scripts/kanban-move.sh"       "$dest/pipeline/scripts/"
+  chmod +x "$dest/pipeline/scripts/kanban-move.sh" 2>/dev/null || true
   cp "$src/core/agents/implementer.template.md" "$dest/pipeline/"
   [ -f "$src/CHANGELOG.md" ] && cp "$src/CHANGELOG.md" "$dest/pipeline/"
   printf '%s\n' "$ver" > "$dest/pipeline/VERSION"
