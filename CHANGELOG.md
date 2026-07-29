@@ -3,6 +3,13 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 1.2.1 — 2026-07-29
+
+- Telemetry collector URL shipped as the config-template default
+  (`https://telemetry.cohorte.thebidouille.fr/v1/events`) — consenting installs start
+  reporting once the collector is live. Still strictly opt-in; nothing changes for anyone
+  who declined (or never answered) the consent question.
+
 ## 1.2.0 — 2026-07-29
 
 > **Opt-in anonymous telemetry, GDPR-first.** Nothing is sent unless you explicitly say yes.
