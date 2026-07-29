@@ -4,8 +4,11 @@
 // locally with `node scripts/validate-core.mjs`.
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = new URL("..", import.meta.url).pathname;
+// fileURLToPath, not .pathname — on Windows the latter yields "/C:/…", which
+// join() then resolves against the cwd drive ("C:\C:\…") and every read ENOENTs.
+const root = fileURLToPath(new URL("..", import.meta.url));
 const errors = [];
 const fail = (file, msg) => errors.push(`${file}: ${msg}`);
 
@@ -108,6 +111,36 @@ if (/^\s*model:\s*inherit\b/m.test(tpl))
 const steps = join(root, "core/templates/steps/init-pipeline");
 if (!existsSync(steps) || readdirSync(steps).length === 0)
   fail("core/templates/steps/init-pipeline", "router step files missing/empty");
+
+// ── telemetry coverage ──────────────────────────────────────────────────────
+// The funnel is only readable if every one of its stages pings — a single missing
+// one silently truncates it (that is how /smoke, /review and /fix went unreported
+// until 1.2.3). The phase list here must match SCHEMA.md §Telemetry's table.
+const FUNNEL = ["brainstorm", "spec", "build", "smoke", "review", "fix", "ship"];
+for (const c of FUNNEL)
+  if (!/usage ping/i.test(read(`core/commands/${c}.md`)))
+    fail(`core/commands/${c}.md`, "funnel command with no usage ping — breaks the telemetry funnel");
+// …and nothing outside the funnel may ping (consent text scopes it to the funnel).
+for (const f of readdirSync(join(root, "core/commands"))) {
+  const c = f.replace(/\.md$/, "");
+  // `telemetry-send.sh` + an argument = a call site; the bare filename (e.g. /doctor
+  // listing the scripts it checks for) is a mention, not a ping.
+  if (!FUNNEL.includes(c) && /telemetry-send\.sh +\S|usage ping/i.test(read(`core/commands/${f}`)))
+    fail(`core/commands/${f}`, "non-funnel command pings telemetry — outside the consented scope");
+}
+
+// ── shipped scripts ─────────────────────────────────────────────────────────
+// Every scripts/*.sh must be copied by BOTH installers. Callers chain these with
+// `|| true`, so one the installer forgets is a silent no-op forever — no kanban
+// card moves, no telemetry ping, no error. CI is the only place this is loud.
+// A `<name>.sh` with a `<name>.sh.template` sibling is a locally-rendered artifact
+// (this repo dogfoods its own /init-pipeline), not a core asset — skip those.
+const installers = { "install.sh": read("install.sh"), "install.ps1": read("install.ps1") };
+const shipped = readdirSync(join(root, "scripts"));
+for (const f of shipped.filter((f) => f.endsWith(".sh") && !shipped.includes(`${f}.template`)))
+  for (const [name, src] of Object.entries(installers))
+    if (!src.includes(`scripts/${f}`) && !src.includes(`scripts\\${f}`))
+      fail(name, `never copies scripts/${f} into pipeline/scripts/ (silent no-op at runtime)`);
 
 // ── report ──────────────────────────────────────────────────────────────────
 if (errors.length) {

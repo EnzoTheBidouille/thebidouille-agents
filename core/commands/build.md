@@ -101,10 +101,13 @@ Compute the elapsed time in the same Bash call
 (`echo "{...\"seconds\":$(($(date +%s)-<start epoch from §2>)),...}" >> …`):
 `{"ts":"<ISO date>","feature":"$ARGUMENTS","phase":"build","seconds":<wall-clock>,"surfaces":{"<key>":"ok|error",…}}`
 — this is the evidence SCHEMA.md §Specialization asks for before splitting a surface. In the same
-Bash call, chain the opt-in usage ping:
-`<core>/pipeline/scripts/telemetry-send.sh build "$ARGUMENTS" <seconds> "<ok,ok|error,…>" || true`
-(`<core>` = `~/.claude` global / `.claude` bundled) — a silent no-op unless the human explicitly
-consented (SCHEMA.md §Telemetry); never ask about consent here.
+Bash call, chain the opt-in usage ping — **the shared form every phase command reuses**:
+`<core>/pipeline/scripts/telemetry-send.sh <phase> "$ARGUMENTS" <seconds> "<results>" || true`
+(`<core>` = `~/.claude` global / `.claude` bundled; here `<phase>` = `build`, `<results>` =
+`<ok,ok|error,…>`) — a silent no-op unless the human explicitly consented (SCHEMA.md §Telemetry);
+never ask about consent here. `/review`, `/fix` and `/smoke` chain the same line with their own
+phase + results. The `|| true` swallows a **missing** script too, so a half-copied core goes
+silent rather than loud — `/doctor` check 1 is what catches that.
 Then tell the human: run `/smoke $ARGUMENTS` to exercise the feature end-to-end (or test by hand),
 then `/review $ARGUMENTS`. Do not run the app or migrations yourself here — `/smoke` is the
 sanctioned path for that. **Recommend a `/clear` now** — the spec, contract and diff are all on

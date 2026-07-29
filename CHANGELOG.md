@@ -3,6 +3,35 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 1.2.3 — 2026-07-29
+
+- **Telemetry now covers the whole funnel.** Only `/build` was actually pinging; `/smoke`,
+  `/review` and `/fix` wrote their metrics line but never sent one, so consenting installs
+  reported a quarter of their pipeline. Those three are fixed, and `/brainstorm`, `/spec`
+  (on a landed freeze) and `/ship` join them — the seven stages of `idea → PR` now report,
+  so it's finally possible to see *where* features stall. Setup and maintenance commands
+  (`/doctor`, `/init-pipeline`, `/update-pipeline`, `/audit`, `/refactor`, `/align-ds`)
+  deliberately never ping: the collected set stays inside what the consent text describes.
+  Same data categories as before, same purpose — nothing new about you is sent, so your
+  existing consent stands and nothing re-asks. The full table is in SCHEMA.md §Telemetry.
+- `telemetry-send.sh` now allowlists the phase name client-side — a typo in a command file
+  used to sail through and land a phantom phase in the dataset.
+- `/fix` never defined a wall-clock start, so the `seconds` in its metrics line was
+  undefined. It now notes the epoch like `/build` and `/review` do.
+- **`/doctor` catches a half-copied core.** New check: `pipeline/scripts/` must hold every
+  shipped script, and `VERSION` must not be newer than its siblings. Callers chain these
+  scripts with `|| true`, so a missing one was invisible — no kanban move, no telemetry
+  ping, no error. If you saw either go quiet, this is why: re-run the installer.
+- CI now fails if an installer forgets to copy a `scripts/*.sh`, and the dry-run install
+  asserts the scripts land executable — the root cause above, caught before release
+  rather than on someone's machine.
+- The npm tarball no longer ships `scripts/new-feature.sh` + `scripts/remove-feature.sh`
+  — cohorte's *own* rendered isolation scripts, with this repo's ports and paths baked
+  in. They claimed in their header to be excluded but never were (an explicit `files`
+  whitelist wins over `.npmignore`). Only the `*.sh.template` files ship, as intended.
+- Fixed `validate-core.mjs` crashing on Windows (`C:\C:\…` path), so the guard above
+  actually runs locally too.
+
 ## 1.2.2 — 2026-07-29
 
 - The reference collector moved to its own (private) deployment repo; the public repo keeps

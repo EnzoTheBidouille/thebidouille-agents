@@ -40,6 +40,10 @@ jobs:
           test -f "$scratch/.claude/agents/smoke.md"
           test -f "$scratch/.claude/commands/build.md"
           grep -q "^model: sonnet" "$scratch/.claude/commands/build.md"
+          # Every caller chains these with `|| true`, so one the installer forgets
+          # is a silent no-op on the user's machine, never an error. Assert them.
+          test -x "$scratch/.claude/pipeline/scripts/telemetry-send.sh"
+          test -x "$scratch/.claude/pipeline/scripts/kanban-move.sh"
 
       - name: Build dashboard
         run: npm run build:dashboard
