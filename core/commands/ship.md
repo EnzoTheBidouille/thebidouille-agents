@@ -1,4 +1,5 @@
 ---
+model: sonnet
 description: At a SHIP verdict, dispatch the release agent to commit, push, and open the PR (with your confirmation).
 argument-hint: <feature_id>
 ---
@@ -54,9 +55,10 @@ Confirm `specs/$ARGUMENTS.md` was committed as `status: shipped` (part of the re
 `shipped` column (SCHEMA.md §Kanban "Move a card") and **append the PR number** so the line reads
 `- [ ] <title> #$ARGUMENTS — PR #<num>`. Take `<num>` from the PR URL (`…/pull/13` ⇒ `13`); **always write
 it when a PR was created** (the `gh` path) — it is what the dashboard turns into a PR link. If only a
-compare URL was emitted (no PR yet), move the card without a number. Then **re-read the board** and confirm
-the card sits under the `shipped` heading with no stale copy left under its previous column. No board ⇒
-skip silently.
+compare URL was emitted (no PR yet), move the card without a number. Then verify with a **grep for
+`#$ARGUMENTS`** on the board (with surrounding heading context — `grep -B20 '#$ARGUMENTS' | grep '^##'`
+or an offset-limited Read around the match): exactly one card, under the `shipped` heading — never
+re-read the whole board into context. No board ⇒ skip silently.
 
 ## 5. After the PR — CI gate + teardown
 
@@ -66,3 +68,5 @@ skip silently.
   `scripts/remove-feature.sh $ARGUMENTS` (add `--drop-db` to also drop the feature db; kept by
   default). It removes the worktree, deletes the merged branch, frees the slot. Never run it before
   the merge is confirmed, and only with the human's go-ahead (the gate will ask anyway).
+- Feature closed — **recommend a `/clear`** before starting the next one; nothing from this session
+  is needed again (spec `shipped`, PR merged, board updated).

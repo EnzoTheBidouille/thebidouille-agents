@@ -1,4 +1,5 @@
 ---
+model: sonnet
 description: Refresh the pipeline core (global ~/.claude, or a repo's bundled .claude) to the latest published cohorte version, then reconcile this repo's generated files to it — /init-pipeline stays one-time.
 argument-hint: [path-to-local-checkout]
 ---

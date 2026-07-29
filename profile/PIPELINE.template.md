@@ -69,7 +69,10 @@ surfaces:
     label: frontend (React/TanStack)
     agent: frontend
     tools: [Read, Write, Edit, Bash, Grep, Glob, DesignSync, mcp__serena]
-    model: inherit                            # this surface makes real design decisions ⇒ worth the lead's model
+    model: sonnet                             # default even for design surfaces — designs + contract are
+                                              #   frozen inputs the agent applies; `inherit` (bills at the
+                                              #   lead's tier, often Opus) ONLY if this surface must make
+                                              #   novel design decisions
     test_cmd: pnpm --filter web test
     lint_cmd: pnpm --filter web lint
     format_cmd: pnpm --filter web format

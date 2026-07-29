@@ -6,16 +6,12 @@
 
 <2–4 lines: what this ships and the value, from the spec goal>
 
-### Contract
-
-<the interface + contract types added/changed — from spec §5 (omit if contract.enabled is false)>
-
 ### Changes
 
 > One bullet per surface (from `PIPELINE.md` §surfaces), plus the shared contract.
 
 - **<surface.key>:** <what changed>
-- **Shared:** `<contract.path>/<feature_id>.<ext>`
+- **Shared:** `<contract.path>/<feature_id>.<ext>` <(new/changed types: names only; omit if contract.enabled is false)>
 
 ### Tests
 
