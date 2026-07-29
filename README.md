@@ -277,7 +277,7 @@ result counts, and a *hash* of the feature id — never repo names, paths, code,
 recorded so you're never re-asked. Withdraw anytime (`telemetry.enabled: false` in
 `~/.claude/cohorte.config.yaml`); erase your history anytime (`/doctor` prints your `install_id`,
 the collector's `DELETE /v1/install/<id>` drops it). Full spec + GDPR details:
-`profile/SCHEMA.md` §Telemetry; reference collector in `telemetry/`.
+`profile/SCHEMA.md` §Telemetry (including the collector API contract).
 
 ## License
 

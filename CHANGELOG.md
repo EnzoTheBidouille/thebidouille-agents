@@ -3,6 +3,11 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 1.2.2 — 2026-07-29
+
+- The reference collector moved to its own (private) deployment repo; the public repo keeps
+  the collector API contract in SCHEMA.md §Telemetry. No behavior change for users.
+
 ## 1.2.1 — 2026-07-29
 
 - Telemetry collector URL shipped as the config-template default
