@@ -3,6 +3,15 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 1.2.5 — 2026-07-29
+
+- **`.claude/pipeline.json`'s `core_version` never updated on global installs.** The installer
+  bumps it in bundled mode, but a global core is shared — it cannot know which repos point at
+  it, so nothing bumped the field and it drifted forever. Repos running a current core were
+  still claiming `1.0.0`. `/update-pipeline` now syncs the pointer in both modes.
+- `/doctor` no longer reports that drift as a broken install: a global-mode pointer lagging the
+  VERSION file is ⚠️ with the one-command fix, not ❌. The core was never the problem.
+
 ## 1.2.4 — 2026-07-29
 
 > **If you installed with `npx cohorte`, this is the release that makes 1.2.3 actually
