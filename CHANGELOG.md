@@ -3,6 +3,23 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 1.2.4 — 2026-07-29
+
+> **If you installed with `npx cohorte`, this is the release that makes 1.2.3 actually
+> reach you.** Re-run `npx cohorte@latest update --global` (or `update` for a bundled core).
+
+- **`npx cohorte install/update` shipped a core missing two scripts.** `bin/cli.js` — the
+  port of `install.sh` that `npx` actually runs — copied only `scripts/*.template`, never
+  `kanban-move.sh` or `telemetry-send.sh`. Since every caller chains them with `|| true`,
+  the result was silent on every npx-installed machine: no kanban card moves, no telemetry
+  pings, no error anywhere. The shell installers named both files explicitly and this port
+  drifted from them. It now copies by a rule that needs no list to keep in sync.
+- The same port never copied `CHANGELOG.md` into the core either, so `/doctor` and
+  `/update-pipeline`'s "What's new" had nothing to read on npx installs. Fixed.
+- CI now dry-runs `bin/cli.js` into a scratch dir and asserts the same postconditions as
+  the `install.sh` dry-run. 1.2.3's guard only grepped the two shell installers — it would
+  have passed this bug, because the port copies by rule rather than by name.
+
 ## 1.2.3 — 2026-07-29
 
 - **Telemetry now covers the whole funnel.** Only `/build` was actually pinging; `/smoke`,
