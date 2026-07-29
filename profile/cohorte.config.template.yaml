@@ -22,7 +22,7 @@ telemetry:
   enabled: false              # cfg:telemetry_enabled — true ONLY via explicit consent
   install_id: ""              # cfg:telemetry_install_id — random UUID minted at consent; the erasure key
   consent_date: ""            # cfg:telemetry_consent_date — ISO date the human said yes
-  endpoint: ""                # cfg:telemetry_endpoint — collector URL (maintainer default; empty = off even if enabled)
+  endpoint: "https://telemetry.cohorte.thebidouille.fr/v1/events"  # cfg:telemetry_endpoint — collector URL; empty = off even if enabled
 
 # ── obsidian ──────────────────────────────────────────────────────────────────
 # Local vault used by the kanban mirror — defined here ONCE so no capability ever duplicates
