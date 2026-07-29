@@ -51,7 +51,14 @@ the human's choices — so `/init-pipeline` never needs re-running for an upgrad
 ## 3. Report old → new
 
 Re-read the VERSION file(s) and print `old → new`. If unchanged, say the core was already up to date.
-For a bundled repo, note that `.claude/pipeline.json`'s `core_version` was bumped and should be committed.
+
+**Sync the pointer — in BOTH modes.** If this repo has a `.claude/pipeline.json` whose `core_version`
+differs from the core you just installed, rewrite that one field (leave every other field untouched)
+and tell the human to commit it. In **bundled** mode the installer already did it; in **global** mode
+**nothing does** — the installer refreshes one shared core and cannot know which repos point at it,
+so before 1.2.5 the field simply drifted forever (a repo on a current core still claiming `1.0.0`).
+`/doctor` check 1 requires the pointer to be coherent with the VERSION file, so a drifted field reads
+as a broken install when nothing is broken.
 
 Then print **What's new**: read the installed `<core>/pipeline/CHANGELOG.md` and show the entries
 between the old and new versions (most recent first). File absent ⇒ the old core predates 0.1.14 —
