@@ -60,7 +60,7 @@ When the agents return:
   re-reads each loop. Keep any round with ≥1 still-open `- [ ]` item fully expanded (§2's skip logic
   needs those checkboxes).
 - Print one status line per surface (`<key> · items fixed <n>/<m> · tests pass/fail`) — do not restate
-  handoff content — and append ONE metrics line for the batch to `.claude/pipeline-metrics.jsonl`
+  handoff content — and append ONE metrics line for the batch to `pipeline-metrics.jsonl`
   (see `/build` §4, `phase: "fix"`).
 - Tell the human: re-run `/smoke` if the failures were runtime ones, and `/review $ARGUMENTS` for the
   re-verdict — the re-review is what *verifies* the ticked items actually hold (a regression simply

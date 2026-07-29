@@ -93,8 +93,11 @@ tree. For each surface in `surfaces`:
 
 When all return, flag any contract mismatch or failing test from the handoffs; otherwise print one
 status line per surface (`<key> · tests pass/fail · <n> TODOs`) — do not restate handoff content.
-Append **ONE line for the batch** to `.claude/pipeline-metrics.jsonl` (create it if absent; it must
-be gitignored), computing the elapsed time in the same Bash call
+Append **ONE line for the batch** to the **main checkout's** `.claude/pipeline-metrics.jsonl` —
+NOT the worktree's, which dies at teardown while metrics must accumulate across features. Resolve
+it from anywhere: `$(dirname "$(git rev-parse --git-common-dir)")/.claude/pipeline-metrics.jsonl`
+(in the main checkout this resolves to itself). Create it if absent; it must be gitignored.
+Compute the elapsed time in the same Bash call
 (`echo "{...\"seconds\":$(($(date +%s)-<start epoch from §2>)),...}" >> …`):
 `{"ts":"<ISO date>","feature":"$ARGUMENTS","phase":"build","seconds":<wall-clock>,"surfaces":{"<key>":"ok|error",…}}`
 — this is the evidence SCHEMA.md §Specialization asks for before splitting a surface.

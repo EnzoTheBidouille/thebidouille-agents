@@ -56,8 +56,8 @@ metrics line needs it.
 
 Merge the returned reports into **one** REVIEW REPORT (same template): findings concatenated and
 re-ordered by severity, counts summed, duplicates collapsed, verdict = the worst returned
-(`BLOCK` > `REVISE` > `SHIP`). Append ONE metrics line for the batch to `.claude/pipeline-metrics.jsonl`
-(gitignored): `{"ts":"<ISO>","feature":"$ARGUMENTS","phase":"review","seconds":<wall-clock>,"surfaces":{"<key>":"<verdict>:<finding count>",…}}`.
+(`BLOCK` > `REVISE` > `SHIP`). Append ONE metrics line for the batch to `pipeline-metrics.jsonl`
+(main-checkout path + rules in `/build` §4): `{"ts":"<ISO>","feature":"$ARGUMENTS","phase":"review","seconds":<wall-clock>,"surfaces":{"<key>":"<verdict>:<finding count>",…}}`.
 **Stage the full report to `specs/reports/$ARGUMENTS.md`** (overwrite) — a gitignored buffer so a
 `/fix` after a `/clear` can still read the findings; the `specs/reports/` subfolder is skipped by the
 non-recursive `specs/*.md` glob, so it's never mistaken for a spec (no phantom card, no bogus stage).

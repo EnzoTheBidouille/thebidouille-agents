@@ -155,10 +155,12 @@ the frozen contract as the only cross-surface channel**. So specialization means
 
 Coarse first, specialize on evidence: start with one `frontend` / `backend` surface each; split only a
 surface that's proven slow and cleanly separable. The evidence lives in
-`.claude/pipeline-metrics.jsonl` (gitignored) — one JSONL line per phase batch
+the **main checkout's** `.claude/pipeline-metrics.jsonl` (gitignored) — one JSONL line per phase batch
 (`ts`/`feature`/`phase`/`seconds`/`surfaces:{key: result}`), appended by `/build`, `/review`, `/fix`
-and `/smoke`. Read it before proposing a split: split the surface that actually dominates wall-clock,
-not the one that feels big.
+and `/smoke`. Always the main checkout, never the feature worktree (which dies at teardown while
+metrics must accumulate across features) — resolve from anywhere with
+`$(dirname "$(git rev-parse --git-common-dir)")/.claude/pipeline-metrics.jsonl`. Read it before
+proposing a split: split the surface that actually dominates wall-clock, not the one that feels big.
 
 ## Measuring cost — what's slow vs what's expensive
 

@@ -55,7 +55,10 @@ fix only with the human's go-ahead (or hand them the command).
    against stale code ⇒ suggest rebasing it.
 7. **Specs & metrics.** Every `specs/*.md` front-matter `status` is a valid stage; `shipped` specs
    with a live worktree flagged (see 6). `.claude/pipeline-metrics.jsonl` and `specs/reports/` (the
-   `/review`·`/smoke` report buffer that lets a `/fix` survive a `/clear`) are gitignored.
+   `/review`·`/smoke` report buffer that lets a `/fix` survive a `/clear`) are gitignored. Metrics
+   belong to the **main checkout** — a `pipeline-metrics.jsonl` inside a live feature worktree is a
+   stale-core sign (its lines die at teardown) ⇒ suggest appending its lines to the main checkout's
+   file and deleting the stray.
 
 ## Report
 

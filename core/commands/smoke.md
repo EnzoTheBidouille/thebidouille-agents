@@ -33,7 +33,8 @@ human; that's expected.
 ## 3. Relay the verdict
 
 - Print the agent's return as-is (verdict + ❌ lines + report path) — it is already minimal.
-- Append ONE metrics line to `.claude/pipeline-metrics.jsonl` (see `/build` §4, `phase: "smoke"`).
+- Append ONE metrics line to `pipeline-metrics.jsonl` (main-checkout path + rules in `/build` §4,
+  `phase: "smoke"`).
 - **PASS** → tell the human to run `/review $ARGUMENTS`. **FAIL** → the failures are findings: feed
   them to `/fix $ARGUMENTS`, re-run `/smoke` after. Either way the report is on disk —
   **recommend a `/clear`** before the next command.
