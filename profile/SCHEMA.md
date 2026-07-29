@@ -155,16 +155,16 @@ the frozen contract as the only cross-surface channel**. So specialization means
 
 Coarse first, specialize on evidence: start with one `frontend` / `backend` surface each; split only a
 surface that's proven slow and cleanly separable. The evidence lives in
-`.claude/pipeline-metrics.jsonl` (gitignored) — one JSONL line per dispatched agent
-(`ts`/`feature`/`phase`/`surface`/`seconds`/`result`), appended by `/build`, `/review`, `/fix` and
-`/smoke`. Read it before proposing a split: split the surface that actually dominates wall-clock,
+`.claude/pipeline-metrics.jsonl` (gitignored) — one JSONL line per phase batch
+(`ts`/`feature`/`phase`/`seconds`/`surfaces:{key: result}`), appended by `/build`, `/review`, `/fix`
+and `/smoke`. Read it before proposing a split: split the surface that actually dominates wall-clock,
 not the one that feels big.
 
 ## Measuring cost — what's slow vs what's expensive
 
-`pipeline-metrics.jsonl` records **wall-clock seconds** per dispatch (§Specialization) — it tells you what's
-SLOW. It deliberately does NOT record tokens: the lead can't reliably read a subagent's token count to log
-it. For what's EXPENSIVE, use Claude Code's own accounting:
+`pipeline-metrics.jsonl` records **wall-clock seconds** per phase batch (§Specialization) — it tells you
+what's SLOW. It deliberately does NOT record tokens: the lead can't reliably read a subagent's token count
+to log it. For what's EXPENSIVE, use Claude Code's own accounting:
 
 - **`/cost`** (built-in, zero setup) — reports per-**subagent** and per-**slash-command** share of your usage
   over the last 24 h / 7 d (e.g. _"Top subagents: frontend 7 %, backend 4 % · Top skills: /build 1 %,
@@ -175,6 +175,14 @@ it. For what's EXPENSIVE, use Claude Code's own accounting:
   and point it at a collector. Metrics `claude_code.token.usage` + `claude_code.cost.usage` carry
   `session.id` + model + type (input/output/cacheRead). Subagent tokens roll into the session total;
   per-subagent attribution needs traces (`CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`, beta).
+
+**Lead context discipline — the silent bill.** The lead session's conversation history is re-sent as
+input on EVERY turn; a session that spans spec→build→smoke→review→fix without clearing re-pays the
+accumulated spec walk-through, handoffs, and reports on each turn. The pipeline is built so this is
+never necessary: every phase handoff (spec, contract, diff, staged reports) lives on disk, so `/clear`
+at each phase boundary is always safe — each command's closing line recommends it. Corollaries the
+commands enforce: never paste a diff into a dispatch (agents compute their own, scoped); never echo a
+staged report or design brief into chat; redirect bulky command output to a file and grep it.
 
 ## Rendering / reconciling a surface agent (shared procedure)
 
@@ -196,16 +204,18 @@ this exact procedure so a surface is always defined the same way. To add surface
    ones empty unless `uses_design`). For a `uses_design` surface, fill them **link-based** (never with a
    stored `design_project` id — that goes stale on a DS rebuild):
    - `<SURFACE_DESIGN_INPUT>` — a 4th input bullet: _"The **feature design** — the pages this feature
-     touches, listed in the spec front-matter `design_files` as full links
-     (`https://claude.ai/design/p/<projectId>?file=<file>`). For each, extract the `<projectId>` (the
+     touches, listed in your dispatch's design slot as full links
+     (`https://claude.ai/design/p/<projectId>?file=<file>`); a slot saying `none` means a fix loop with
+     no visual work — skip DesignSync entirely. For each link, extract the `<projectId>` (the
      `/p/…` segment) and `<file>` (the `?file=` query) from the URL and read it read-only via `DesignSync
      get_file(<projectId>, <file>)`; `list_files(<projectId>)` to catch linked pages (shared nav/modals)
      this feature also changes. The link is self-contained — no stored project id. Build with the code UI
      kit (the `design_system_project`'s materialization: `@/components/ui/*` + tokens); read a primitive
      via `get_file` only if it's missing/stale in code. Mobile-first."_
-   - `<SURFACE_TDD_STEP1>` — _"**Pull the feature design first:** `DesignSync get_file(<projectId>,
-     <file>)` for each `design_files` link and translate each into the code design system
-     (`@/components/ui/*`, `cn()` + CVA), mobile-first — never ad-hoc CSS. Then:"_
+   - `<SURFACE_TDD_STEP1>` — _"**Pull the feature design first** (skip if your dispatch's design slot
+     says `none`): `DesignSync get_file(<projectId>, <file>)` for each link in the slot and translate
+     each into the code design system (`@/components/ui/*`, `cn()` + CVA), mobile-first — never ad-hoc
+     CSS. Then:"_
 3. **Add a §Conventions + §Testing stanza** for `S` in `PIPELINE.md` (mirror a sibling surface; keep it
    rule-shaped). If `S` is a shared-code surface, its convention is "single owner of shared X; slices
    consume, never redefine."
@@ -274,7 +284,9 @@ writes it when a PR was actually created.
 `#<id>` under its current `## <column>` heading, delete it there, and append it (whole line, tag
 preserved) under the target `## <column>` heading. If no card carries `#<id>` (feature started outside
 the board), create the card in the target column instead of erroring. One card per `#<id>`; if
-duplicates exist, keep the first and drop the rest.
+duplicates exist, keep the first and drop the rest. **Never read the whole board into context** — it
+grows with every feature ever tracked: `grep -n` for `#<id>` and the `## ` headings to locate lines,
+then use offset-limited Reads + targeted Edits around the matches.
 
 **Stage → column**, used both by each pipeline command (to move its card live) and by backfill:
 

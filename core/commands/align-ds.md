@@ -1,4 +1,5 @@
 ---
+model: sonnet
 description: Align the code UI kit to the design system (design → code). Diffs the live design system against the committed snapshot and applies the deltas. No-op if the project has no design system.
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, DesignSync
 ---

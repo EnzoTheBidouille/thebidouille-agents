@@ -1,4 +1,5 @@
 ---
+model: sonnet
 description: Diagnose the pipeline installation — core version, pointer, agents↔surfaces, hooks, gate, retrieval, design, isolation — and print the exact fix for each failure.
 ---
 
@@ -22,7 +23,17 @@ fix only with the human's go-ahead (or hand them the command).
    `surfaces[].agent` has its `.claude/agents/<agent>.md` and every agent file has its `surfaces[]`
    entry — **no orphans either way** (SCHEMA.md rule). Each rendered agent's frontmatter `tools`
    matches its surface's `tools` (incl. `DesignSync` iff `uses_design`, retrieval MCP tools iff
-   `retrieval.provider` ≠ `none`).
+   `retrieval.provider` ≠ `none`). **Model pins:** each rendered agent's frontmatter `model` matches
+   its `surfaces[].model` — ❌ if missing, mismatched, or a literal `<SURFACE_MODEL>` placeholder
+   (all three silently fall back to inheriting the lead session's model — often Opus — on every
+   dispatch); ⚠️ any `inherit` with the note that it bills at the lead's tier. The generic agents
+   (`review.md`, `release.md`, `smoke.md` — repo or `~/.claude/agents/`) must each carry their
+   `model:` line too (sonnet/haiku/sonnet). **Command pins:** every mechanical command file
+   (`build`, `review`, `fix`, `smoke`, `ship`, `audit`, `refactor`, `doctor`, `align-ds`,
+   `update-pipeline` — in `.claude/commands/` or `~/.claude/commands/`) carries `model: sonnet` in
+   its frontmatter — ⚠️ if missing (the lead's orchestration turn then bills at the session model,
+   e.g. Opus/Fable). `brainstorm`, `spec`, and `init-pipeline` are intentionally unpinned
+   (interactive — they inherit the session model).
 3. **Hooks & gate.** `.claude/gate-config.json` exists and mirrors the profile's `gate` block
    (regenerate if drifted). The PreToolUse gate hook is registered **once** for the install mode
    (bundled: repo `settings.json`; global: `~/.claude/settings.json` — flag double registration,

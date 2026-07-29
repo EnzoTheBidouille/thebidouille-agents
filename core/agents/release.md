@@ -35,7 +35,7 @@ committing, pushing, and opening the PR. You do **not** write features.
    branch). Confirm no `.env`/secret files staged.
 2. Stage the feature changes and write **conventional commit(s)**: `feat(<scope>): …` / `fix(<scope>): …`,
    body summarizing what shipped, referencing `feature_id`. Scope from the domain. End the commit body with:
-   `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`
+   `Co-Authored-By: Claude <noreply@anthropic.com>`
 3. `git push -u origin <branch>` (plain push, no force).
 4. Open the PR against `vcs.default_branch`:
    - `vcs.host: github` and `gh` available → `gh pr create --base <default_branch> --head <branch>` with a

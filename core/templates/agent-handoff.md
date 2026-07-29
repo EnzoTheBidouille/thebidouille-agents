@@ -1,29 +1,23 @@
 # HANDOFF — <surface> · `<feature_id>`
 
-Branch: <feature_branch_prefix><feature_id>
-Commit/diff base: <default_branch...HEAD or "uncommitted working tree">
+<!-- Keep it tight: the lead only acts on mismatches, test failures, remediation ticks, and TODOs.
+     Never list files one by one — the lead has `git diff --stat`. -->
 
 ## Summary
 
 <2–4 lines: what you built and the approach>
 
-## Files touched
+## Migrations / schema (only if any)
 
-- `path/to/file` — <what & why>
-
-## Migrations / schema (if any)
-
-- `<name>` — <additive change> · run with <PIPELINE.md commands.migrate>
+- `<name>` — <additive change>
 
 ## Tests
 
-- Added: <test files>
 - Run: <this surface's test_cmd> · result: <pass/fail + counts>
 
-## Contract adherence
+## Contract mismatches / assumptions
 
-- [ ] Implemented exactly to the frozen contract (`<contract.path>/<feature_id>.<ext>`)
-- Mismatches / assumptions: <none, or describe — DO NOT edit the contract; report instead>
+<none, or describe — NEVER edit the contract; report here instead>
 
 ## Remediation addressed (fix loops only)
 
@@ -31,4 +25,4 @@ Commit/diff base: <default_branch...HEAD or "uncommitted working tree">
 
 ## TODO / not done
 
-- <anything deferred, blocked, or out of scope>
+- <anything deferred, blocked, or out of scope — or "none">

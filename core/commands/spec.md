@@ -20,7 +20,9 @@ Detect the mode from the pasted content:
 
 ## Mode A — new spec (input is a brainstorm return, or empty)
 
-1. If empty, ask the human to paste the brainstorm return (or describe the feature) and wait.
+1. If empty, look for a staged brainstorm return first — `specs/reports/*-brainstorm.md` (where
+   `/brainstorm` stages its output); one match ⇒ read it and confirm, several ⇒ ask which. None ⇒
+   ask the human to paste the return (or describe the feature) and wait.
 2. Derive a `feature_id` (kebab-case slug). Confirm it.
 3. Walk the human through each section of `specs/_template.md`, **section by section**, with focused
    questions. The critical one is **§5 API CONTRACT** — pin down every endpoint/interface (method, path,
@@ -28,8 +30,10 @@ Detect the mode from the pasted content:
    and name the exact schema/types that will live in the contract file (`contract.path/<id>.<ext>` in the
    profile's `mechanism`). Don't move on until frontend and backend could each build from it with zero
    further questions. _If `contract.enabled` is false, capture the interface precisely in prose instead._
-4. Fill **§8 Design brief** (only if `design.enabled` / the feature has UI) so it's self-contained for the
-   design step: screens, states, components, responsive notes.
+4. Capture the **design brief** content (only if `design.enabled` / the feature has UI): screens,
+   states, components, responsive notes — it will be authored to `specs/design/<id>.md` in step 6;
+   spec §8 carries only a short summary + the pointer `> full brief: specs/design/<id>.md` (so
+   non-design surfaces never re-read the full brief on every dispatch).
 4b. **New-surface heads-up.** If the feature clearly introduces an area no existing `surfaces[].path`
    owns (a new service/app/top-level module), note it in the spec (a line in the relevant task section:
    `> needs new surface: <proposed key/path>`). Don't render agents here — `/build` §1.5 auto-reconciles
@@ -37,31 +41,34 @@ Detect the mode from the pasted content:
 5. When the human validates, **freeze**: write `specs/<id>.md` (`status: frozen`, front-matter filled).
    Create the file — do not ask the human to. **Postcondition:** `grep -q '^status: frozen' specs/<id>.md`
    — if it fails the freeze didn't land; fix it before pointing the human at `/build`.
-6. Emit the **spec return** — the §8 design brief rendered via `.claude/templates/design-brief.md`.
+6. Author the **design brief** — `specs/design/<id>.md`, rendered via
+   `.claude/templates/design-brief.md` (resolves to `~/.claude/templates/…` on a global install).
    _Only if `design.enabled` / the feature has UI; skip entirely for a backend-only feature._
-   - **Write it to `specs/design/<id>.md`** (a standalone `.md`, versioned with the spec). Create the
-     file — do not ask the human to. Keep it in the `specs/design/` subfolder, **not** `specs/<id>....md`:
-     the `specs/*.md` glob that drives the kanban backfill and `/doctor` is non-recursive, so a brief in
-     the subfolder never gets mistaken for a spec (no phantom card, no bogus stage). This is a derived
-     artifact that mirrors §8 — overwrite it on every freeze so it never drifts from the spec.
-   - Then print the same content in a copy-paste block and tell the human: paste it into the design tool
-     (if any — typically a fresh design project for this feature) or just open `specs/design/<id>.md`,
-     then run `/build <id>` and hand its design gate the resulting page link(s) — a full
-     `https://claude.ai/design/p/<projectId>?file=<file>` link carries its own project + page, no profile
-     change needed. (They can also paste the links into the spec's `design_files`
-     themselves.) _The frozen spec + `specs/design/<id>.md` are the whole handoff — `/clear` before
-     `/build` is safe._
+   - **Write it to `specs/design/<id>.md`** (the authored artifact, versioned with the spec; spec §8
+     holds the summary + pointer). Create the file — do not ask the human to. Keep it in the
+     `specs/design/` subfolder, **not** `specs/<id>....md`: the `specs/*.md` glob that drives the
+     kanban backfill and `/doctor` is non-recursive, so a brief in the subfolder never gets mistaken
+     for a spec (no phantom card, no bogus stage). Overwrite it on every freeze.
+   - Print ONLY the path + a one-line summary — never echo the brief into chat (it would sit in this
+     session's history; echo it only if the human asks). Tell the human: copy it from
+     `specs/design/<id>.md` into the design tool (if any — typically a fresh design project for this
+     feature), then run `/build <id>` and hand its design gate the resulting page link(s) — a full
+     `https://claude.ai/design/p/<projectId>?file=<file>` link carries its own project + page, no
+     profile change needed. (They can also paste the links into the spec's `design_files` themselves.)
+     **Recommend a `/clear` before `/build`** — the frozen spec + `specs/design/<id>.md` are the whole
+     handoff.
 
 ## Mode B — review return (input is a REVIEW REPORT)
 
-1. Read the report — pasted as input, or (if the context was cleared) read from `specs/reports/<id>.md`,
-   where `/review` stages its last report. Identify `feature_id` from its header; open `specs/<id>.md`.
+1. Read the report — pasted as input, or (whenever nothing is pasted) read from
+   `specs/reports/<id>.md`, where `/review` stages its last report. Identify `feature_id` from its
+   header; open `specs/<id>.md`.
 2. Append each finding to the spec's **`## Remediation`**, one per line:
    `- [ ] <severity> · <file:line> · <spec-violation|quality|security> · <concrete fix>`
    (Keep prior items; add the new round under a dated/numbered subheading.)
 3. If a finding implies the **contract** must change, update §5 and flag it so the lead re-authors the
    contract file.
 4. Set `status: in-review`. Tell the human to run `/build <id>` to re-dispatch fresh agents.
-   _The spec is the whole handoff — `/clear` before `/build` is safe._
+   **Recommend a `/clear` before `/build`** — the spec is the whole handoff.
 
 In both modes the spec is the single source of truth; agents are stateless and read only it + the diff.

@@ -4,8 +4,9 @@ argument-hint: [one-line idea (optional)]
 ---
 
 You are facilitating an **interactive brainstorm** for a new feature. This runs in the main thread — a
-back-and-forth with the human, NOT a one-shot. Do not write any files — the ONE exception is moving this
-feature's kanban card at Finish, when a board is configured.
+back-and-forth with the human, NOT a one-shot. Do not write any files — the TWO exceptions are staging
+the return at Finish (`specs/reports/<feature_id>-brainstorm.md`) and moving this feature's kanban card
+at Finish, when a board is configured.
 
 > Read `PIPELINE.md` §Personas (the panel) and §`rbac` first. If `rbac.enabled`, the panel must
 > pressure-test the idea so it serves **every** role, not just admins.
@@ -39,8 +40,10 @@ screens, risks, and what's explicitly out.
 ## Finish
 
 When the human is satisfied, produce the **brainstorm return** by filling
-`.claude/templates/brainstorm-return.md` and printing it in a copy-paste block. Tell them to paste it
-into `/spec`.
+`.claude/templates/brainstorm-return.md` and **staging it to
+`specs/reports/<feature_id>-brainstorm.md`** (the gitignored buffer dir — `/spec` reads it from there
+when invoked with no paste). In chat print only a 3-line summary + the path. Tell them to run `/spec`
+— **recommend a `/clear` first**, the return is staged on disk (pasting it remains a fallback).
 
 **Kanban:** settle the `feature_id` (kebab-case slug) the return carries — it is the card's join key
 downstream. If a board is configured, **move** the card into the **Brainstorm** column tagged

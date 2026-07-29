@@ -179,7 +179,8 @@ try {
     function Copy-FixedAgents {
         New-Item -ItemType Directory -Force -Path (Join-Path $dest 'agents') | Out-Null
         Copy-Item (Join-Path $src 'core\agents\review.md'),
-                  (Join-Path $src 'core\agents\release.md') (Join-Path $dest 'agents') -Force
+                  (Join-Path $src 'core\agents\release.md'),
+                  (Join-Path $src 'core\agents\smoke.md') (Join-Path $dest 'agents') -Force
         # 0.1.19 split the bi-mode questionnaire-researcher into research-agent + questionnaire-architect;
         # copy-over never deletes, so scrub the retired agent lest a dead subagent_type linger.
         Remove-Item -LiteralPath (Join-Path $dest 'agents\questionnaire-researcher.md') -Force -ErrorAction SilentlyContinue
