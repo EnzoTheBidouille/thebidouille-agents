@@ -1,6 +1,6 @@
 {
   "name": "cohorte",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Portable, stack-agnostic multi-agent development pipeline for Claude Code — install the core, run /init-pipeline, and it adapts to your project's stack.",
   "bin": {
     "cohorte": "bin/cli.js"
@@ -16,6 +16,7 @@
     "dashboard/server",
     "dashboard/dist",
     "dashboard/README.md",
+    "telemetry",
     "install.sh",
     "install.ps1",
     "CHANGELOG.md"

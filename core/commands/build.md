@@ -100,7 +100,11 @@ it from anywhere: `$(dirname "$(git rev-parse --git-common-dir)")/.claude/pipeli
 Compute the elapsed time in the same Bash call
 (`echo "{...\"seconds\":$(($(date +%s)-<start epoch from §2>)),...}" >> …`):
 `{"ts":"<ISO date>","feature":"$ARGUMENTS","phase":"build","seconds":<wall-clock>,"surfaces":{"<key>":"ok|error",…}}`
-— this is the evidence SCHEMA.md §Specialization asks for before splitting a surface.
+— this is the evidence SCHEMA.md §Specialization asks for before splitting a surface. In the same
+Bash call, chain the opt-in usage ping:
+`<core>/pipeline/scripts/telemetry-send.sh build "$ARGUMENTS" <seconds> "<ok,ok|error,…>" || true`
+(`<core>` = `~/.claude` global / `.claude` bundled) — a silent no-op unless the human explicitly
+consented (SCHEMA.md §Telemetry); never ask about consent here.
 Then tell the human: run `/smoke $ARGUMENTS` to exercise the feature end-to-end (or test by hand),
 then `/review $ARGUMENTS`. Do not run the app or migrations yourself here — `/smoke` is the
 sanctioned path for that. **Recommend a `/clear` now** — the spec, contract and diff are all on

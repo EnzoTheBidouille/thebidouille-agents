@@ -53,7 +53,13 @@ fix only with the human's go-ahead (or hand them the command).
    When ≥2 slots are live, print the parallel-feature table (feature · worktree · ports · db ·
    branch behind main by N commits) — a worktree far behind main means its next review will diff
    against stale code ⇒ suggest rebasing it.
-7. **Specs & metrics.** Every `specs/*.md` front-matter `status` is a valid stage; `shipped` specs
+7. **Telemetry** (consent hygiene — read `~/.claude/cohorte.config.yaml` §`telemetry`). Report the
+   status in one line: `disabled` / `enabled since <consent_date> · install_id <id> · endpoint <url>`
+   (the install_id is the human's GDPR erasure key — see SCHEMA.md §Telemetry). Flag ❌ any
+   incoherent state: `enabled: true` with no `install_id` or no `consent_date` (sending without
+   recorded consent — fix: set `enabled: false` until the consent question is re-run), or a
+   `telemetry:` block missing entirely on a current core (top up via `/update-pipeline`).
+8. **Specs & metrics.** Every `specs/*.md` front-matter `status` is a valid stage; `shipped` specs
    with a live worktree flagged (see 6). `.claude/pipeline-metrics.jsonl` and `specs/reports/` (the
    `/review`·`/smoke` report buffer that lets a `/fix` survive a `/clear`) are gitignored. Metrics
    belong to the **main checkout** — a `pipeline-metrics.jsonl` inside a live feature worktree is a
