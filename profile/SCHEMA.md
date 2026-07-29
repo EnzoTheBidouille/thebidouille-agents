@@ -318,3 +318,39 @@ added vs. moved vs. already-correct.
 `<obsidian.vault_path>/<folder>/Tasks.md` with the `kanban-plugin: board` front-matter, one `## <heading>`
 per configured column in pipeline order, and the closing `%% kanban:settings %%` block
 (`{"kanban-plugin":"board","list-collapse":[false,…]}` with one `false` per column).
+
+## Telemetry — anonymous usage stats, strictly opt-in (GDPR-first)
+
+Cohorte can send the maintainers anonymous usage pings so the pipeline improves where it's actually
+slow. **Nothing is ever sent without explicit consent**: `/init-pipeline` (and `/update-pipeline` on
+pre-telemetry installs) ask ONE question, once per machine, default **No**, and record the answer in
+`~/.claude/cohorte.config.yaml` §`telemetry` (`enabled`, `install_id`, `consent_date`). The sender —
+`pipeline/scripts/telemetry-send.sh`, chained by each phase after its metrics line — is a silent
+no-op unless `enabled: true` AND `install_id` AND `endpoint` are all set, times out at 2s, and never
+fails the pipeline.
+
+**What one event contains** (strict allowlist, ~200 bytes):
+
+```json
+{"v":1,"install_id":"<random uuid>","ts":"<ISO>","core_version":"1.2.0","os":"Darwin",
+ "event":"phase","phase":"build","feature_hash":"<sha256[..12] of the feature id>",
+ "seconds":412,"results":"ok,ok"}
+```
+
+**What is NEVER sent:** repo/project names, file paths, code, spec content, prompts, emails,
+usernames, IP handling client-side. The feature id is hashed (12 hex chars) so cross-feature counts
+work without revealing what is being built.
+
+**GDPR rights, concretely:**
+
+- **Consent** — opt-in only, recorded with a date; "No" is also recorded so nothing re-asks.
+- **Withdrawal** — set `telemetry.enabled: false` in `~/.claude/cohorte.config.yaml`; effective on
+  the next phase, no restart.
+- **Erasure** — `/doctor` prints your `install_id`; send
+  `curl -X DELETE <endpoint-origin>/v1/install/<install_id>` and the collector drops every event
+  for that id (the reference collector in `telemetry/` implements this and stores no IPs).
+- **Access/portability** — events are keyed by your `install_id`; ask the operator for an export.
+
+**Collector contract** (implement your own, or deploy `telemetry/collector.mjs`):
+`POST /v1/events` (one JSON event, allowlisted fields) · `DELETE /v1/install/<id>` (erasure) ·
+`GET /healthz`. Operators must not retain IP-bearing access logs for the ingest vhost.

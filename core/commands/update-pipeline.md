@@ -75,7 +75,10 @@ Two of the §Reconcile steps matter specifically here:
 
 - **Global config seed** (§Reconcile step 5): if `~/.claude/cohorte.config.yaml` is absent, seed it
   from the template so the kanban + shared-vault config has a home. Never clobber an existing filled
-  file. Report what was seeded.
+  file. Report what was seeded. If the existing file has NO `telemetry:` block with a `consent_date`
+  (pre-telemetry install), top up the block from the template and ask the ONE opt-in consent
+  question defined in `templates/steps/init-pipeline/02-interview-gaps.md` §Telemetry — record the
+  answer either way so it is never re-asked. Consent is strictly opt-in; "No" is the default.
 - **Kanban sync** (§Reconcile step 6): resolve this project's board from `kanban.boards[<PIPELINE
   name>]`. **Not linked** → offer to link/create a board (confirm the vault + `<folder>/Tasks.md`,
   write the `boards` entry, create the board file per §Kanban). **Linked** → verify the board file

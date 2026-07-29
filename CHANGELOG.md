@@ -3,6 +3,26 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 1.2.0 — 2026-07-29
+
+> **Opt-in anonymous telemetry, GDPR-first.** Nothing is sent unless you explicitly say yes.
+
+- `/init-pipeline` (and `/update-pipeline` on existing installs) ask ONE consent question, once per
+  machine, default **No** — both answers are recorded in `~/.claude/cohorte.config.yaml` §`telemetry`
+  so you're never re-asked.
+- When enabled, each pipeline phase fires a ~200-byte ping (fire-and-forget, 2s timeout, never
+  blocks): core version, OS, phase, duration, per-surface result counts, and a **hash** of the
+  feature id. Never sent: repo names, paths, code, spec content, IPs.
+- Withdraw anytime (`telemetry.enabled: false`); erase your history anytime (`/doctor` prints your
+  `install_id`; `DELETE /v1/install/<id>` on the collector drops it). Full spec: SCHEMA.md
+  §Telemetry; privacy summary in the README.
+- Ships a zero-dependency reference collector (`telemetry/collector.mjs` — NDJSON storage, strict
+  field allowlist, erasure endpoint, stores no IPs) to self-host.
+- `/doctor` reports telemetry consent state and flags incoherent configs (enabled without a
+  recorded consent).
+- Note: the shipped default `endpoint` is empty — telemetry stays dormant even for consenting
+  installs until a collector URL ships in the config template.
+
 ## 1.1.1 — 2026-07-29
 
 - **Fix: pipeline metrics survive worktree teardown.** With `isolation.enabled` the lead session

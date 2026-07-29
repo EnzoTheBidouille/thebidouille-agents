@@ -269,6 +269,16 @@ Rules that make it safe:
   their eventual reviews diff against reality.
 - `/doctor` check 6 shows the live slot table (feature ↔ worktree ↔ ports) when you lose track.
 
+## Privacy — opt-in telemetry
+
+Cohorte can send **anonymous** usage pings (core version, OS, phase name, duration, per-surface
+result counts, and a *hash* of the feature id — never repo names, paths, code, or IPs). It is
+**strictly opt-in**: `/init-pipeline` asks once per machine, the default is No, and both answers are
+recorded so you're never re-asked. Withdraw anytime (`telemetry.enabled: false` in
+`~/.claude/cohorte.config.yaml`); erase your history anytime (`/doctor` prints your `install_id`,
+the collector's `DELETE /v1/install/<id>` drops it). Full spec + GDPR details:
+`profile/SCHEMA.md` §Telemetry; reference collector in `telemetry/`.
+
 ## License
 
 [AGPL-3.0](LICENSE). Free to use, including commercially — but if you modify it and distribute it
