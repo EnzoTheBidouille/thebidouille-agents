@@ -3,6 +3,14 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 1.2.6 — 2026-07-30
+
+- **`npx cohorte install` never installed the `smoke` agent.** It copied only `review.md` and
+  `release.md`, so `/smoke` was there but the agent it dispatches was not — the run failed
+  saying `/smoke` is not installed. The shell installers always copied it; only the npm port
+  drifted. It now copies every non-template agent in `core/agents/`, so nothing to keep in sync.
+  Fix an affected install by re-running `npx cohorte install --global` (or `install --repo`).
+
 ## 1.2.5 — 2026-07-29
 
 - **`.claude/pipeline.json`'s `core_version` never updated on global installs.** The installer

@@ -58,6 +58,14 @@ jobs:
           CLAUDE_CONFIG_DIR="$scratch/.claude" node bin/cli.js install --global
           test -f "$scratch/.claude/pipeline/VERSION"
           test -f "$scratch/.claude/commands/build.md"
+          # The command is useless without the agent it dispatches: until 1.2.6 this
+          # port copied a hardcoded review+release and shipped /smoke with no `smoke`
+          # agent. The shell dry-run above asserted it; this one didn't, so CI stayed
+          # green. Assert every non-template agent here too.
+          test -f "$scratch/.claude/agents/smoke.md"
+          test -f "$scratch/.claude/agents/review.md"
+          test -f "$scratch/.claude/agents/release.md"
+          test ! -e "$scratch/.claude/agents/implementer.template.md"
           test -x "$scratch/.claude/pipeline/scripts/telemetry-send.sh"
           test -x "$scratch/.claude/pipeline/scripts/kanban-move.sh"
           test -f "$scratch/.claude/pipeline/CHANGELOG.md"
