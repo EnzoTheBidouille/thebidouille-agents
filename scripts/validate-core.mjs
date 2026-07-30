@@ -23,7 +23,7 @@ const frontmatter = (text) => {
 // orchestration turn silently bills at the session model — Opus/Fable).
 // Interactive commands must stay unpinned (they inherit on purpose).
 const PINNED = ["build", "review", "fix", "smoke", "ship", "audit",
-  "refactor", "doctor", "align-ds", "update-pipeline"];
+  "refactor", "doctor", "align-ds", "update-pipeline", "cycle"];
 const UNPINNED = ["brainstorm", "spec", "init-pipeline"];
 
 for (const f of readdirSync(join(root, "core/commands"))) {

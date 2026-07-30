@@ -37,7 +37,7 @@ fix only with the human's go-ahead (or hand them the command).
    (`review.md`, `release.md`, `smoke.md`, `profile-reader.md` — repo or `~/.claude/agents/`) must
    each carry their `model:` line too (sonnet/haiku/sonnet/haiku). **Command pins:** every mechanical command file
    (`build`, `review`, `fix`, `smoke`, `ship`, `audit`, `refactor`, `doctor`, `align-ds`,
-   `update-pipeline` — in `.claude/commands/` or `~/.claude/commands/`) carries `model: sonnet` in
+   `update-pipeline`, `cycle` — in `.claude/commands/` or `~/.claude/commands/`) carries `model: sonnet` in
    its frontmatter — ⚠️ if missing (the lead's orchestration turn then bills at the session model,
    e.g. Opus/Fable). `brainstorm`, `spec`, and `init-pipeline` are intentionally unpinned
    (interactive — they inherit the session model).

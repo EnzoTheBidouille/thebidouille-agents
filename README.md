@@ -214,6 +214,7 @@ it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.
 | `/brainstorm`        | Interactive persona panel that pressure-tests a feature idea.                         |
 | `/spec`              | Freeze the feature spec + contract into `specs/<id>.md` (UI features also get a standalone design brief at `specs/design/<id>.md`). Also applies review returns. |
 | `/build <id>`        | Lead authors the contract, then dispatches one implementer per surface in parallel.   |
+| `/cycle <id>`        | Launch the full dev-cycle **workflow** on a frozen spec: build → smoke ∥ review → fix until zero findings; deferred questions in the output. Needs workflows enabled (falls back to the conversational path). |
 | `/smoke <id>`        | Run the feature for real: infra up, contract endpoints, UI flows, design conformance. |
 | `/review <id>`       | Read-only review agents (one per touched surface, parallel) audit the diff vs the spec. |
 | `/fix <id>`          | Apply a review/smoke report: remediation into the spec, re-dispatch only the surfaces with findings. |
