@@ -1,6 +1,6 @@
-# What is cohorte?
+# What is Cohorte?
 
-**cohorte** is a portable, stack-agnostic **multi-agent development pipeline for Claude Code**. You
+**Cohorte** is a portable, stack-agnostic **multi-agent development pipeline for Claude Code**. You
 install a generic core once (globally in `~/.claude`, or bundled per repo in `<project>/.claude`),
 run `/init-pipeline` inside a project, and the pipeline adapts itself to that project: its stack,
 its surfaces, its commands, its conventions, its guardrails.
@@ -80,10 +80,10 @@ same gate — a different orchestration engine. Workflows are opt-in and can't a
 mid-run; their design moves every human decision to the edges. See
 [Workflows](/guide/workflows).
 
-## What cohorte is *not*
+## What Cohorte is *not*
 
 - Not a framework you code against — it's markdown, shell, and one Python hook dropped into
-  `.claude/`. Your app code never imports anything from cohorte.
+  `.claude/`. Your app code never imports anything from Cohorte.
 - Not tied to a stack. Node/pnpm monorepo, Python, Go, Rust — the profile captures *your*
   commands and conventions; the core never assumes.
 - Not a replacement for judgment. Brainstorm, spec freeze, and ship confirmation are deliberately

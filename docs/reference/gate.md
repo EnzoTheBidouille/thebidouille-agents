@@ -1,7 +1,7 @@
 # Gate & permissions
 
 Autonomous agents running Bash need guardrails that don't depend on the model's good behavior.
-cohorte layers three mechanisms, all generated from the profile.
+Cohorte layers three mechanisms, all generated from the profile.
 
 ## `hooks/gate.py` — the PreToolUse gate
 

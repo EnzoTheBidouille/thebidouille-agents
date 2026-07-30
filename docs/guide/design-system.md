@@ -7,7 +7,7 @@ design step in the pipeline is a silent no-op — backend-only projects never pa
 
 The design system (Claude Design or Figma, per `design.provider`) is the **source of truth**; the
 code UI kit (`design.ui_kit_path`, e.g. `apps/web/src/components/ui`, plus
-`design.tokens_path`) is its materialization. cohorte never pushes code → design for a curated
+`design.tokens_path`) is its materialization. Cohorte never pushes code → design for a curated
 DS — that would overwrite it.
 
 Two granularities:

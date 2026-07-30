@@ -2,18 +2,18 @@
 layout: home
 
 hero:
-  name: cohorte
+  name: Cohorte
   text: Multi-agent dev pipeline for Claude Code
   tagline: Install the core, run /init-pipeline, and a portable, stack-agnostic team of agents adapts to your project — spec-driven, TDD-first, token-frugal.
   image:
-    src: /cohorte-mark.svg
-    alt: cohorte
+    src: /cohorte-avatar-512.png
+    alt: Cohorte
   actions:
     - theme: brand
       text: Get started
       link: /guide/getting-started
     - theme: alt
-      text: What is cohorte?
+      text: What is Cohorte?
       link: /guide/what-is-cohorte
     - theme: alt
       text: GitHub
