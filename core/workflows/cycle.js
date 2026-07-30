@@ -184,7 +184,9 @@ const buildPrompt = s =>
   'your surface): none'
 const handoffs = await parallel(surfaces.map(s => () =>
   agent(buildPrompt(s), { agentType: s.agent, label: `build:${s.key}`, phase: 'Build' })
-    .then(h => ({ key: s.key, handoff: h }))))
+    // agent() resolves to null (never throws) when a subagent dies — wrapping
+    // unconditionally would hide every death from the `dead` check below.
+    .then(h => (h == null ? null : { key: s.key, handoff: h }))))
 const built = handoffs.filter(Boolean)
 const dead = surfaces.filter(s => !built.some(b => b.key === s.key)).map(s => s.key)
 if (dead.length) questions.push(`implementer(s) died during build: ${dead.join(', ')} — inspect and re-run /build if their surface matters`)
@@ -207,8 +209,10 @@ const runPreflight = () => agent(
 
 let verdict = null
 let smokePass = false
+let smokeFails = []      // last round's smoke failures — Close reports the real count
 let open = []            // findings still open, each {severity,file,line,kind,problem,fix,src}
 let rounds = 0
+let preflightRed = false // did the LAST round end on a red preflight (open/verdict then stale)?
 
 // ── Phases 4/5 — bounded verify → fix rounds ────────────────────────────────
 while (rounds < MAX_ROUNDS && (!budget.total || budget.remaining() > 30000)) {
@@ -218,7 +222,8 @@ while (rounds < MAX_ROUNDS && (!budget.total || budget.remaining() > 30000)) {
 
   // 4a. preflight — mechanical red short-circuits straight to a fix round
   const pre = await runPreflight()
-  if (!pre || !pre.pass) {
+  preflightRed = !pre || !pre.pass
+  if (preflightRed) {
     const tail = (pre && pre.tail) || ''
     const hit = new Set(surfaces.filter(s => tail.includes(String(s.path))).map(s => s.key))
     const targets = hit.size ? [...hit] : built.map(b => b.key)
@@ -281,13 +286,15 @@ while (rounds < MAX_ROUNDS && (!budget.total || budget.remaining() > 30000)) {
   ])
 
   smokePass = !!(smoke && smoke.pass)
-  const smokeFails = (smoke && smoke.failures) || []
+  smokeFails = (smoke && smoke.failures) || []
   open = (reviewed || []).filter(Boolean).flatMap(r => r.kept.map(f => ({ ...f, src: r.key })))
   verdict = open.some(f => f.kind === 'security') ? 'BLOCK'
-    : open.some(f => f.severity === 'CRITICAL') ? 'REVISE' : 'SHIP'
+    : open.length ? 'REVISE' : 'SHIP'
   log(`Round ${rounds}: review ${verdict} (${open.length} finding(s)) · smoke ${smokePass ? 'PASS' : `FAIL:${smokeFails.length}`}`)
 
-  if (verdict === 'SHIP' && smokePass) break
+  // The loop's contract is ZERO open findings + PASS — a SHIP verdict alone
+  // (which older revisions granted despite HIGH/MEDIUM leftovers) is not enough.
+  if (!open.length && smokePass) break
   if (rounds >= MAX_ROUNDS) break
 
   // 5. fix round. Contract-impacting findings stay INSIDE the loop: a
@@ -343,6 +350,9 @@ while (rounds < MAX_ROUNDS && (!budget.total || budget.remaining() > 30000)) {
     { agentType: byKey[k].agent, label: `fix:${k}`, phase: 'Fix' })))
 }
 
+if (preflightRed) {
+  questions.push('the last round ended on a RED preflight — the reported verdict/findings are from the previous round and may already be fixed; rerun /review after the mechanical fixes land')
+}
 if (rounds >= MAX_ROUNDS && !(verdict === 'SHIP' && smokePass)) {
   questions.push(`round cap (${MAX_ROUNDS}) reached with ${open.length} finding(s) open — rerun the cycle (maxRounds higher) or continue with /fix ${feature} + /review`)
 }
@@ -376,7 +386,7 @@ await agent(
   `{"ts":"<ISO now>","feature":"${feature}","phase":"cycle","seconds":0,"surfaces":{"rounds":"${rounds}","verdict":"${verdict || 'none'}:${open.length}","smoke":"${smokePass ? 'PASS' : 'FAIL'}"}}\n` +
   '5. Chain the opt-in usage pings (all funnel phases this run executed, 0 seconds each): ' +
   `<core>/pipeline/scripts/telemetry-send.sh build "${feature}" 0 "${built.map(() => 'ok').join(',') || 'error'}" || true; ` +
-  `<core>/pipeline/scripts/telemetry-send.sh smoke "${feature}" 0 "${smokePass ? 'PASS' : 'FAIL:' + open.filter(f => f.kind === 'runtime').length}" || true; ` +
+  `<core>/pipeline/scripts/telemetry-send.sh smoke "${feature}" 0 "${smokePass ? 'PASS' : 'FAIL:' + smokeFails.length}" || true; ` +
   `<core>/pipeline/scripts/telemetry-send.sh review "${feature}" 0 "${verdict || 'none'}:${open.length}" || true\n` +
   'Return the single word: done.',
   { model: 'haiku', label: 'close', effort: 'low' },

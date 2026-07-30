@@ -3,6 +3,35 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 1.3.3 — 2026-07-30
+
+> **Re-run `npx cohorte@latest update --global` (or `update`)** — the gate fixes only apply once
+> the installed `hooks/gate.py` is refreshed.
+
+- **The cycle workflow could exit SHIP-READY with open findings.** A round with only HIGH/MEDIUM
+  findings scored `SHIP`, broke the loop, ticked the DoD and stamped the freshness gate — making
+  `/ship` a straight shot over unfixed findings, against the workflow's own "zero open findings"
+  contract. The exit condition is now literally zero open findings + a smoke PASS.
+- **Dead implementers went undetected in the cycle workflow.** `agent()` returns `null` when a
+  subagent dies, but the build fan-out wrapped every result in a truthy object before the check —
+  so the "implementer(s) died" question never fired and build telemetry always said `ok`.
+- **`gate.py` gated worktree commands as if they ran on the default branch.** Branch and HEAD were
+  resolved in `CLAUDE_PROJECT_DIR` (the main checkout, usually on `main`) instead of where the
+  command actually runs — so in a feature worktree, every `ask_on_default_branch` pattern
+  prompted, and the preflight HEAD-moved check compared against the wrong checkout. Git state now
+  resolves at the hook payload's `cwd`.
+- **The preflight phase gate hung headless runs.** The bypassPermissions "nobody can answer an
+  ask ⇒ deny" escalation only covered Bash patterns; a review/smoke Task dispatch with a stale
+  stamp still emitted an unanswerable `ask`. The phase gate now escalates the same way.
+- **`/init-pipeline` bundled installs registered the gate with the dead `Bash`-only matcher** —
+  the exact bug 1.3.2 fixed in the installers lived on in the template — and never dropped an
+  existing registration, so a bundled repo later switched to global ran the gate twice per
+  command. The template now mandates `Bash|Task` and a reconcile.
+- Smaller cycle-workflow fixes: smoke telemetry reports the real failure count (was always 0 —
+  it filtered on a `kind` value that doesn't exist); a run whose last round ends on a red
+  preflight now flags that the reported findings are from the previous round; a malformed
+  preflight stamp says "unreadable" instead of "not found".
+
 ## 1.3.2 — 2026-07-30
 
 > **Re-run `npx cohorte@latest update --global` (or `update`).** This release repairs the gate
