@@ -48,9 +48,12 @@ SPLIT = re.compile(r"&&|\|\||[;|\n]")
 WS = re.compile(r"\s+")
 
 
+def project_root() -> str:
+    return os.environ.get("CLAUDE_PROJECT_DIR", ".")
+
+
 def load_config() -> dict:
-    root = os.environ.get("CLAUDE_PROJECT_DIR", ".")
-    path = os.path.join(root, ".claude", "gate-config.json")
+    path = os.path.join(project_root(), ".claude", "gate-config.json")
     empty = {"deny": [], "ask": [], "ask_on_default_branch": [], "default_branch": "main",
              "preflight": {}}
     try:
@@ -76,13 +79,19 @@ def norm(s: str) -> str:
     return WS.sub(" ", s.strip())
 
 
-def current_branch():
-    """The checked-out branch of CLAUDE_PROJECT_DIR, or None (not a repo / detached / git absent)."""
-    root = os.environ.get("CLAUDE_PROJECT_DIR", ".")
+def session_cwd(payload: dict) -> str:
+    """Where the gated command actually runs. A feature worktree is its own
+    checkout — resolving git state in CLAUDE_PROJECT_DIR (the main checkout)
+    would gate every worktree command as if it ran on the default branch."""
+    return payload.get("cwd") or project_root()
+
+
+def current_branch(cwd: str):
+    """The checked-out branch at `cwd`, or None (not a repo / detached / git absent)."""
     try:
         out = subprocess.run(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            cwd=root, capture_output=True, text=True, timeout=3,
+            cwd=cwd, capture_output=True, text=True, timeout=3,
         )
         if out.returncode == 0:
             return out.stdout.strip() or None
@@ -91,13 +100,12 @@ def current_branch():
     return None
 
 
-def current_head():
-    """HEAD sha of CLAUDE_PROJECT_DIR, or None."""
-    root = os.environ.get("CLAUDE_PROJECT_DIR", ".")
+def current_head(cwd: str):
+    """HEAD sha at `cwd`, or None."""
     try:
         out = subprocess.run(
             ["git", "rev-parse", "HEAD"],
-            cwd=root, capture_output=True, text=True, timeout=3,
+            cwd=cwd, capture_output=True, text=True, timeout=3,
         )
         if out.returncode == 0:
             return out.stdout.strip() or None
@@ -116,29 +124,37 @@ def check_preflight(payload: dict, cfg: dict) -> int:
     if subagent not in agents:
         return 0
 
-    root = os.environ.get("CLAUDE_PROJECT_DIR", ".")
-    stamp = os.path.join(root, ".claude", "preflight.ok")
+    stamp = os.path.join(project_root(), ".claude", "preflight.ok")
     why = None
     try:
         with open(stamp, "r", encoding="utf-8") as fh:
-            epoch_s, _, sha = fh.read().strip().partition(" ")
-        age_min = (time.time() - float(epoch_s)) / 60
-        max_age = float(pf.get("max_age_minutes", 30) or 30)
-        if age_min > max_age:
-            why = f"the preflight stamp is {age_min:.0f} min old (max {max_age:.0f})"
-        else:
-            head = current_head()
-            if head and sha not in ("", "none") and head != sha:
-                why = "HEAD moved since the preflight ran"
+            raw = fh.read().strip()
     except Exception:
+        raw = None
         why = "no preflight stamp found"
+    if raw is not None:
+        try:
+            epoch_s, _, sha = raw.partition(" ")
+            age_min = (time.time() - float(epoch_s)) / 60
+            max_age = float(pf.get("max_age_minutes", 30) or 30)
+            if age_min > max_age:
+                why = f"the preflight stamp is {age_min:.0f} min old (max {max_age:.0f})"
+            else:
+                head = current_head(session_cwd(payload))
+                if head and sha not in ("", "none") and head != sha:
+                    why = "HEAD moved since the preflight ran"
+        except Exception:
+            why = "the preflight stamp is unreadable (expected `<epoch> <sha>`)"
     if why is None:
         return 0
+    # Same rule as the Bash gate: unattended runs have nobody to answer an "ask".
+    unattended = payload.get("permission_mode") == "bypassPermissions"
     return decide(
-        "ask",
+        "deny" if unattended else "ask",
         f"Phase gate: dispatching `{subagent}` but {why}. Run the deterministic pre-flight first "
         f"(pipeline/scripts/preflight.sh — typecheck + lint + tests) so agents never review red code; "
-        f"or confirm to dispatch anyway (PIPELINE.md gate.preflight).",
+        f"or confirm to dispatch anyway (PIPELINE.md gate.preflight)."
+        + (" (denied outright: unattended run, nobody to confirm)" if unattended else ""),
     )
 
 
@@ -173,7 +189,7 @@ def main() -> int:
     # be conservative and gate. Resolve the branch once, lazily.
     on_default = False
     if branch_gated:
-        branch = current_branch()
+        branch = current_branch(session_cwd(payload))
         on_default = branch is None or branch == default
 
     for raw in SPLIT.split(command):

@@ -30,8 +30,12 @@
    retrieval provider's MCP tools when wired (e.g. `mcp__serena`). Never allowlist anything matching
    a `gate.ask`/`gate.deny` pattern. Mention the human can widen it later with
    `/fewer-permission-prompts`) + the hooks, **conditioned on the install mode:**
-   - **bundled:** register the PreToolUse `Bash` hook `.claude/hooks/gate.py` and the PostToolUse
-     formatter (detected formatter).
+   - **bundled:** register the PreToolUse hook `.claude/hooks/gate.py` with matcher `Bash|Task`
+     (Task is required — the preflight phase gate keys off Task dispatches; a `Bash`-only matcher
+     leaves it dead) and the PostToolUse formatter (detected formatter). Before adding, drop any
+     existing PreToolUse entry whose command ends in `gate.py` (here AND in `~/.claude/settings.json`
+     if one points at this repo's copy) — exactly one registration must survive, or every gated
+     command prompts twice.
    - **global:** the PreToolUse gate hook is
      already in `~/.claude/settings.json` and reads this repo's `gate-config.json` — do **not** re-register
      it here (double-registration double-prompts). It no-ops where its config is absent, so one
