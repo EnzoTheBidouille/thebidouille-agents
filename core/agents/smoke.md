@@ -57,5 +57,7 @@ assert on the pieces you need.
 - **Write the full report to `specs/reports/<id>.md`** (overwrite) — the same gitignored buffer
   `/review` uses, so a `/fix` after a `/clear` still has the failures.
 - Tear down what you started (kill the dev server); leave shared infra as you found it.
-- **Your return to the lead is ONLY:** the verdict line (`PASS` / `FAIL`), the ❌ lines verbatim (if
-  any), and `Full report: specs/reports/<id>.md`. No logs, no bodies, no screenshots.
+- **Your return to the lead is ONLY:** the verdict line (`PASS` / `FAIL:<n>`), **at most 10 ❌
+  lines** — one line each (`❌ <flow/endpoint> · expected <x> got <y>`), no command output, no code
+  or body excerpts; more than 10 ⇒ keep the 10 most severe and add `+<n> more — see the report` —
+  and `Full report: specs/reports/<id>.md`. No logs, no bodies, no screenshots.

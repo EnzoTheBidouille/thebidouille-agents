@@ -28,6 +28,20 @@ const UPDATE_WARNING = (
   </div>
 );
 
+const AUDIT_WARNING = (
+  <div>
+    <p><strong>Runs Claude Code headless</strong> (<code>claude -p "/audit"</code>) in this project,
+      autonomously (no permission prompts). It runs the mechanical gates + a convention/TDD audit and
+      writes the prioritized backlog to <code>specs/refactor-backlog.md</code>. Read-only on your source.
+      <strong> Consumes tokens</strong> (it dispatches agents); needs the <code>claude</code> CLI
+      authenticated.</p>
+    <p className="warn-line">⚠ Headless means the run <strong>starts without any prompt</strong> and
+      cannot ask you anything mid-run — and there is <strong>no resume</strong>: if the session dies,
+      the run is gone (re-launch it). Prefer running <code>/audit</code> in a Claude Code session for
+      anything you want to steer.</p>
+  </div>
+);
+
 // Drill-down view for a single project.
 export default function ProjectDetail({ project }) {
   const [state, setState] = useState(null);
@@ -78,6 +92,11 @@ export default function ProjectDetail({ project }) {
               <button className="tool-btn" onClick={() => setRunner({
                 title: 'Update pipeline (headless Claude)', command: '/update-pipeline', confirmText: UPDATE_WARNING,
               })}>Update-pipeline…</button>
+            )}
+            {hasProfile && (
+              <button className="tool-btn" onClick={() => setRunner({
+                title: 'Audit (headless Claude)', command: '/audit', confirmText: AUDIT_WARNING,
+              })}>Audit…</button>
             )}
             {hasFootprint && (
               <button className="danger-ghost" onClick={() => setResetting(true)}>Reset pipeline…</button>

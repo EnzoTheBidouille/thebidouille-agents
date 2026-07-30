@@ -68,10 +68,16 @@ skip silently.
 
 Only when the current repo has a `PIPELINE.md`: run the **Reconcile procedure** from the installed
 `pipeline/SCHEMA.md` §Reconcile — top up the profile's machine block with new fields at their defaults
-(one batched question set for any genuinely new human decision, e.g. choosing a `retrieval` provider),
-re-render the surface agents from the current `implementer.template.md`, additively patch
-`settings.json`/`gate-config.json`, and run any newly-added capability's wiring (e.g. Serena's
-project-scope `claude mcp add`). Even when no capability is new, **re-run the retrieval provider's
+(one batched question set for any genuinely new human decision — e.g. choosing a `retrieval` provider,
+or the **quiet command variants**: `test_quiet_cmd`/`lint_quiet_cmd` + `commands.test_quiet`/
+`lint_quiet`, proposing the detected bridled forms per §Output discipline; `gate.preflight` tops up
+silently at its defaults), re-render the surface agents from the current `implementer.template.md`
+(this refreshes each agent's **baked §Conventions slice** — required after any hand-edit of the
+profile's prose), additively patch `settings.json`/`gate-config.json` (including the `preflight`
+block and the workflow-agent `allow` entries from init step 5), and run any newly-added capability's
+wiring (e.g. Serena's project-scope `claude mcp add`). Verify the refreshed core actually carries
+`<core>/workflows/` + `agents/profile-reader.md` — missing means the update half-ran: re-run the
+installer. Even when no capability is new, **re-run the retrieval provider's
 health check** (SCHEMA.md §Code retrieval: CLI resolvable from PATH, `.mcp.json` entry present —
 upgrading a bare `serena` entry to the PATH-proof launcher form, `.serena/` gitignored, server
 actually connected) and repair whatever fails — wiring that worked at

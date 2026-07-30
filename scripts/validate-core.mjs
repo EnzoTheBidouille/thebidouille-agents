@@ -43,7 +43,8 @@ for (const f of readdirSync(join(root, "core/commands"))) {
 // Every non-template agent needs name/tools/model, and must be shipped by
 // both installers (a new agent that install.sh doesn't copy never reaches
 // a global install — the exact bug that motivated this check).
-const AGENT_MODEL = { review: "sonnet", release: "haiku", smoke: "sonnet" };
+const AGENT_MODEL = { review: "sonnet", release: "haiku", smoke: "sonnet",
+  "profile-reader": "haiku" };
 const installSh = read("install.sh");
 const installPs1 = read("install.ps1");
 
@@ -54,7 +55,7 @@ for (const f of readdirSync(join(root, "core/agents"))) {
   if (!fm) { fail(path, "missing or malformed YAML frontmatter"); continue; }
   if (f === "implementer.template.md") {
     for (const ph of ["<SURFACE_AGENT>", "<SURFACE_LABEL>", "<SURFACE_PATH>",
-      "<SURFACE_TOOLS>", "<SURFACE_MODEL>", "<PROJECT_NAME>",
+      "<SURFACE_TOOLS>", "<SURFACE_MODEL>", "<PROJECT_NAME>", "<SURFACE_CONVENTIONS>",
       "<SURFACE_EXTRA_NEVER>", "<SURFACE_DESIGN_INPUT>", "<SURFACE_TDD_STEP1>"])
       if (!text.includes(ph)) fail(path, `render placeholder ${ph} disappeared`);
     continue;
@@ -89,7 +90,7 @@ for (const path of allDocs) {
   }
   for (const m of text.matchAll(/subagent_type:\s*(?:`|)([a-z-]+)(?:`|)/g)) {
     const t = m[1];
-    if (["review", "release", "smoke"].includes(t)) continue;
+    if (["review", "release", "smoke", "profile-reader"].includes(t)) continue;
     if (t.startsWith("<")) continue; // <surface.agent> placeholder
     if (!existsSync(join(root, "core/agents", `${t}.md`)))
       fail(path, `dispatches subagent_type ${t} with no core/agents/${t}.md`);
@@ -145,6 +146,41 @@ for (const f of shipped.filter((f) => f.endsWith(".sh") && !shipped.includes(`${
   for (const [name, src] of Object.entries(installers))
     if (!src.includes(`scripts/${f}`) && !src.includes(`scripts\\${f}`))
       fail(name, `never copies scripts/${f} into pipeline/scripts/ (silent no-op at runtime)`);
+
+// ── workflow scripts ────────────────────────────────────────────────────────
+// core/workflows/*.js run inside the Claude Code Workflow runtime: an async
+// function body with agent()/pipeline()/… injected, plus one `export const
+// meta` line. Validate the syntax the same way the runtime parses it (plain
+// `node --check` would reject the top-level return/await), and the invariants:
+// a meta literal, phase 0 through profile-reader, and no Date.now()-family
+// calls (they would break workflow resume).
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+const workflowsDir = join(root, "core/workflows");
+if (!existsSync(workflowsDir) || readdirSync(workflowsDir).length === 0)
+  fail("core/workflows", "workflow scripts missing/empty");
+else for (const f of readdirSync(workflowsDir)) {
+  if (!f.endsWith(".js")) continue;
+  const path = `core/workflows/${f}`;
+  const text = read(path);
+  if (!/^export const meta = \{/m.test(text))
+    fail(path, "missing the `export const meta = {…}` literal");
+  if (!text.includes("agentType: 'profile-reader'"))
+    fail(path, "phase 0 must read the profile via the profile-reader agent");
+  if (/\bDate\.now\(\)|\bMath\.random\(\)|new Date\(\)/.test(text))
+    fail(path, "Date.now()/Math.random()/new Date() are unavailable in workflow scripts");
+  try {
+    new AsyncFunction("agent", "parallel", "pipeline", "phase", "log", "args",
+      "budget", "workflow", text.replace(/^export const meta/m, "const meta"));
+  } catch (e) {
+    fail(path, `does not parse as a workflow body: ${e.message}`);
+  }
+}
+// Both shell installers must copy the workflows dir (bin/cli.js copies by rule,
+// covered by the ci.yml dry-run).
+if (!installSh.includes("core/workflows"))
+  fail("install.sh", "does not copy core/workflows (copy_core)");
+if (!installPs1.includes("core\\workflows"))
+  fail("install.ps1", "does not copy core\\workflows (Copy-Core)");
 
 // ── report ──────────────────────────────────────────────────────────────────
 if (errors.length) {

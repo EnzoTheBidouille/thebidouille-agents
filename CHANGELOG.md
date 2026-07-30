@@ -3,6 +3,56 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 1.3.0 — 2026-07-30
+
+**Token economy — immediate wins, no workflow needed:**
+
+- **Deterministic pre-flight before `/review` and `/smoke`.** A shipped script
+  (`pipeline/scripts/preflight.sh`) runs typecheck + lint + tests first; red ⇒ the command
+  aborts with the raw last-40 lines and **spawns zero agents** — a reviewer no longer burns
+  its whole run rediscovering what `tsc` printed for free. Green runs stamp
+  `.claude/preflight.ok`, and `gate.py` enforces it as a **phase gate**: a review/smoke
+  dispatch with a missing/stale stamp gets a confirm (`gate.preflight` in the profile).
+- **Quiet commands.** New profile fields (`test_quiet_cmd`/`lint_quiet_cmd` per surface,
+  `commands.test_quiet`/`lint_quiet` repo-wide) hold the bridled forms agents actually run
+  (`--reporter=dot`, `--quiet`, failures-only); absent ⇒ `<cmd> 2>&1 | tail -40`.
+  `/init-pipeline` now asks for them instead of storing a bare `pnpm test`;
+  `/update-pipeline` tops up older profiles.
+- **`/review` computes the diff once.** One `git diff --stat`, then full patches staged to
+  disk only for the touched surfaces — reviewers read the artifact instead of each
+  re-running git.
+- **Conventions baked into rendered agents.** The implementer template gets a
+  `<SURFACE_CONVENTIONS>` slice rendered at init; at runtime agents read only the profile's
+  machine block. Edit conventions in `PIPELINE.md`, then `/update-pipeline` re-renders.
+- **Capped reports.** Review reports: max 20 findings, one line each, zero code excerpts;
+  smoke returns: max 10 ❌ lines. Dispatch prompts now keep every volatile slot (feature id,
+  paths, file lists) at the END so repeats hit the prompt-cache prefix.
+- `gate.py` also escalates every `ask` to a hard deny in unattended runs
+  (`bypassPermissions`) — nobody is there to answer a prompt.
+
+**Workflows (opt-in — conversational commands stay the default and the fallback):**
+
+- Four deterministic multi-agent scripts for the Claude Code Workflow runtime
+  (≥ 2.1.154, workflows enabled): **`workflows/cycle.js` — the full dev cycle on a frozen
+  spec** (contract → parallel build → smoke ∥ review(+cross-check) → fix, looping until
+  zero findings + PASS; contract changes handled in-loop by a lead-equivalent agent, human
+  decisions returned in a `questions` array at the end; a clean exit ticks the DoD and
+  stamps the freshness gate so `/ship` follows directly), `workflows/review.js` (preflight
+  gate → one reviewer per touched surface → adversarial cross-check of CRITICAL/security
+  findings → verdict only), `workflows/audit.js` (one auditor per domain, concurrent,
+  prioritized backlog), `workflows/refactor.js` (big domains only: shared first, parallel
+  implementers, per-domain verify + one retry). Mechanical phases route to haiku.
+- New `profile-reader` agent (haiku) — phase 0 of every workflow: returns the
+  `PIPELINE.md` machine block as JSON, since workflow scripts have no filesystem access.
+- `/doctor` check 8 reports the workflow prerequisites and which path a session will take;
+  the generated `settings.json` allow-list now covers what workflow agents need (quiet
+  commands, shipped scripts, `git rev-parse`, retrieval MCP tools) so runs don't stall on
+  prompts nobody is watching.
+- Installers (npx CLI, install.sh, install.ps1) ship `core/workflows/` + `preflight.sh` +
+  the `profile-reader` agent in both global and bundled modes; CI dry-runs assert it.
+- Dashboard: new headless **Audit** action (`claude -p "/audit"` — starts without a prompt,
+  no resume if the session dies) and the workflows state in the project drill-down.
+
 ## 1.2.6 — 2026-07-30
 
 - **`npx cohorte install` never installed the `smoke` agent.** It copied only `review.md` and
