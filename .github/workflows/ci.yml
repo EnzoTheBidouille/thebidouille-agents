@@ -50,6 +50,7 @@ jobs:
           test -f "$scratch/.claude/workflows/review.js"
           test -f "$scratch/.claude/workflows/audit.js"
           test -f "$scratch/.claude/workflows/refactor.js"
+          test -f "$scratch/.claude/workflows/cycle.js"
           test -f "$scratch/.claude/agents/profile-reader.md"
 
       # bin/cli.js is what `npx cohorte install/update` actually runs — a
@@ -80,6 +81,7 @@ jobs:
           test -f "$scratch/.claude/workflows/review.js"
           test -f "$scratch/.claude/workflows/audit.js"
           test -f "$scratch/.claude/workflows/refactor.js"
+          test -f "$scratch/.claude/workflows/cycle.js"
           # The per-project rendered scripts must NOT ship — only their templates.
           test ! -e "$scratch/.claude/pipeline/scripts/new-feature.sh"
           test -f "$scratch/.claude/pipeline/scripts/new-feature.sh.template"

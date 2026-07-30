@@ -280,6 +280,7 @@ it out turn by turn:
 
 | Script                  | What it runs                                                                              |
 | ----------------------- | ----------------------------------------------------------------------------------------- |
+| `workflows/cycle.js`    | **The full dev cycle on a frozen spec**: contract → parallel build → smoke ∥ review(+cross-check) → fix, looping until zero findings + PASS (contract changes handled in-loop by a lead-equivalent agent). Human decisions come back in a `questions` array at the END — empty when `/brainstorm`+`/spec` did their job. Exits SHIP-ready (DoD ticked, freshness stamped) so `/ship` is a straight shot. |
 | `workflows/review.js`   | Preflight gate (aborts while red — zero agents), one reviewer per touched surface, adversarial cross-check of CRITICAL/security findings, merged verdict only. |
 | `workflows/audit.js`    | One auditor per domain (every surface + shared) concurrently, prioritized `specs/refactor-backlog.md`. |
 | `workflows/refactor.js` | Big domains only: `shared` first and alone, then parallel surface implementers, per-domain verify + one retry. |
@@ -291,8 +292,10 @@ The essentials:
   ("run the review workflow").
 - **Prerequisite: Claude Code ≥ 2.1.154** with workflows enabled. `/doctor` (check 8) tells you
   which path your session will take and why.
-- **No input mid-run.** A workflow runs to completion without questions — anything interactive
-  (contract decisions, ambiguous findings) belongs to the conversational commands. The destructive-
+- **No input mid-run — questions at the edges.** A workflow runs to completion without asking
+  anything. `cycle.js` moves the decisions to its boundaries: a readiness gate refuses a non-frozen
+  spec up front, and whatever would have been a mid-run question lands in the result's `questions`
+  array at the end (spec gaps, hit round-cap) — answer them, rerun the cycle. The destructive-
   command gate still fires inside workflow subagents; in unattended runs its confirms become denies.
 - Phase 0 of every script is the `profile-reader` agent (haiku) — it reads `PIPELINE.md` and hands
   the script the profile as JSON, since workflow scripts have no filesystem access. Mechanical

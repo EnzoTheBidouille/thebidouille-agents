@@ -71,8 +71,8 @@ fix only with the human's go-ahead (or hand them the command).
    take and why:
    - **Claude Code version** ≥ 2.1.154 (`claude --version 2>/dev/null | head -1`) — older or no CLI
      on PATH ⇒ conversational only.
-   - **Scripts present:** `<core>/workflows/review.js` + `audit.js` + `refactor.js` — missing on a
-     current core ⇒ half-done install, re-run install/update.
+   - **Scripts present:** `<core>/workflows/review.js` + `audit.js` + `refactor.js` + `cycle.js` —
+     missing on a current core ⇒ half-done install, re-run install/update.
    - **Phase-0 agent present:** `<agents dir>/profile-reader.md` (repo `.claude/agents/` bundled or
      `~/.claude/agents/` global) — the workflows abort without it.
    - **Workflows enabled in this session** — the `Workflow` tool is in your own toolset right now;

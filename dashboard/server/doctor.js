@@ -198,7 +198,7 @@ function checkWorkflows(projectRoot, globalDir, installMode) {
   const agentsDir = installMode === 'bundled'
     ? path.join(projectRoot, '.claude', 'agents')
     : path.join(globalDir, 'agents');
-  const scripts = ['review.js', 'audit.js', 'refactor.js'];
+  const scripts = ['review.js', 'audit.js', 'refactor.js', 'cycle.js'];
   const missing = scripts.filter(s => !exists(path.join(dir, s)));
   if (missing.length === scripts.length) {
     return mk('workflows', 'Workflows', 'warn',

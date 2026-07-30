@@ -342,9 +342,28 @@ Shared design, all three scripts:
 - **`refactor.js`** — big domains only (it skips domains with a handful of open items — the
   conversational `/refactor` is cheaper there): `shared` first and alone, then the other domains'
   implementers in parallel, each verified per-domain.
+- **`cycle.js`** — the **full dev cycle** on a frozen spec: contract → parallel build → rounds of
+  [preflight → smoke ∥ review(+cross-check) → fix on the surfaces with findings], looping until
+  **zero open findings + a PASS smoke** (`maxRounds`, default 5, and the token budget are runaway
+  protection, not targets). Since a workflow can't ask anything mid-run, the decisions move to the
+  edges: a **readiness gate** aborts up front if the spec isn't frozen (other gaps ride along as
+  deferred questions), and everything genuinely human comes back at the END in the result's
+  `questions` array — empty when `/brainstorm` + `/spec` did their job. Even a finding that implies
+  a **contract change stays inside the loop**: a lead-equivalent agent re-authors spec §5 + the
+  contract file (exactly what conversational `/fix` §1 does — implementers still never touch it),
+  the consuming surfaces re-dispatch, and the loop continues; the re-authorings are reported in the
+  result's `contractChanges` for the human to review in the diff. A clean exit ticks the DoD and
+  stamps the freshness gate so `/ship <id>` is a straight shot; a stopped run appends its open
+  findings to the spec's `## Remediation` so a rerun of the cycle — or a conversational `/fix` —
+  continues seamlessly. `/ship` itself stays outside on purpose — outward-facing and irreversible,
+  it keeps its human confirmation.
+  **Corollary — harden the spec:** the more `/brainstorm` + `/spec` pre-answer (edge cases, error
+  envelopes, role matrix, design links), the further the cycle runs and the emptier `questions`
+  comes back; a vague spec just converts into deferred questions.
 - **No input mid-run.** A workflow runs to completion without questions; anything interactive
-  (contract changes, human decisions) belongs to the conversational path. The gate hook still fires
-  on workflow subagents (see §Preflight) — in unattended runs its asks become denies.
+  (contract changes, human decisions) belongs to the conversational path — or, for `cycle.js`, to
+  the `questions` array of its result. The gate hook still fires on workflow subagents (see
+  §Preflight) — in unattended runs its asks become denies.
 - **Permissions:** `/init-pipeline` and `/update-pipeline` extend the generated `settings.json`
   `allow` list with what workflow agents need (the quiet commands, the shipped
   `pipeline/scripts/*.sh`, read-only git incl. `git rev-parse`, and the retrieval provider's MCP

@@ -32,12 +32,16 @@ user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per 
 
 **Workflows (opt-in — conversational commands stay the default and the fallback):**
 
-- Three deterministic multi-agent scripts for the Claude Code Workflow runtime
-  (≥ 2.1.154, workflows enabled): `workflows/review.js` (preflight gate → one reviewer per
-  touched surface → adversarial cross-check of CRITICAL/security findings → verdict only),
-  `workflows/audit.js` (one auditor per domain, concurrent, prioritized backlog),
-  `workflows/refactor.js` (big domains only: shared first, parallel implementers,
-  per-domain verify + one retry). Mechanical phases route to haiku.
+- Four deterministic multi-agent scripts for the Claude Code Workflow runtime
+  (≥ 2.1.154, workflows enabled): **`workflows/cycle.js` — the full dev cycle on a frozen
+  spec** (contract → parallel build → smoke ∥ review(+cross-check) → fix, looping until
+  zero findings + PASS; contract changes handled in-loop by a lead-equivalent agent, human
+  decisions returned in a `questions` array at the end; a clean exit ticks the DoD and
+  stamps the freshness gate so `/ship` follows directly), `workflows/review.js` (preflight
+  gate → one reviewer per touched surface → adversarial cross-check of CRITICAL/security
+  findings → verdict only), `workflows/audit.js` (one auditor per domain, concurrent,
+  prioritized backlog), `workflows/refactor.js` (big domains only: shared first, parallel
+  implementers, per-domain verify + one retry). Mechanical phases route to haiku.
 - New `profile-reader` agent (haiku) — phase 0 of every workflow: returns the
   `PIPELINE.md` machine block as JSON, since workflow scripts have no filesystem access.
 - `/doctor` check 8 reports the workflow prerequisites and which path a session will take;
