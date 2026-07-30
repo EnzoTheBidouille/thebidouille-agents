@@ -3,7 +3,7 @@ import { defineConfig } from 'vitepress'
 // Deployed to GitHub Pages at https://thebidouilleagency.github.io/cohorte/
 // by .github/workflows/docs.yml — `base` must match the repo name.
 export default defineConfig({
-  title: 'cohorte',
+  title: 'Cohorte',
   description:
     'Portable, stack-agnostic multi-agent development pipeline for Claude Code — install the core, run /init-pipeline, and it adapts to your project.',
   base: '/cohorte/',
@@ -27,7 +27,7 @@ export default defineConfig({
         {
           text: 'Introduction',
           items: [
-            { text: 'What is cohorte?', link: '/guide/what-is-cohorte' },
+            { text: 'What is Cohorte?', link: '/guide/what-is-cohorte' },
             { text: 'Getting started', link: '/guide/getting-started' },
           ],
         },

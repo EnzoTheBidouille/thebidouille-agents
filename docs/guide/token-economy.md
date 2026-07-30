@@ -1,7 +1,7 @@
 # Token economy
 
 Multi-agent pipelines can burn tokens spectacularly: every agent re-reads context, every runner
-dumps logs, every long-lived lead session re-pays its history each turn. cohorte treats token
+dumps logs, every long-lived lead session re-pays its history each turn. Cohorte treats token
 frugality as a design constraint, not an afterthought. This page collects every mechanism and the
 habits that make them pay.
 

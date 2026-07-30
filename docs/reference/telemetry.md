@@ -1,6 +1,6 @@
 # Telemetry & privacy
 
-cohorte can send the maintainers **anonymous** usage pings so the pipeline improves where it's
+Cohorte can send the maintainers **anonymous** usage pings so the pipeline improves where it's
 actually slow. The posture is GDPR-first and strictly opt-in — this page is the complete
 disclosure.
 
