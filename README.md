@@ -7,6 +7,9 @@
 [![Publish to npm](https://github.com/TheBidouilleAgency/cohorte/actions/workflows/publish.yml/badge.svg)](https://github.com/TheBidouilleAgency/cohorte/actions/workflows/publish.yml)
 [![node >=18](https://img.shields.io/node/v/cohorte?logo=node.js&logoColor=white)](https://nodejs.org)
 [![license: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+[![docs](https://img.shields.io/badge/docs-thebidouilleagency.github.io%2Fcohorte-6f42c1)](https://thebidouilleagency.github.io/cohorte/)
+
+**[📖 Full documentation](https://thebidouilleagency.github.io/cohorte/)** — guides (feature cycle, workflows, token economy, parallel features) + complete reference (commands, agents, profile, gate, scripts).
 
 </div>
 
