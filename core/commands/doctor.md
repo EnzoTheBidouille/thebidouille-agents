@@ -21,8 +21,8 @@ fix only with the human's go-ahead (or hand them the command).
    commands' step files are present — `templates/steps/init-pipeline/` non-empty (a router whose
    `templates/steps/<cmd>/` dir is missing is a partial/stale install ⇒
    re-run install/update). **Shipped scripts present and executable** in `<core>/pipeline/scripts/`:
-   `kanban-move.sh`, `telemetry-send.sh`, `new-feature.sh.template`, `remove-feature.sh.template`
-   — ❌ any missing one. Every caller chains these with `|| true`, so an absent script is a **silent**
+   `kanban-move.sh`, `telemetry-send.sh`, `preflight.sh`, `new-feature.sh.template`,
+   `remove-feature.sh.template` — ❌ any missing one. Every caller chains these with `|| true`, so an absent script is a **silent**
    no-op (no kanban card moves, no telemetry ping, no error anywhere) — this check is the only thing
    that sees it. Also flag ❌ a `VERSION` **newer than** the other `pipeline/` files (compare mtimes):
    a version bumped without a full re-copy is a half-done update ⇒ re-run install/update.
@@ -34,8 +34,8 @@ fix only with the human's go-ahead (or hand them the command).
    its `surfaces[].model` — ❌ if missing, mismatched, or a literal `<SURFACE_MODEL>` placeholder
    (all three silently fall back to inheriting the lead session's model — often Opus — on every
    dispatch); ⚠️ any `inherit` with the note that it bills at the lead's tier. The generic agents
-   (`review.md`, `release.md`, `smoke.md` — repo or `~/.claude/agents/`) must each carry their
-   `model:` line too (sonnet/haiku/sonnet). **Command pins:** every mechanical command file
+   (`review.md`, `release.md`, `smoke.md`, `profile-reader.md` — repo or `~/.claude/agents/`) must
+   each carry their `model:` line too (sonnet/haiku/sonnet/haiku). **Command pins:** every mechanical command file
    (`build`, `review`, `fix`, `smoke`, `ship`, `audit`, `refactor`, `doctor`, `align-ds`,
    `update-pipeline` — in `.claude/commands/` or `~/.claude/commands/`) carries `model: sonnet` in
    its frontmatter — ⚠️ if missing (the lead's orchestration turn then bills at the session model,
@@ -66,7 +66,23 @@ fix only with the human's go-ahead (or hand them the command).
    incoherent state: `enabled: true` with no `install_id` or no `consent_date` (sending without
    recorded consent — fix: set `enabled: false` until the consent question is re-run), or a
    `telemetry:` block missing entirely on a current core (top up via `/update-pipeline`).
-8. **Specs & metrics.** Every `specs/*.md` front-matter `status` is a valid stage; `shipped` specs
+8. **Workflows** (the opt-in execution path — SCHEMA.md §Workflows; the conversational commands
+   stay the default, so failures here are ⚠️ at most, never ❌). Report which path this machine will
+   take and why:
+   - **Claude Code version** ≥ 2.1.154 (`claude --version 2>/dev/null | head -1`) — older or no CLI
+     on PATH ⇒ conversational only.
+   - **Scripts present:** `<core>/workflows/review.js` + `audit.js` + `refactor.js` + `cycle.js` —
+     missing on a current core ⇒ half-done install, re-run install/update.
+   - **Phase-0 agent present:** `<agents dir>/profile-reader.md` (repo `.claude/agents/` bundled or
+     `~/.claude/agents/` global) — the workflows abort without it.
+   - **Workflows enabled in this session** — the `Workflow` tool is in your own toolset right now;
+     absent ⇒ disabled for this session (a setting or an old client), conversational path.
+   - **Preflight wiring** (used by both paths): `pipeline/scripts/preflight.sh` executable and
+     `gate-config.json` carries the `preflight` block — mismatch ⇒ regenerate from the profile.
+   End the check with ONE summary line, e.g.
+   `workflows: available (opt-in — ask to "run the review workflow")` or
+   `workflows: unavailable (<first failing prerequisite>) — conversational commands (the default)`.
+9. **Specs & metrics.** Every `specs/*.md` front-matter `status` is a valid stage; `shipped` specs
    with a live worktree flagged (see 6). `.claude/pipeline-metrics.jsonl` and `specs/reports/` (the
    `/review`·`/smoke` report buffer that lets a `/fix` survive a `/clear`) are gitignored. Metrics
    belong to the **main checkout** — a `pipeline-metrics.jsonl` inside a live feature worktree is a

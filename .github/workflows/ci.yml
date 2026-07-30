@@ -44,7 +44,14 @@ jobs:
           # is a silent no-op on the user's machine, never an error. Assert them.
           test -x "$scratch/.claude/pipeline/scripts/telemetry-send.sh"
           test -x "$scratch/.claude/pipeline/scripts/kanban-move.sh"
+          test -x "$scratch/.claude/pipeline/scripts/preflight.sh"
           test -f "$scratch/.claude/pipeline/CHANGELOG.md"
+          # Workflow variants + their phase-0 agent must ship together.
+          test -f "$scratch/.claude/workflows/review.js"
+          test -f "$scratch/.claude/workflows/audit.js"
+          test -f "$scratch/.claude/workflows/refactor.js"
+          test -f "$scratch/.claude/workflows/cycle.js"
+          test -f "$scratch/.claude/agents/profile-reader.md"
 
       # bin/cli.js is what `npx cohorte install/update` actually runs — a
       # hand-written port of install.sh, so it drifts silently (until 1.2.4 it
@@ -65,10 +72,16 @@ jobs:
           test -f "$scratch/.claude/agents/smoke.md"
           test -f "$scratch/.claude/agents/review.md"
           test -f "$scratch/.claude/agents/release.md"
+          test -f "$scratch/.claude/agents/profile-reader.md"
           test ! -e "$scratch/.claude/agents/implementer.template.md"
           test -x "$scratch/.claude/pipeline/scripts/telemetry-send.sh"
           test -x "$scratch/.claude/pipeline/scripts/kanban-move.sh"
+          test -x "$scratch/.claude/pipeline/scripts/preflight.sh"
           test -f "$scratch/.claude/pipeline/CHANGELOG.md"
+          test -f "$scratch/.claude/workflows/review.js"
+          test -f "$scratch/.claude/workflows/audit.js"
+          test -f "$scratch/.claude/workflows/refactor.js"
+          test -f "$scratch/.claude/workflows/cycle.js"
           # The per-project rendered scripts must NOT ship — only their templates.
           test ! -e "$scratch/.claude/pipeline/scripts/new-feature.sh"
           test -f "$scratch/.claude/pipeline/scripts/new-feature.sh.template"

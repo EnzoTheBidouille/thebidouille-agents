@@ -136,6 +136,7 @@ try {
         Copy-Tree (Join-Path $src 'core\commands')  (Join-Path $dest 'commands')
         Copy-Tree (Join-Path $src 'core\hooks')     (Join-Path $dest 'hooks')
         Copy-Tree (Join-Path $src 'core\templates') (Join-Path $dest 'templates')
+        Copy-Tree (Join-Path $src 'core\workflows') (Join-Path $dest 'workflows')
         # 0.1.19 renamed questionnaire-domain-brief.md -> research-brief.md; drop the stale copy.
         Remove-Item -LiteralPath (Join-Path $dest 'templates\questionnaire-domain-brief.md') -Force -ErrorAction SilentlyContinue
         New-Item -ItemType Directory -Force -Path (Join-Path $dest 'pipeline\scripts') | Out-Null
@@ -145,6 +146,7 @@ try {
         Copy-Item (Join-Path $src 'scripts\*.template')           (Join-Path $dest 'pipeline\scripts') -Force
         Copy-Item (Join-Path $src 'scripts\kanban-move.sh')       (Join-Path $dest 'pipeline\scripts') -Force
         Copy-Item (Join-Path $src 'scripts\telemetry-send.sh')    (Join-Path $dest 'pipeline\scripts') -Force
+        Copy-Item (Join-Path $src 'scripts\preflight.sh')         (Join-Path $dest 'pipeline\scripts') -Force
         Copy-Item (Join-Path $src 'core\agents\implementer.template.md') (Join-Path $dest 'pipeline') -Force
         if (Test-Path (Join-Path $src 'CHANGELOG.md')) { Copy-Item (Join-Path $src 'CHANGELOG.md') (Join-Path $dest 'pipeline') -Force }
         [System.IO.File]::WriteAllText((Join-Path $dest 'pipeline\VERSION'), "$ver`n", [System.Text.UTF8Encoding]::new($false))
@@ -182,7 +184,8 @@ try {
         New-Item -ItemType Directory -Force -Path (Join-Path $dest 'agents') | Out-Null
         Copy-Item (Join-Path $src 'core\agents\review.md'),
                   (Join-Path $src 'core\agents\release.md'),
-                  (Join-Path $src 'core\agents\smoke.md') (Join-Path $dest 'agents') -Force
+                  (Join-Path $src 'core\agents\smoke.md'),
+                  (Join-Path $src 'core\agents\profile-reader.md') (Join-Path $dest 'agents') -Force
         # 0.1.19 split the bi-mode questionnaire-researcher into research-agent + questionnaire-architect;
         # copy-over never deletes, so scrub the retired agent lest a dead subagent_type linger.
         Remove-Item -LiteralPath (Join-Path $dest 'agents\questionnaire-researcher.md') -Force -ErrorAction SilentlyContinue
