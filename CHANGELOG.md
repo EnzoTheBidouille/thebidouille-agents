@@ -3,6 +3,16 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 1.3.1 — 2026-07-30
+
+- **`/cycle <feature_id> [max_rounds]`** — a launcher command for the full dev-cycle workflow,
+  so you don't have to phrase the request in prose. It resolves `workflows/cycle.js`
+  (bundled or global), checks the runtime is available (missing ⇒ it hands you the
+  conversational `/build` → `/smoke` → `/review` path instead), sanity-checks the spec is
+  frozen, launches the workflow in the background, then relays the verdict: outcome,
+  contract re-authorings to eyeball, the `questions` array verbatim, and the next step
+  (`/ship` on SHIP-READY, rerun `/cycle` or `/fix` otherwise). Kanban card moves included.
+
 ## 1.3.0 — 2026-07-30
 
 **Token economy — immediate wins, no workflow needed:**

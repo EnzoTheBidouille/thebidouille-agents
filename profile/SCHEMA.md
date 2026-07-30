@@ -318,7 +318,9 @@ Workflow runtime executes instead of the lead reasoning out the fan-out turn by 
 `<core>/workflows/review.js`, `audit.js`, `refactor.js` (installed to `.claude/workflows/` bundled or
 `~/.claude/workflows/` global). The conversational commands (`/review`, `/audit`, `/refactor`)
 **remain the default path and the fallback** — a workflow runs only when the human explicitly asks
-for it ("run the review workflow"), and requires Claude Code ≥ **2.1.154** with workflows enabled.
+for it ("run the review workflow", or via the `/cycle <id>` launcher command, which resolves
+`cycle.js` and invokes the runtime for them), and requires Claude Code ≥ **2.1.154** with workflows
+enabled.
 `/doctor` reports which path a session will take. The interactive commands (`/init-pipeline`,
 `/brainstorm`, `/spec`) and the dispatch-only ones (`/build`, `/ship`) have **no** workflow variant on
 purpose: they're interviews or already a single parallel dispatch — a script adds nothing.
