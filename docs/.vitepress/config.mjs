@@ -74,7 +74,12 @@ export default defineConfig({
 
     footer: {
       message: 'Released under the AGPL-3.0 license.',
-      copyright: 'The Bidouille Agency',
+      // Raw HTML (v-html) — the img src must carry the /cohorte/ base itself.
+      copyright:
+        'Built by <a href="https://github.com/TheBidouilleAgency" target="_blank" rel="noopener" ' +
+        'style="display:inline-flex;align-items:center;gap:6px;vertical-align:middle;font-weight:500">' +
+        '<img src="/cohorte/tba-mark-64.png" alt="The Bidouille Agency" ' +
+        'style="height:18px;width:18px;border-radius:5px">The Bidouille Agency</a>',
     },
 
     editLink: {
