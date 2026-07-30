@@ -3,6 +3,31 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 1.3.2 — 2026-07-30
+
+> **Re-run `npx cohorte@latest update --global` (or `update`).** This release repairs the gate
+> hook registration in place — updating is what applies it.
+
+- **1.3.0's preflight phase gate never fired on any install.** `gate.py` gates review/smoke
+  dispatches on `tool_name == "Task"`, but all three installers registered the hook with
+  `matcher: "Bash"` — a Task call never reached it. The `preflight` block in `gate-config.json`
+  and `gate.preflight` in `PIPELINE.md` were both dead config. The matcher is now `Bash|Task`.
+- **Re-installing duplicated the hook, every time.** The "already registered?" test was
+  `command.endswith("gate.py")`, which is false for the Windows form `py "C:\…\gate.py"` because
+  of the trailing quote — so `install.sh` and `bin/cli.js` appended another copy on each run, and
+  `gate.py` ran once per copy on every Bash call (four copies seen in the wild). Registration is
+  now a **reconcile**: it drops every existing `gate.py` entry and writes exactly one. Idempotent,
+  it collapses the duplicates you already have, and it upgrades the stale matcher — an
+  append-if-absent would have found the stale entry and skipped, pinning the bug forever.
+  Unrelated hooks and every other settings key are untouched.
+- **`npx cohorte update` never touched the hook at all**, so neither fix above could have reached
+  you through the command you actually run to get fixes — only a full re-install rewrote it.
+  `install.sh` and `install.ps1` always registered on update; this port had drifted (the same
+  class of drift as 1.2.4 and 1.2.6). It now registers on both paths.
+- CI installs **twice** before asserting the hook, via a new `scripts/assert-gate-hook.mjs`:
+  exactly one registration, matcher covering both Bash and Task. A single install could never
+  surface the duplication — which is precisely why CI stayed green while it shipped.
+
 ## 1.3.1 — 2026-07-30
 
 - **`/cycle <feature_id> [max_rounds]`** — a launcher command for the full dev-cycle workflow,

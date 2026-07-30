@@ -21,6 +21,13 @@ const VERSION = pkg.version;
 
 const REPO_URL = 'https://github.com/TheBidouilleAgency/cohorte';
 
+// PreToolUse matcher for the gate hook. MUST cover Task as well as Bash:
+// gate.py's preflight phase gate keys off tool_name === "Task" (the `preflight`
+// block in a repo's gate-config.json). A Bash-only matcher never delivers a Task
+// dispatch to the hook, so that gate silently never fires — it was dead code
+// from 1.3.0 to 1.3.1. Keep in lockstep with install.sh and install.ps1.
+const GATE_MATCHER = 'Bash|Task';
+
 function usage(code) {
   console.log(`cohorte v${VERSION}
 
@@ -274,19 +281,24 @@ function registerGlobalHook() {
   } catch { /* absent or invalid → start fresh */ }
   if (!data.hooks || typeof data.hooks !== 'object') data.hooks = {};
   if (!Array.isArray(data.hooks.PreToolUse)) data.hooks.PreToolUse = [];
-  const pre = data.hooks.PreToolUse;
-  const hooks = [
-    { file: path.join(dest, 'hooks', 'gate.py'), matcher: 'Bash' },
-  ];
-  for (const { file, matcher } of hooks) {
-    const base = path.basename(file);
-    const already = pre.some(entry => (entry.hooks || []).some(
-      h => typeof h.command === 'string' && h.command.trim().endsWith(base)));
-    if (!already) {
-      const cmd = process.platform === 'win32' ? `${python} "${file}"` : `${python} ${file}`;
-      pre.push({ matcher, hooks: [{ type: 'command', command: cmd }] });
-    }
-  }
+
+  const file = path.join(dest, 'hooks', 'gate.py');
+  const base = path.basename(file);
+  // Trailing-quote tolerant: the Windows form is `py "C:\...\gate.py"`, and a
+  // bare .endsWith() missed it — which is how repeat `npx cohorte install`
+  // runs accumulated a duplicate registration every time (gate.py then ran
+  // once per copy on every Bash call).
+  const isGate = entry => (entry.hooks || []).some(
+    h => typeof h.command === 'string' && h.command.trim().replace(/"+$/, '').endsWith(base));
+  const cmd = process.platform === 'win32' ? `${python} "${file}"` : `${python} ${file}`;
+
+  // Reconcile rather than append-if-absent: drop every existing gate.py
+  // registration, then add exactly one. Idempotent, collapses duplicates older
+  // installers left behind, and upgrades a stale "Bash"-only matcher in place —
+  // an append-if-absent would find the stale entry and skip, pinning the bug.
+  data.hooks.PreToolUse = data.hooks.PreToolUse.filter(e => !isGate(e));
+  data.hooks.PreToolUse.push({ matcher: GATE_MATCHER, hooks: [{ type: 'command', command: cmd }] });
+
   fs.writeFileSync(settingsPath, JSON.stringify(data, null, 2) + '\n');
   return 'ok';
 }
@@ -311,7 +323,13 @@ if (scope === 'global') {
     : `→ updating pipeline core GLOBALLY in ${dest} (keeping global settings.json)`);
   copyFixedAgents();
   copyCore();
-  const hookState = mode === 'install' ? registerGlobalHook() : 'unchanged';
+  // Register on UPDATE too — install.sh and install.ps1 always have, and this
+  // port skipping it is why a duplicated or stale-matcher registration could
+  // never be repaired by `npx cohorte update`: the only route that rewrites it
+  // was a full re-install, which is not what anyone runs to get a fix. Safe to
+  // run every time — registration reconciles only gate.py entries and leaves
+  // every other hook and settings key untouched.
+  const hookState = registerGlobalHook();
   await seedConfig();
   console.log(`
 ✓ pipeline core installed globally into ${dest}  (version ${VERSION})

@@ -251,23 +251,31 @@ try {
             $data.hooks | Add-Member -NotePropertyName PreToolUse -NotePropertyValue @()
         }
 
-        $already = $false
+        # Reconcile rather than append-if-absent: drop every existing gate.py
+        # registration, then add exactly one. Idempotent, collapses duplicates older
+        # installers left behind, and upgrades a stale "Bash"-only matcher in place —
+        # an append-if-absent would find the stale entry and skip, pinning the bug.
+        $kept = @()
         foreach ($entry in @($data.hooks.PreToolUse)) {
+            $isGate = $false
             foreach ($h in @($entry.hooks)) {
                 if ($h -and $h.command -and "$($h.command)".Trim().TrimEnd('"').EndsWith('gate.py')) {
-                    $already = $true
+                    $isGate = $true
                 }
             }
+            if (-not $isGate) { $kept += $entry }
         }
-        if (-not $already) {
-            $data.hooks.PreToolUse = @($data.hooks.PreToolUse) + [pscustomobject]@{
-                matcher = 'Bash'
-                hooks   = @([pscustomobject]@{ type = 'command'; command = $cmd })
-            }
-            Write-JsonFile $settingsPath $data
-            return 'ok'
+        # The matcher MUST cover Task as well as Bash: gate.py's preflight phase gate
+        # keys off tool_name == "Task" (the `preflight` block in a repo's
+        # gate-config.json). A Bash-only matcher never delivers a Task dispatch to the
+        # hook, so that gate silently never fires. Keep in lockstep with install.sh
+        # and bin/cli.js.
+        $data.hooks.PreToolUse = @($kept) + [pscustomobject]@{
+            matcher = 'Bash|Task'
+            hooks   = @([pscustomobject]@{ type = 'command'; command = $cmd })
         }
-        return 'present'
+        Write-JsonFile $settingsPath $data
+        return 'ok'
     }
 
     # Bump only the core_version in a repo's committed .claude/pipeline.json (bundled mode).

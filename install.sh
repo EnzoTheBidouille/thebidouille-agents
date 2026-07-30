@@ -185,8 +185,24 @@ register_global_hook() {
   python3 - "$dest/settings.json" "$dest/hooks/gate.py" <<'PY'
 import json, sys
 settings, gate = sys.argv[1], sys.argv[2]
-# (hook path, PreToolUse matcher)
-hooks = [(gate, "Bash")]
+# The matcher MUST cover Task as well as Bash: gate.py's preflight phase gate
+# keys off tool_name == "Task" (the `preflight` block in a repo's
+# gate-config.json). A Bash-only matcher never delivers a Task dispatch to the
+# hook, so that gate silently never fires — it was dead code from 1.3.0 to 1.3.1.
+MATCHER = "Bash|Task"
+base = gate.rsplit("/", 1)[-1]
+
+
+def is_gate(entry):
+    # Trailing-quote tolerant: the Windows form is `py "C:\...\gate.py"`, and a
+    # bare .endswith() missed it — which is how repeat installs accumulated a
+    # duplicate registration every time (gate.py then ran once per copy).
+    return any(
+        (h.get("command") or "").strip().rstrip('"').endswith(base)
+        for h in entry.get("hooks", [])
+    )
+
+
 try:
     with open(settings) as fh:
         data = json.load(fh)
@@ -195,15 +211,14 @@ try:
 except Exception:
     data = {}
 pre = data.setdefault("hooks", {}).setdefault("PreToolUse", [])
-for path, matcher in hooks:
-    base = path.rsplit("/", 1)[-1]
-    already = any(
-        h.get("command", "").strip().endswith(base)
-        for entry in pre for h in entry.get("hooks", [])
-    )
-    if not already:
-        pre.append({"matcher": matcher,
-                    "hooks": [{"type": "command", "command": "python3 " + path}]})
+# Reconcile rather than append-if-absent: drop every existing gate.py
+# registration, then add exactly one. Idempotent, collapses duplicates older
+# installers left behind, and upgrades a stale "Bash"-only matcher in place —
+# an append-if-absent would find the stale entry and skip, pinning the bug.
+kept = [e for e in pre if not is_gate(e)]
+kept.append({"matcher": MATCHER,
+             "hooks": [{"type": "command", "command": "python3 " + gate}]})
+data["hooks"]["PreToolUse"] = kept
 with open(settings, "w") as fh:
     json.dump(data, fh, indent=2)
     fh.write("\n")
