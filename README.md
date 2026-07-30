@@ -163,7 +163,7 @@ npx cohorte dashboard --port=4400 --open   # custom port, open the browser
 ```
 
 **Bound to `127.0.0.1` by default** — the dashboard's actions execute code (install/update/reset,
-and `/init-pipeline`·`/update-pipeline` via headless Claude), so it must stay on loopback. Each user
+and `/init-pipeline`·`/update-pipeline`·`/audit` via headless Claude), so it must stay on loopback. Each user
 runs their own agent and drives only their own machine. `--host=0.0.0.0` exposes it to the network
 (it prints a security warning) — only on a trusted network, since anyone who reaches the port can run
 those actions.
@@ -178,10 +178,13 @@ those actions.
   column, via `gh`), otherwise a **Specs board** from `specs/*.md` (by `draft · frozen · in-review ·
   shipped`). The Kanban supersedes the Specs board when both would apply.
 - **Actions** (stream their output live) — **Update / Install core** (the shared global core, or a
-  repo's bundled core); **Init-pipeline / Update-pipeline**, which run those Claude Code commands
-  **headless** (`claude -p`, autonomous — Init skips the interactive interview, so review the result);
-  and **Reset pipeline**, which backs up then wipes a project's pipeline footprint and reinstalls a
-  fresh core. Buttons render only when they apply (e.g. Init only when there's no profile).
+  repo's bundled core); **Init-pipeline / Update-pipeline / Audit**, which run those Claude Code
+  commands **headless** (`claude -p`, autonomous — Init skips the interactive interview, so review
+  the result; Audit writes `specs/refactor-backlog.md`; headless runs start without any prompt and
+  have **no resume** if the session dies); and **Reset pipeline**, which backs up then wipes a
+  project's pipeline footprint and reinstalls a fresh core. Buttons render only when they apply
+  (e.g. Init only when there's no profile). The drill-down's health checklist also shows the
+  **workflows** state (scripts + profile-reader installed, which path a session will take).
 
 Runtime is **dependency-free** — node's built-in `http` server serves a prebuilt React app (the app
 source lives in `dashboard/app/`, built to `dashboard/dist/` at publish time). The `/doctor` checks
@@ -269,6 +272,34 @@ Rules that make it safe:
   their eventual reviews diff against reality.
 - `/doctor` check 6 shows the live slot table (feature ↔ worktree ↔ ports) when you lose track.
 
+### Workflows — deterministic multi-agent runs (opt-in)
+
+Three phases also ship as **workflow scripts** for the Claude Code Workflow runtime — the same
+fan-out the commands orchestrate, but driven by a deterministic script instead of the lead reasoning
+it out turn by turn:
+
+| Script                  | What it runs                                                                              |
+| ----------------------- | ----------------------------------------------------------------------------------------- |
+| `workflows/review.js`   | Preflight gate (aborts while red — zero agents), one reviewer per touched surface, adversarial cross-check of CRITICAL/security findings, merged verdict only. |
+| `workflows/audit.js`    | One auditor per domain (every surface + shared) concurrently, prioritized `specs/refactor-backlog.md`. |
+| `workflows/refactor.js` | Big domains only: `shared` first and alone, then parallel surface implementers, per-domain verify + one retry. |
+
+The essentials:
+
+- **The conversational commands stay the default path** — and the fallback when workflows are
+  disabled or the client is too old. A workflow runs only when you explicitly ask for it
+  ("run the review workflow").
+- **Prerequisite: Claude Code ≥ 2.1.154** with workflows enabled. `/doctor` (check 8) tells you
+  which path your session will take and why.
+- **No input mid-run.** A workflow runs to completion without questions — anything interactive
+  (contract decisions, ambiguous findings) belongs to the conversational commands. The destructive-
+  command gate still fires inside workflow subagents; in unattended runs its confirms become denies.
+- Phase 0 of every script is the `profile-reader` agent (haiku) — it reads `PIPELINE.md` and hands
+  the script the profile as JSON, since workflow scripts have no filesystem access. Mechanical
+  phases run on haiku; judgment phases use the same pinned agents as the commands.
+
+Details: `profile/SCHEMA.md` §Workflows.
+
 ## Privacy — opt-in telemetry
 
 Cohorte can send **anonymous** usage pings (core version, OS, phase name, duration, per-surface
@@ -296,15 +327,16 @@ bin/cli.js              # the npm CLI: install / update / dashboard / version (c
 install.sh              # script installer (fresh + --update) for no-Node environments
 install.ps1             # same installer for Windows PowerShell (fresh + -Update)
 core/                   # copied verbatim into ~/.claude (global) or <project>/.claude (bundled)
-  agents/               # implementer.template.md (rendered per surface) + review.md + release.md
-  commands/             # init-pipeline + the workflow commands + /update-pipeline
-  hooks/                # gate.py (destructive-command gate; branch-aware — git/docker free off the default branch)
+  agents/               # implementer.template.md (rendered per surface) + review / release / smoke / profile-reader
+  commands/             # init-pipeline + the pipeline commands + /update-pipeline
+  hooks/                # gate.py (destructive-command gate; branch-aware; preflight phase gate)
   templates/            # handoff / brainstorm-return / design-brief / review-feedback / pr-body / spec
+  workflows/            # opt-in Workflow-runtime scripts: review.js / audit.js / refactor.js
 profile/
   PIPELINE.template.md  # the profile skeleton /init-pipeline fills
   SCHEMA.md             # field reference
   cohorte.config.template.yaml   # seeds ~/.claude/cohorte.config.yaml (kanban)
-scripts/                # new-feature / remove-feature worktree-isolation templates
+scripts/                # worktree-isolation templates + shipped preflight/kanban/telemetry scripts
 dashboard/              # local web cockpit (npx … dashboard) — see dashboard/README.md
   server/               # dependency-free node runtime (serves the built app + JSON/stream API)
   app/                  # Vite + React source (built to dashboard/dist/ at publish time)

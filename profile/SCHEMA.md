@@ -27,12 +27,14 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
 | `surfaces[].tools`                   | list         | init                              | Frontmatter `tools:` for the rendered agent.                  |
 | `surfaces[].model`                   | enum         | init (`<SURFACE_MODEL>`)          | Frontmatter `model:` tier — `sonnet`/`haiku`/`inherit`. Default `sonnet` (implementers mostly apply a frozen contract — far cheaper than the Opus lead the dispatcher runs on, and Sonnet handles it well); `haiku` for purely mechanical surfaces (scaffolding); `inherit` only for surfaces with real design decisions worth the lead's model. |
 | `surfaces[].*_cmd`                   | string       | implementer                       | test/lint/format/typecheck/build commands.                    |
+| `surfaces[].test_quiet_cmd` `.lint_quiet_cmd` | string | implementer, preflight, workflows | Bridled variants agents actually run (dot reporter / `--quiet` / failures-only). `""` ⇒ `<cmd> 2>&1 \| tail -40`. See §Output discipline. |
 | `surfaces[].uses_design`             | bool         | build, frontend                   | Whether this surface consumes designs.                        |
 | `contract.enabled`                   | bool         | build                             | `false` ⇒ skip contract authoring (§2 of /build).             |
 | `contract.mechanism`                 | enum         | build, lead                       | `shared-types-zod`/`openapi`/`protobuf`/`json-schema`/`none`. |
 | `contract.path` `.ext` `.index`      | string       | build                             | Where `<feature_id>` contract is authored + barrel.           |
 | `contract.authored_by`               | const `lead` | build                             | Implementers import it read-only, never edit.                 |
 | `commands.*`                         | string       | all                               | Repo-wide install/dev/lint/format/typecheck/test + migrate.   |
+| `commands.test_quiet` `.lint_quiet`  | string       | review, smoke, audit, workflows   | Repo-wide bridled variants — what the `/review`·`/smoke` pre-flight runs. Same fallback as the per-surface ones. |
 | `rbac.enabled`                       | bool         | brainstorm, review                | Toggle RBAC personas + authz audit.                           |
 | `rbac.hierarchy`                     | list         | review                            | Highest→lowest role list.                                     |
 | `design.enabled`                     | bool         | build, frontend, align-ds         | `false` ⇒ design steps are no-ops.                            |
@@ -50,6 +52,9 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
 | `gate.ask[]`                         | list         | hooks/gate.py, settings           | Command substrings that require confirm, on any branch.       |
 | `gate.ask_on_default_branch[]`       | list         | hooks/gate.py                     | Confirm ONLY on `default_branch`; free on feature branches.   |
 | `gate.default_branch`                | string       | hooks/gate.py                     | Protected branch (default `main`); gate resolves via git.     |
+| `gate.preflight.enabled`             | bool         | hooks/gate.py, review, smoke      | Phase gate: review/smoke dispatches need a fresh preflight stamp. See §Preflight. |
+| `gate.preflight.agents[]`            | list         | hooks/gate.py                     | `subagent_type`s the stamp gates (default `[review, smoke]`). |
+| `gate.preflight.max_age_minutes`     | number       | hooks/gate.py                     | Stamp freshness window (default 30).                          |
 
 ## Prose sections
 
@@ -186,6 +191,49 @@ at each phase boundary is always safe — each command's closing line recommends
 commands enforce: never paste a diff into a dispatch (agents compute their own, scoped); never echo a
 staged report or design brief into chat; redirect bulky command output to a file and grep it.
 
+## Output discipline — quiet commands
+
+A test runner's default output is written for a human watching a terminal: one line per test, banners,
+timing tables. An agent pays input price for every one of those lines, on every turn they survive in its
+context. The profile therefore stores **two forms of each noisy command**:
+
+- `test_cmd` / `lint_cmd` — the full form, for a human running it by hand.
+- `test_quiet_cmd` / `lint_quiet_cmd` (per surface) and `commands.test_quiet` / `commands.lint_quiet`
+  (repo-wide) — the **bridled** form agents actually execute: dot/failures-only reporter
+  (`--reporter=dot`, `--quiet`, `-q`, `--silent`, framework equivalent) so a green run costs lines,
+  not pages, and a red run prints only the failures.
+
+Rules for every consumer (implementers, preflight, `/audit` gates, workflow agents):
+
+1. Run the quiet variant when set.
+2. Quiet variant empty/absent (older profile) ⇒ run `<full cmd> 2>&1 | tail -40` — never the bare
+   command into your context.
+3. Need the full log? Redirect it to a file and grep it; never print it.
+
+`/init-pipeline` **asks** for these variants (detected defaults offered first) instead of silently
+storing a bare `pnpm test` as the thing agents execute; `/update-pipeline` tops up older profiles.
+
+## Preflight — the deterministic phase gate
+
+`/review` and `/smoke` start by running `pipeline/scripts/preflight.sh` — a plain shell script (no
+agent) that executes the profile's mechanical checks in order (typecheck → lint → tests, quiet
+variants) with all output redirected to `specs/reports/<id>.preflight.txt`:
+
+- **Any check red** ⇒ the script prints the last 40 lines raw and exits 1. The command **aborts
+  there: zero agents are spawned.** A reviewer dispatched onto code that doesn't compile burns its
+  whole run rediscovering what `tsc` already printed for free — the failure goes straight to the
+  human (or `/fix`) instead.
+- **All green** ⇒ the script stamps `.claude/preflight.ok` (`<epoch> <HEAD sha>`).
+
+`hooks/gate.py` enforces the stamp as a **phase gate** (the `preflight` block of `gate-config.json`,
+generated from `gate.preflight`): a Task dispatch of a listed `subagent_type` (default
+`review`/`smoke`) with a missing/stale stamp — older than `max_age_minutes`, or HEAD moved — gets an
+"ask", so a lead can't accidentally skip the gate but a human can consciously override it. The gate
+hook fires for **every** agent in the session, including subagents spawned by the Workflow runtime
+(they run in `acceptEdits` whatever the session mode — Write/Edit auto-approved — but Bash and Task
+still pass through hooks). In `bypassPermissions` (headless runs) every gate "ask" is escalated to a
+hard deny, because nobody is there to answer a prompt.
+
 ## Rendering / reconciling a surface agent (shared procedure)
 
 Both `/init-pipeline` (initial render) and `/build` (auto-reconcile when a spec needs a new agent) use
@@ -203,7 +251,13 @@ this exact procedure so a surface is always defined the same way. To add surface
    (resolve bundled `.claude/` vs global `~/.claude/`), substituting `<SURFACE_AGENT>`, `<SURFACE_LABEL>`,
    `<SURFACE_PATH>`, `<SURFACE_TOOLS>`, `<SURFACE_MODEL>`, `<PROJECT_NAME>`, and the surface-specific
    blocks (`<SURFACE_EXTRA_NEVER>`, `<SURFACE_DESIGN_INPUT>`, `<SURFACE_TDD_STEP1>` — leave the design
-   ones empty unless `uses_design`). For a `uses_design` surface, fill them **link-based** (never with a
+   ones empty unless `uses_design`). Fill `<SURFACE_CONVENTIONS>` with the surface's convention slice
+   **baked at render time**: `PIPELINE.md` §Conventions `### Shared` + this surface's
+   `### Surface: <key>` stanza + its §Testing lines, verbatim. At runtime the agent then reads only
+   the profile's machine block (the fenced `yaml pipeline-profile`) — never the prose sections. The
+   bake stays honest because §Conventions edits go through `/update-pipeline`, whose reconcile
+   re-renders every agent (step 2 below); hand-edit the prose without re-rendering and the baked
+   slice goes stale — that's the trade for not re-reading the prose on every dispatch. For a `uses_design` surface, fill them **link-based** (never with a
    stored `design_project` id — that goes stale on a DS rebuild):
    - `<SURFACE_DESIGN_INPUT>` — a 4th input bullet: _"The **feature design** — the pages this feature
      touches, listed in your dispatch's design slot as full links
@@ -256,6 +310,45 @@ files automatically. It works because every generated artifact is a **determinis
 
 Re-running `/init-pipeline` remains possible (it reconciles too) but is only *needed* when the stack
 itself changes in ways `/build` §1.5 can't auto-grow (e.g. package manager or contract mechanism swap).
+
+## Workflows — deterministic multi-agent runs (opt-in)
+
+Three phases have a **workflow variant** — a deterministic orchestration script the Claude Code
+Workflow runtime executes instead of the lead reasoning out the fan-out turn by turn:
+`<core>/workflows/review.js`, `audit.js`, `refactor.js` (installed to `.claude/workflows/` bundled or
+`~/.claude/workflows/` global). The conversational commands (`/review`, `/audit`, `/refactor`)
+**remain the default path and the fallback** — a workflow runs only when the human explicitly asks
+for it ("run the review workflow"), and requires Claude Code ≥ **2.1.154** with workflows enabled.
+`/doctor` reports which path a session will take. The interactive commands (`/init-pipeline`,
+`/brainstorm`, `/spec`) and the dispatch-only ones (`/build`, `/ship`) have **no** workflow variant on
+purpose: they're interviews or already a single parallel dispatch — a script adds nothing.
+
+Shared design, all three scripts:
+
+- **Phase 0 is always `profile-reader`** — workflow scripts have no filesystem or shell access, so a
+  dedicated agent (`core/agents/profile-reader.md`, haiku, read-only) reads `PIPELINE.md` and returns
+  the `yaml pipeline-profile` block as JSON. Every later phase is parameterized from that object.
+- **Mechanical phases run on haiku** (profile read, preflight, diff staging, report merging/writing);
+  judgment phases dispatch the same pinned agents the commands use (`review` at sonnet, the surface
+  implementers at their `surfaces[].model` tier) — the per-surface `model:` routing carries over.
+- **Only the verdict comes back.** Bulk (diffs, reports, backlogs) is staged to the same disk
+  buffers the commands use (`specs/reports/`, `specs/refactor-backlog.md`); the workflow's return is
+  counts + verdict + paths.
+- **`review.js`** — preflight gate (aborts red, zero agents), one `git diff --stat` staged per
+  touched surface, one reviewer per surface in parallel, then an **adversarial cross-check** phase
+  that tries to refute each CRITICAL/security finding before it can trigger a fix loop.
+- **`audit.js`** — one auditor per domain (each surface + `shared`), concurrency capped by the
+  runtime (~16), merged into the prioritized `specs/refactor-backlog.md`.
+- **`refactor.js`** — big domains only (it skips domains with a handful of open items — the
+  conversational `/refactor` is cheaper there): `shared` first and alone, then the other domains'
+  implementers in parallel, each verified per-domain.
+- **No input mid-run.** A workflow runs to completion without questions; anything interactive
+  (contract changes, human decisions) belongs to the conversational path. The gate hook still fires
+  on workflow subagents (see §Preflight) — in unattended runs its asks become denies.
+- **Permissions:** `/init-pipeline` and `/update-pipeline` extend the generated `settings.json`
+  `allow` list with what workflow agents need (the quiet commands, the shipped
+  `pipeline/scripts/*.sh`, read-only git incl. `git rev-parse`, and the retrieval provider's MCP
+  tools) so a run never stalls mid-workflow on a permission prompt nobody is watching.
 
 ## Kanban — mirroring the pipeline onto an Obsidian board
 

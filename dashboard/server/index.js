@@ -113,11 +113,13 @@ function runAction(req, res, body, { pkgRoot }) {
 // Run a pipeline slash-command through Claude Code headless (`claude -p`) in the project dir,
 // streaming its output. The command is whitelisted (no arbitrary injection into claude -p) and
 // runs autonomously (--dangerously-skip-permissions), so it never hangs waiting on a prompt.
+// Headless caveat the UI warns about: the run starts without any confirmation prompt and there
+// is no resume — if the claude process dies mid-run, the run is simply gone.
 function runClaude(req, res, body) {
   const project = body.project ? path.resolve(body.project) : null;
   const command = String(body.command || '');
-  if (!/^\/(init-pipeline|update-pipeline)$/.test(command)) {
-    return sendJson(res, 400, { error: 'unsupported command (only /init-pipeline or /update-pipeline)' });
+  if (!/^\/(init-pipeline|update-pipeline|audit)$/.test(command)) {
+    return sendJson(res, 400, { error: 'unsupported command (only /init-pipeline, /update-pipeline or /audit)' });
   }
   if (!project || !fs.existsSync(project)) {
     return sendJson(res, 400, { error: 'project path not found' });

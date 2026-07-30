@@ -78,6 +78,7 @@ copy_core() {
   cp -R "$src/core/commands"  "$dest/"
   cp -R "$src/core/hooks"     "$dest/"
   cp -R "$src/core/templates" "$dest/"
+  cp -R "$src/core/workflows" "$dest/"
   # 0.1.19 renamed questionnaire-domain-brief.md → research-brief.md; drop the stale copy.
   rm -f "$dest/templates/questionnaire-domain-brief.md"
   mkdir -p "$dest/pipeline/scripts"
@@ -87,7 +88,9 @@ copy_core() {
   cp "$src"/scripts/*.template           "$dest/pipeline/scripts/"
   cp "$src/scripts/kanban-move.sh"       "$dest/pipeline/scripts/"
   cp "$src/scripts/telemetry-send.sh"    "$dest/pipeline/scripts/"
-  chmod +x "$dest/pipeline/scripts/kanban-move.sh" "$dest/pipeline/scripts/telemetry-send.sh" 2>/dev/null || true
+  cp "$src/scripts/preflight.sh"         "$dest/pipeline/scripts/"
+  chmod +x "$dest/pipeline/scripts/kanban-move.sh" "$dest/pipeline/scripts/telemetry-send.sh" \
+           "$dest/pipeline/scripts/preflight.sh" 2>/dev/null || true
   cp "$src/core/agents/implementer.template.md" "$dest/pipeline/"
   [ -f "$src/CHANGELOG.md" ] && cp "$src/CHANGELOG.md" "$dest/pipeline/"
   printf '%s\n' "$ver" > "$dest/pipeline/VERSION"
@@ -128,7 +131,7 @@ PY
 copy_fixed_agents() {
   mkdir -p "$dest/agents"
   cp "$src/core/agents/review.md" "$src/core/agents/release.md" \
-     "$src/core/agents/smoke.md" \
+     "$src/core/agents/smoke.md" "$src/core/agents/profile-reader.md" \
      "$dest/agents/"
   # 0.1.19 split the bi-mode questionnaire-researcher into research-agent + questionnaire-architect;
   # copy-over never deletes, so scrub the retired agent lest a dead subagent_type linger.

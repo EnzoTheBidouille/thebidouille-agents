@@ -12,7 +12,7 @@ const { versions } = require('./versions');
 // Rendered surface agents live alongside these fixed (non-surface) agents; exclude them
 // from the orphan check so they're never mistaken for a stray surface agent.
 const FIXED_AGENTS = new Set([
-  'review', 'release',
+  'review', 'release', 'smoke', 'profile-reader',
   'implementer.template',
 ]);
 
@@ -186,6 +186,39 @@ function checkIsolation(profile, projectRoot) {
   return mk('isolation', 'Isolation', 'ok', 'feature scripts rendered (worktree state not checked here)');
 }
 
+// Workflow variants (review/audit/refactor as deterministic multi-agent runs) are opt-in;
+// the conversational commands stay the default path, so nothing here is ever 'bad'.
+// Whether the session has workflows ENABLED needs a live Claude session — /doctor
+// in-session checks that; here we only check what's on disk.
+function checkWorkflows(projectRoot, globalDir, installMode) {
+  if (installMode === 'none') return mk('workflows', 'Workflows', 'skip', 'no core installed');
+  const dir = installMode === 'bundled'
+    ? path.join(projectRoot, '.claude', 'workflows')
+    : path.join(globalDir, 'workflows');
+  const agentsDir = installMode === 'bundled'
+    ? path.join(projectRoot, '.claude', 'agents')
+    : path.join(globalDir, 'agents');
+  const scripts = ['review.js', 'audit.js', 'refactor.js'];
+  const missing = scripts.filter(s => !exists(path.join(dir, s)));
+  if (missing.length === scripts.length) {
+    return mk('workflows', 'Workflows', 'warn',
+      'no workflow scripts installed — conversational commands only (the default path)',
+      'npx cohorte update   (ships core/workflows/)');
+  }
+  if (missing.length) {
+    return mk('workflows', 'Workflows', 'warn', `missing script(s): ${missing.join(', ')}`,
+      'npx cohorte update   (half-copied core)');
+  }
+  if (!exists(path.join(agentsDir, 'profile-reader.md'))) {
+    return mk('workflows', 'Workflows', 'warn',
+      'scripts present but the profile-reader agent (their phase 0) is missing',
+      'npx cohorte update   (re-copies the fixed agents)');
+  }
+  return mk('workflows', 'Workflows', 'ok',
+    'scripts + profile-reader installed — opt-in per run; needs Claude Code ≥ 2.1.154 with ' +
+    'workflows enabled (run /doctor in-session to check the live half)');
+}
+
 function scanSpecs(projectRoot) {
   const dir = path.join(projectRoot, 'specs');
   const specs = [];
@@ -240,6 +273,7 @@ async function state({ projectRoot, globalDir, cliVersion }) {
     checkRetrieval(profile),
     checkDesign(profile, projectRoot),
     checkIsolation(profile, projectRoot),
+    checkWorkflows(projectRoot, globalDir, v.installMode),
     checkSpecs(specs),
   ];
 
