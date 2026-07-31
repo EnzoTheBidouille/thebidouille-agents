@@ -233,7 +233,7 @@ function checkIsolation(profile, projectRoot) {
   return mk('isolation', 'Isolation', 'ok', 'feature scripts rendered (worktree state not checked here)');
 }
 
-// Workflow variants (cycle/review/audit/refactor as deterministic multi-agent runs) are opt-in;
+// Workflow variants (review/audit/refactor as deterministic multi-agent runs) are opt-in;
 // the conversational commands stay the default path, so nothing here is ever 'bad'.
 // Whether the session has workflows ENABLED needs a live Claude session — /doctor
 // in-session checks that; here we only check what's on disk.

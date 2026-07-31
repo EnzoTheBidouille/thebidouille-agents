@@ -63,11 +63,6 @@ The spec's `## Remediation` checkboxes are the state. If a prior round's fixes w
 The worktree is behind main. `/doctor` check 6 shows "behind by N commits" per live worktree;
 `git rebase main` in the worktree before the next review.
 
-**The cycle workflow returns the same `questions` every run.**
-That's the signal the spec is vague, not that the loop is stuck — every recurring question maps
-to a spec section to sharpen (§5 contract precision, design links, role matrix). Fix upstream in
-`/spec`; the readiness gate stops flagging it.
-
 **A workflow run died mid-flight (session killed, headless audit interrupted).**
 There is no resume for headless runs. Disk state is safe by design: reports staged, remediation
 appended, backlog written — relaunch the workflow (or continue conversationally) and it picks up

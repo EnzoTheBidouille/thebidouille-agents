@@ -136,7 +136,7 @@ fs.mkdirSync(dest, { recursive: true });
 
 // --- helpers (mirror install.sh) --------------------------------------------
 function copyCore() {
-  // `workflows` = the deterministic orchestration scripts (cycle/review/audit/refactor) the
+  // `workflows` = the deterministic orchestration scripts (review/audit/refactor) the
   // Workflow runtime resolves from .claude/workflows (bundled) or ~/.claude/workflows
   // (global) — same copy rule in both modes, like commands.
   for (const d of ['commands', 'hooks', 'templates', 'workflows']) {

@@ -205,7 +205,7 @@ for (const f of workflowNames) {
 
 // ── dashboard: the metrics phase list is duplicated server/client ────────────
 // A phase present in one and not the other parses fine and renders in no column —
-// silently invisible data, which is how the cycle batch went unnoticed.
+// silently invisible data, which is how a phase batch once went unnoticed.
 const phaseList = (text, file) => {
   const m = text.match(/const PHASES = \[([^\]]*)\]/);
   if (!m) { fail(file, "no `const PHASES = [...]` found"); return null; }
