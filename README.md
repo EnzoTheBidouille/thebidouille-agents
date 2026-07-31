@@ -217,7 +217,7 @@ it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.
 | `/brainstorm`        | Interactive persona panel that pressure-tests a feature idea.                         |
 | `/spec`              | Freeze the feature spec + contract into `specs/<id>.md` (UI features also get a standalone design brief at `specs/design/<id>.md`). Also applies review returns. |
 | `/build <id>`        | Lead authors the contract, then dispatches one implementer per surface in parallel.   |
-| `/cycle <id>`        | Launch the full dev-cycle **workflow** on a frozen spec: build → smoke ∥ review → fix until zero findings; deferred questions in the output. Needs workflows enabled (falls back to the conversational path). |
+| `/cycle <id>`        | Launch the full dev-cycle **workflow** on a frozen spec: build → review → fix until zero findings (add `smoke` to run the app each round); deferred questions in the output. Needs workflows enabled (falls back to the conversational path). |
 | `/smoke <id>`        | Run the feature for real: infra up, contract endpoints, UI flows, design conformance. |
 | `/review <id>`       | Read-only review agents (one per touched surface, parallel) audit the diff vs the spec. |
 | `/fix <id>`          | Apply a review/smoke report: remediation into the spec, re-dispatch only the surfaces with findings. |
@@ -278,13 +278,13 @@ Rules that make it safe:
 
 ### Workflows — deterministic multi-agent runs (opt-in)
 
-Three phases also ship as **workflow scripts** for the Claude Code Workflow runtime — the same
+Four phases also ship as **workflow scripts** for the Claude Code Workflow runtime — the same
 fan-out the commands orchestrate, but driven by a deterministic script instead of the lead reasoning
 it out turn by turn:
 
 | Script                  | What it runs                                                                              |
 | ----------------------- | ----------------------------------------------------------------------------------------- |
-| `workflows/cycle.js`    | **The full dev cycle on a frozen spec**: contract → parallel build → smoke ∥ review(+cross-check) → fix, looping until zero findings + PASS (contract changes handled in-loop by a lead-equivalent agent). Human decisions come back in a `questions` array at the END — empty when `/brainstorm`+`/spec` did their job. Exits SHIP-ready (DoD ticked, freshness stamped) so `/ship` is a straight shot. |
+| `workflows/cycle.js`    | **The full dev cycle on a frozen spec**: contract → parallel build → review(+cross-check) → fix (∥ smoke each round if opted in via `args.smoke`), looping until zero findings (contract changes handled in-loop by a lead-equivalent agent). Human decisions come back in a `questions` array at the END — empty when `/brainstorm`+`/spec` did their job. Exits SHIP-ready (DoD ticked, freshness stamped) so `/ship` is a straight shot. |
 | `workflows/review.js`   | Preflight gate (aborts while red — zero agents), one reviewer per touched surface, adversarial cross-check of CRITICAL/security findings, merged verdict only. |
 | `workflows/audit.js`    | One auditor per domain (every surface + shared) concurrently, prioritized `specs/refactor-backlog.md`. |
 | `workflows/refactor.js` | Big domains only: `shared` first and alone, then parallel surface implementers, per-domain verify + one retry. |
@@ -338,7 +338,7 @@ core/                   # copied verbatim into ~/.claude (global) or <project>/.
   commands/             # init-pipeline + the pipeline commands + /update-pipeline
   hooks/                # gate.py (destructive-command gate; branch-aware; preflight phase gate)
   templates/            # handoff / brainstorm-return / design-brief / review-feedback / pr-body / spec
-  workflows/            # opt-in Workflow-runtime scripts: review.js / audit.js / refactor.js
+  workflows/            # opt-in Workflow-runtime scripts: cycle.js / review.js / audit.js / refactor.js
 profile/
   PIPELINE.template.md  # the profile skeleton /init-pipeline fills
   SCHEMA.md             # field reference

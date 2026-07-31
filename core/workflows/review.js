@@ -132,7 +132,17 @@ const staged = await agent(
   '4. Return the touched surfaces with their staged diff path and changed-file list. No changed paths at all ⇒ return an empty surfaces array.',
   { model: 'haiku', label: 'stage-diff', schema: STAGE, effort: 'low' },
 )
-const touched = (staged && staged.surfaces) || []
+// A DEAD staging agent returns null, which is not the same fact as "the diff is
+// empty" — conflating them handed back verdict SHIP ("nothing to review") for a
+// feature nobody had looked at. Distinguish them.
+if (!staged) {
+  return {
+    verdict: 'ABORTED',
+    reason: 'the diff-staging agent died — no reviewer was spawned and nothing was reviewed',
+    next: `re-run the review workflow, or /review ${feature} conversationally`,
+  }
+}
+const touched = staged.surfaces || []
 if (!touched.length) return { verdict: 'SHIP', reason: `no diff against ${base} — nothing to review`, findings: 0 }
 log(`Touched surfaces: ${touched.map(s => s.key).join(', ')}`)
 
@@ -172,14 +182,27 @@ const reviewed = await pipeline(
 )
 
 const results = reviewed.filter(Boolean)
+// A reviewer that DIED returns null — and a dead reviewer produces zero findings,
+// which is byte-identical to a clean surface. Left unchecked, "every reviewer
+// crashed" scores SHIP: the strongest possible verdict from the weakest possible
+// evidence. Name the unreviewed surfaces and refuse to certify them.
+const unreviewed = touched.filter(s => !results.some(r => r.key === s.key)).map(s => s.key)
+if (unreviewed.length) log(`Reviewer died on: ${unreviewed.join(', ')} — those surfaces are NOT reviewed`)
 const kept = results.flatMap(r => r.kept.map(f => ({ ...f, surface: r.key })))
 const refuted = results.flatMap(r => r.refuted.map(f => ({ ...f, surface: r.key })))
 const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }
 for (const f of kept) counts[f.severity] = (counts[f.severity] || 0) + 1
 // Verdict from the findings that SURVIVED the cross-check (a refuted CRITICAL
-// must not force a fix loop): security ⇒ BLOCK, CRITICAL ⇒ REVISE, else SHIP.
+// must not force a fix loop): security ⇒ BLOCK, CRITICAL ⇒ REVISE, else SHIP —
+// but never SHIP while a surface went unreviewed (absence of evidence, not
+// evidence of absence).
 const verdict = kept.some(f => f.kind === 'security') ? 'BLOCK'
-  : kept.some(f => f.severity === 'CRITICAL') ? 'REVISE' : 'SHIP'
+  : kept.some(f => f.severity === 'CRITICAL') ? 'REVISE'
+    : unreviewed.length ? 'REVISE' : 'SHIP'
+// Only a SHIP whose leftovers are all LOW is a clean bill of health. The
+// conversational /review routes any surviving CRITICAL/HIGH/security to /fix, so
+// this path must not answer "/ship" on a SHIP that still carries HIGH findings.
+const clean = verdict === 'SHIP' && kept.every(f => f.severity === 'LOW')
 
 // ── Phase 5 — stage the merged report; only the verdict leaves the workflow ──
 phase('Merge')
@@ -191,25 +214,54 @@ const reportBody = [
   ...['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map(s => `| ${s} | ${counts[s] || 0} |`), '',
   `Verdict: ${verdict}`, '', '## Findings', '',
   kept.length ? kept.map(findingLine).join('\n') : 'None.',
+  ...(unreviewed.length ? ['', '## NOT reviewed (reviewer died — no verdict on these)', '',
+    unreviewed.map(k => `- \`${k}\` — re-run /review ${feature} (or the review workflow)`).join('\n')] : []),
   ...(refuted.length ? ['', '## Refuted by cross-check (no action needed)', '',
     refuted.map(f => `- ${f.file}:${f.line} · ${f.problem} — refuted: ${f.reason}`).join('\n')] : []),
 ].join('\n')
-await agent(
+const staging = await agent(
   `Stage a cohorte review report and its metrics, mechanically:\n` +
   `1. Write EXACTLY this content to specs/reports/${feature}.md (overwrite):\n<<<REPORT\n${reportBody}\nREPORT\n` +
   `2. Append one line to $(dirname "$(git rev-parse --git-common-dir)")/.claude/pipeline-metrics.jsonl: ` +
   `{"ts":"<ISO now>","feature":"${feature}","phase":"review","seconds":0,"surfaces":{${results.map(r => `"${r.key}":"${verdict}:${r.kept.length}"`).join(',')}}}\n` +
-  `3. Chain the opt-in usage ping: <core>/pipeline/scripts/telemetry-send.sh review "${feature}" 0 "${verdict}:${kept.length}" || true\n` +
+  `3. Chain the opt-in usage ping: <core>/pipeline/scripts/telemetry-send.sh review "${feature}" 0 "${verdict}:${kept.length}" || true ` +
+  '(<core> = .claude if .claude/pipeline/scripts/telemetry-send.sh exists, else ~/.claude; script on neither ⇒ skip the ping).\n' +
+  // Stamp + tick only when nothing above LOW survived: the conversational /review
+  // keeps the stamp only for LOW findings, and a SHIP verdict here can still carry
+  // HIGH/MEDIUM ones — certifying those for /ship would ship known defects. A dead
+  // reviewer already forced the verdict off SHIP, so `clean` covers that too.
+  (clean
+    ? `4. Stamp the freshness gate in specs/${feature}.md's front-matter, exactly as the conversational /review §3 does ` +
+      `(so /ship can prove the reviewed code is what ships): BASE=$(git merge-base ${base} HEAD); set reviewed_base: $BASE and ` +
+      `reviewed_digest: $(git diff $BASE -- . ':(exclude)specs/' | sha256sum | cut -c1-16). ` +
+      '5. Tick the spec DoD boxes this run verified (spec conformance + copy language — review SHIP; tests/lint/typecheck — green preflight); leave the rest unticked.\n'
+    : '') +
   'Return the single word: done.',
   { model: 'haiku', label: 'stage-report', effort: 'low' },
 )
+
+// The staging agent writes the report, the metrics line, and (when clean) the
+// freshness stamp + DoD ticks. If it died, none of that is on disk — returning
+// `report: <path>` and "/ship" would point the human at a file that does not
+// exist and certify a stamp that was never written.
+const staged_ok = staging != null && /done/i.test(String(staging))
 
 return {
   verdict,
   counts,
   refutedByCrossCheck: refuted.length,
+  reportStaged: staged_ok,
+  unreviewedSurfaces: unreviewed,   // reviewers that died — these carry NO verdict
   criticals: kept.filter(f => f.severity === 'CRITICAL' || f.kind === 'security')
     .map(f => `[${f.surface}] ${f.file}:${f.line} — ${f.problem}`),
-  report: `specs/reports/${feature}.md`,
-  next: verdict === 'SHIP' ? `/ship ${feature} (after DoD ticks)` : `/fix ${feature}`,
+  report: staged_ok ? `specs/reports/${feature}.md` : '(NOT written — the staging agent died)',
+  next: !staged_ok
+    ? `the report/metrics/freshness stamp were NEVER written (staging agent died) — the verdict above is real, but nothing is on disk: re-run the review workflow, or /review ${feature}`
+    : unreviewed.length
+      ? `re-run the review — no reviewer completed on: ${unreviewed.join(', ')}`
+      : clean
+        ? `/ship ${feature} (DoD ticked + freshness stamped)`
+        : verdict === 'SHIP'
+        ? `/fix ${feature} — SHIP verdict, but ${kept.length} finding(s) above LOW survived; park them in specs/refactor-backlog.md instead if you deliberately defer them`
+        : `/fix ${feature}`,
 }

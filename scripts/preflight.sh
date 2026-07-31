@@ -40,9 +40,22 @@ for cmd in "$@"; do
 done
 
 # Stamp for the gate.py phase gate: epoch + HEAD sha of the checkout we verified.
-proj="${CLAUDE_PROJECT_DIR:-.}"
+# The stamp MUST land where gate.py reads it: <main checkout>/.claude. CLAUDE_PROJECT_DIR
+# is only exported to hooks — in an agent's Bash call it is unset, and a bare `.` would
+# drop the stamp in the feature worktree where the gate never looks. git-common-dir
+# resolves to the MAIN checkout's .git from any worktree.
+proj="${CLAUDE_PROJECT_DIR:-$(dirname "$(git rev-parse --git-common-dir 2>/dev/null || echo ./.git)")}"
 sha=$(git rev-parse HEAD 2>/dev/null || echo none)
-mkdir -p "$proj/.claude" 2>/dev/null || true
-printf '%s %s\n' "$(date +%s)" "$sha" > "$proj/.claude/preflight.ok" 2>/dev/null || true
+# Stamp BOTH the main checkout and the cwd: gate.py reads CLAUDE_PROJECT_DIR,
+# which is the worktree when the session was opened there and the main checkout
+# when it wasn't — the two disagree, and either layout is supported.
+now=$(date +%s)
+last=""
+for d in "$proj" "$(pwd)"; do
+  [ "$d" = "$last" ] && continue          # same dir twice in the main checkout
+  last="$d"
+  mkdir -p "$d/.claude" 2>/dev/null || true
+  printf '%s %s\n' "$now" "$sha" > "$d/.claude/preflight.ok" 2>/dev/null || true
+done
 
 echo "PREFLIGHT PASS ($n checks green) — full log: $report"

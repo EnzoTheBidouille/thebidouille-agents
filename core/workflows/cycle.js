@@ -1,8 +1,10 @@
 // cohorte — the FULL dev cycle as one deterministic workflow (opt-in):
-// contract → build → [preflight → smoke ∥ review(+cross-check) → fix]* → done.
+// contract → build → [preflight → review(+cross-check) (∥ smoke if opted in) → fix]* → done.
 //
-// Invoke with args = {feature: "<feature_id>", maxRounds?: 3} in the feature's
-// checkout (main checkout on the feature branch, or its worktree).
+// Invoke with args = {feature: "<feature_id>", maxRounds?: 5, smoke?: true} in the
+// feature's checkout (main checkout on the feature branch, or its worktree).
+// Smoke is OFF by default — running the app every round is the human's call
+// (/cycle <id> smoke, or standalone /smoke before /ship).
 //
 // The contract with the human: a workflow can NEVER ask a question mid-run, so
 // everything decisional is moved to the edges —
@@ -24,8 +26,9 @@
 // keeps its human confirmation. A SHIP exit ticks the DoD + stamps the
 // freshness gate, so `/ship <id>` right after is a straight shot.
 //
-// Loop economics: smoke and review run CONCURRENTLY each round (both observe,
-// neither edits); fix rounds re-dispatch only the surfaces owning findings;
+// Loop economics: when smoke is opted in it runs CONCURRENTLY with review each
+// round (both observe, neither edits); fix rounds re-dispatch only the surfaces
+// owning findings;
 // the loop is bounded by maxRounds AND by the session token budget if one is
 // set. Disk state stays pipeline-coherent: reports staged to specs/reports/,
 // unresolved findings appended to the spec's ## Remediation — a conversational
@@ -33,14 +36,14 @@
 
 export const meta = {
   name: 'cohorte-cycle',
-  description: 'Full cohorte dev cycle: contract, parallel build, then bounded smoke∥review→fix rounds; deferred questions in the output, never mid-run',
-  whenToUse: 'Only when the human explicitly asks to run the full dev-cycle workflow on a FROZEN spec. args = {feature: "<feature_id>", maxRounds?: 3}.',
+  description: 'Full cohorte dev cycle: contract, parallel build, then bounded review→fix rounds (smoke opt-in via args.smoke); deferred questions in the output, never mid-run',
+  whenToUse: 'Only when the human explicitly asks to run the full dev-cycle workflow on a FROZEN spec. args = {feature: "<feature_id>", maxRounds?: 5, smoke?: true}.',
   phases: [
     { title: 'Profile', detail: 'PIPELINE.md → JSON via profile-reader', model: 'haiku' },
     { title: 'Ready', detail: 'spec frozen + self-sufficient, or abort with the gaps', model: 'haiku' },
     { title: 'Contract', detail: 'author the frozen contract from spec §5' },
     { title: 'Build', detail: 'one implementer per surface, parallel' },
-    { title: 'Verify', detail: 'per round: preflight → smoke ∥ review + cross-check' },
+    { title: 'Verify', detail: 'per round: preflight → review + cross-check (∥ smoke if opted in)' },
     { title: 'Fix', detail: 'per round: re-dispatch only the surfaces with findings' },
     { title: 'Close', detail: 'reports, Remediation/DoD, freshness stamp, metrics', model: 'haiku' },
   ],
@@ -48,8 +51,12 @@ export const meta = {
 
 const feature = typeof args === 'string' ? args.trim() : args && args.feature
 if (!feature) throw new Error('cohorte-cycle needs args = {feature: "<feature_id>"}')
-// Runaway protection, not a target — the loop's real exit is 0 findings + PASS.
+// Runaway protection, not a target — the loop's real exit is 0 findings (+ PASS if smoking).
 const MAX_ROUNDS = Math.max(1, (args && args.maxRounds) || 5)
+// Smoke is the human's call: booting infra every round is expensive, and lib-only
+// projects have nothing to smoke. Off ⇒ the cycle verifies by review alone, the
+// runtime-flow DoD boxes stay unticked, and /smoke remains available standalone.
+const SMOKE_ON = !!(args && args.smoke)
 
 const questions = []        // every deferred human decision ends up here — emitted at the END
 const contractChanges = []  // contract re-authorings the loop performed (info, not questions)
@@ -211,7 +218,9 @@ let verdict = null
 let smokePass = false
 let smokeFails = []      // last round's smoke failures — Close reports the real count
 let open = []            // findings still open, each {severity,file,line,kind,problem,fix,src}
+let unreviewed = []      // surfaces whose reviewer died this round — they carry NO verdict
 let rounds = 0
+let fixRounds = 0        // fix dispatches performed — the close step's `fix` usage ping needs it
 let preflightRed = false // did the LAST round end on a red preflight (open/verdict then stale)?
 
 // ── Phases 4/5 — bounded verify → fix rounds ────────────────────────────────
@@ -226,10 +235,21 @@ while (rounds < MAX_ROUNDS && (!budget.total || budget.remaining() > 30000)) {
   if (preflightRed) {
     const tail = (pre && pre.tail) || ''
     const hit = new Set(surfaces.filter(s => tail.includes(String(s.path))).map(s => s.key))
-    const targets = hit.size ? [...hit] : built.map(b => b.key)
+    const targets = (hit.size ? [...hit] : built.map(b => b.key)).filter(k => byKey[k])
+    // No target = nobody to dispatch, so the next round finds the same red gates
+    // and spins again: the loop would burn every remaining round doing literally
+    // nothing, then report a stale verdict. Stop and say why instead.
+    if (!targets.length) {
+      questions.push(
+        'the mechanical gates are RED but no surface owns the failure (nothing in the tail matches a ' +
+        `surface path, and no implementer survived the build) — fix it by hand, then rerun /cycle ${feature}. ` +
+        `Failure tail:\n${tail.slice(-1500)}`)
+      break
+    }
     log(`Preflight red — mechanical fix round on: ${targets.join(', ')}`)
     phase('Fix')
-    await parallel(targets.filter(k => byKey[k]).map(k => () => agent(
+    fixRounds++
+    await parallel(targets.map(k => () => agent(
       `Fix loop for feature \`${feature}\` on your surface (**${k}**). Read \`PIPELINE.md\` first. ` +
       `Contract: \`${contractFile || 'spec §5'}\` (read-only). Touch only \`${byKey[k].path}\`. ` +
       'The mechanical gates (typecheck/lint/tests) are RED. Raw failure tail below — fix exactly ' +
@@ -248,12 +268,15 @@ while (rounds < MAX_ROUNDS && (!budget.total || budget.remaining() > 30000)) {
     '4. Return the touched surfaces (empty array if no diff).',
     { model: 'haiku', label: 'stage-diff', phase: 'Verify', schema: STAGE, effort: 'low' },
   )
-  const touched = (staged && staged.surfaces) || []
+  // "The staging agent died" and "there is genuinely no diff" are different facts;
+  // conflating them diagnosed a dead agent as a wrong branch.
+  if (!staged) { questions.push('the diff-staging agent died — nothing could be reviewed this round; rerun the cycle'); break }
+  const touched = staged.surfaces || []
   if (!touched.length) { questions.push(`no diff against ${base} after build — wrong branch/checkout?`); break }
 
-  // 4c. smoke ∥ review(+cross-check) — both observe, neither edits: run together
+  // 4c. review(+cross-check), ∥ smoke only when the human opted in — both observe, neither edits
   const [smoke, reviewed] = await parallel([
-    () => agent(
+    () => !SMOKE_ON ? Promise.resolve(null) : agent(
       'Smoke-test one feature, per your agent instructions (bring it up, exercise the contract + §8 UI ' +
       'flows, stage the full SMOKE REPORT, tear down; return the capped shape — pass + max 10 one-line ' +
       `failures with a file hint when you have one). — Variable slots: feature ${feature} · spec: ` +
@@ -287,21 +310,39 @@ while (rounds < MAX_ROUNDS && (!budget.total || budget.remaining() > 30000)) {
 
   smokePass = !!(smoke && smoke.pass)
   smokeFails = (smoke && smoke.failures) || []
-  open = (reviewed || []).filter(Boolean).flatMap(r => r.kept.map(f => ({ ...f, src: r.key })))
+  const reviewedOk = (reviewed || []).filter(Boolean)
+  // A reviewer that DIED returns null, and a dead reviewer yields zero findings —
+  // byte-identical to a clean surface. Unchecked, "every reviewer crashed" scores
+  // SHIP and this loop exits SHIP-READY, ticking the DoD and stamping the freshness
+  // gate over code nobody read. Track the surfaces that carry no verdict.
+  unreviewed = touched.filter(s => !reviewedOk.some(r => r.key === s.key)).map(s => s.key)
+  open = reviewedOk.flatMap(r => r.kept.map(f => ({ ...f, src: r.key })))
   verdict = open.some(f => f.kind === 'security') ? 'BLOCK'
-    : open.length ? 'REVISE' : 'SHIP'
-  log(`Round ${rounds}: review ${verdict} (${open.length} finding(s)) · smoke ${smokePass ? 'PASS' : `FAIL:${smokeFails.length}`}`)
+    : (open.length || unreviewed.length) ? 'REVISE' : 'SHIP'
+  log(`Round ${rounds}: review ${verdict} (${open.length} finding(s)` +
+    `${unreviewed.length ? `, ${unreviewed.length} surface(s) UNREVIEWED: ${unreviewed.join(', ')}` : ''}) · ` +
+    `smoke ${!SMOKE_ON ? 'SKIPPED' : smokePass ? 'PASS' : `FAIL:${smokeFails.length}`}`)
 
-  // The loop's contract is ZERO open findings + PASS — a SHIP verdict alone
-  // (which older revisions granted despite HIGH/MEDIUM leftovers) is not enough.
-  if (!open.length && smokePass) break
+  // The loop's contract is ZERO open findings on FULLY reviewed surfaces + a smoke
+  // PASS when smoking — a SHIP verdict alone (which older revisions granted despite
+  // HIGH/MEDIUM leftovers) is not enough. Smoke off ⇒ review alone decides, at the
+  // human's explicit risk.
+  if (!open.length && !unreviewed.length && (smokePass || !SMOKE_ON)) break
   if (rounds >= MAX_ROUNDS) break
+  // Nothing to fix, but a reviewer died: spend the next round re-reviewing rather
+  // than dispatching a fix round with no items (which would fall through to the
+  // "findings map to no surface" abort and end the run on a misleading question).
+  if (!open.length && !smokeFails.length && unreviewed.length) {
+    log(`No findings, but ${unreviewed.join(', ')} went unreviewed — retrying the review round`)
+    continue
+  }
 
   // 5. fix round. Contract-impacting findings stay INSIDE the loop: a
   //    lead-equivalent agent re-authors spec §5 + the contract file (implementers
   //    still never touch it — same division of labor as conversational /fix §1),
   //    and the surfaces it names re-dispatch against the updated shapes.
   phase('Fix')
+  fixRounds++
   const contractFindings = contractFile
     ? open.filter(f => String(f.file).startsWith(String(contract.path))) : []
   let rippleSurfaces = []
@@ -316,10 +357,21 @@ while (rounds < MAX_ROUNDS && (!budget.total || budget.remaining() > 30000)) {
       `(surfaces: ${surfaces.map(s => s.key).join(', ')}; when in doubt list them all).`,
       { label: 'contract-fix', phase: 'Fix' },
     )
-    const [what, keys] = String(cf || '').split('||').map(x => x && x.trim())
-    contractChanges.push(what || 'contract re-authored (agent gave no summary)')
-    rippleSurfaces = (keys ? keys.split(',').map(k => k.trim()) : surfaces.map(s => s.key))
-      .filter(k => byKey[k])
+    // A DEAD contract agent (agent() ⇒ null) must not be reported as a successful
+    // re-authoring: doing so both fabricates a `contractChanges` entry and hands
+    // every consuming surface a CRITICAL "the contract was RE-AUTHORED — realign"
+    // item pointing at a file nobody touched. Same failure shape as a dead
+    // reviewer scoring SHIP.
+    if (cf == null) {
+      questions.push(
+        `the contract needed a change (${contractFindings.length} finding(s) under ${contract.path}) but the ` +
+        `contract agent died — the contract is UNCHANGED; re-run /fix ${feature} or author it yourself`)
+    } else {
+      const [what, keys] = String(cf).split('||').map(x => x && x.trim())
+      contractChanges.push(what || 'contract re-authored (agent gave no summary)')
+      rippleSurfaces = (keys ? keys.split(',').map(k => k.trim()) : surfaces.map(s => s.key))
+        .filter(k => byKey[k])
+    }
   }
 
   //    Group the remaining findings by owning surface; smoke failures ride with
@@ -329,9 +381,22 @@ while (rounds < MAX_ROUNDS && (!budget.total || budget.remaining() > 30000)) {
     (perSurface[k] = perSurface[k] || []).push(
       `- [ ] CRITICAL · ${contractFile} · spec-violation · the contract was RE-AUTHORED this round (${contractChanges[contractChanges.length - 1]}) — re-read it and realign your surface's implementation + tests`)
   }
+  // A finding whose file sits under no surface path AND whose reporting surface
+  // is not a live key has no owner: it stays in `open` (so the loop can never
+  // exit clean) while nobody is ever dispatched to fix it — a guaranteed burn to
+  // the round cap. Surface them instead of dropping them silently.
+  const orphaned = []
   for (const f of open.filter(f => !contractFindings.includes(f))) {
     const k = surfaceOf(f.file) || f.src
     if (byKey[k]) (perSurface[k] = perSurface[k] || []).push(itemLine(f))
+    else orphaned.push(f)
+  }
+  if (orphaned.length) {
+    questions.push(
+      `${orphaned.length} finding(s) map to no surface and were never dispatched — fix them by hand ` +
+      `or give their tree a surface in PIPELINE.md: ` +
+      orphaned.slice(0, 5).map(f => `${f.file}:${f.line}`).join(', ') +
+      (orphaned.length > 5 ? `, +${orphaned.length - 5} more` : ''))
   }
   const fallbackKey = Object.keys(perSurface).sort((a, b) => perSurface[b].length - perSurface[a].length)[0]
     || (built[0] && built[0].key)
@@ -350,58 +415,99 @@ while (rounds < MAX_ROUNDS && (!budget.total || budget.remaining() > 30000)) {
     { agentType: byKey[k].agent, label: `fix:${k}`, phase: 'Fix' })))
 }
 
+const smokeOk = !SMOKE_ON || smokePass
+const smokeLabel = !SMOKE_ON ? 'SKIPPED' : smokePass ? 'PASS' : 'FAIL'
 if (preflightRed) {
   questions.push('the last round ended on a RED preflight — the reported verdict/findings are from the previous round and may already be fixed; rerun /review after the mechanical fixes land')
 }
-if (rounds >= MAX_ROUNDS && !(verdict === 'SHIP' && smokePass)) {
+// Only meaningful when the last round actually reviewed: after a preflight-red
+// round `unreviewed` still holds the PREVIOUS round's value, and preflightRed's
+// own question already says the reported state is one round stale.
+if (unreviewed.length && !preflightRed) {
+  questions.push(`no reviewer completed on: ${unreviewed.join(', ')} — those surfaces are NOT reviewed (the verdict covers the others only); rerun /review ${feature}`)
+}
+if (rounds >= MAX_ROUNDS && !(verdict === 'SHIP' && smokeOk)) {
   questions.push(`round cap (${MAX_ROUNDS}) reached with ${open.length} finding(s) open — rerun the cycle (maxRounds higher) or continue with /fix ${feature} + /review`)
 }
-if (budget.total && budget.remaining() <= 30000 && !(verdict === 'SHIP' && smokePass)) {
+if (budget.total && budget.remaining() <= 30000 && !(verdict === 'SHIP' && smokeOk)) {
   questions.push('token budget nearly spent — cycle stopped early; rerun the cycle or continue conversationally')
 }
 
 // ── Phase 6 — close: reports, spec bookkeeping, freshness stamp, metrics ────
 phase('Close')
-const success = verdict === 'SHIP' && smokePass
+const success = verdict === 'SHIP' && smokeOk && !unreviewed.length
 const findingLine = f => `- **[${f.severity}]** \`${f.file}:${f.line}\` · ${f.kind} · ${f.problem} → **Fix:** ${f.fix}`
 const reportBody = [
   '# REVIEW REPORT', `feature_id: ${feature} · merged by cohorte-cycle workflow (round ${rounds})`, '',
-  `Verdict: ${verdict || 'NOT-REACHED'} · smoke: ${smokePass ? 'PASS' : 'FAIL'}`, '', '## Findings', '',
+  `Verdict: ${verdict || 'NOT-REACHED'} · smoke: ${smokeLabel}`, '', '## Findings', '',
   open.length ? open.map(findingLine).join('\n') : 'None.',
+  ...(unreviewed.length ? ['', '## NOT reviewed (reviewer died — no verdict on these)', '',
+    unreviewed.map(k => `- \`${k}\` — rerun /review ${feature}`).join('\n')] : []),
 ].join('\n')
-await agent(
+// Per-surface results for the metrics line. `surfaces` means SURFACES: putting the
+// run summary (rounds/verdict/smoke) in there made the dashboard render them as
+// three phantom surface rows and score `rounds:"1"` as a failed surface.
+const surfaceResults = built.map(b => `"${b.key}":"${
+  unreviewed.includes(b.key) ? 'error' : `${verdict || 'none'}:${open.filter(f => f.src === b.key).length}`}"`).join(',')
+const closed = await agent(
   `Close a cohorte cycle run for feature ${feature}, mechanically:\n` +
   `1. Write EXACTLY this to specs/reports/${feature}.md (overwrite):\n<<<REPORT\n${reportBody}\nREPORT\n` +
   (success
     ? `2. In specs/${feature}.md tick the DoD boxes the cycle verified (spec conformance + copy language — ` +
-      'review SHIP; tests/lint/typecheck — green preflight; runtime flows — smoke PASS); leave anything ' +
+      'review SHIP; tests/lint/typecheck — green preflight; ' +
+      (SMOKE_ON ? 'runtime flows — smoke PASS' : 'runtime flows — LEAVE UNTICKED, smoke was skipped this run') +
+      '); leave anything ' +
       'unverified unticked. 3. Stamp the freshness gate in the spec front-matter, exactly as /review §3 ' +
       `does: BASE=$(git merge-base ${base} HEAD); reviewed_base: $BASE; reviewed_digest: ` +
       `$(git diff $BASE -- . ':(exclude)specs/' | sha256sum | cut -c1-16).\n` :
     `2. Append the open findings to specs/${feature}.md \`## Remediation\` under a subheading ` +
       `\`### cohorte-cycle round ${rounds}\`, one \`- [ ]\` line each (so a conversational /fix picks them ` +
       'up):\n' + (open.map(itemLine).join('\n') || '(none — see questions in the workflow result)') + '\n' +
-      `Set the front-matter status: in-review.\n`) +
+      `3. Set the front-matter status: in-review.\n`) +
   `4. Append ONE metrics line to $(dirname "$(git rev-parse --git-common-dir)")/.claude/pipeline-metrics.jsonl: ` +
-  `{"ts":"<ISO now>","feature":"${feature}","phase":"cycle","seconds":0,"surfaces":{"rounds":"${rounds}","verdict":"${verdict || 'none'}:${open.length}","smoke":"${smokePass ? 'PASS' : 'FAIL'}"}}\n` +
-  '5. Chain the opt-in usage pings (all funnel phases this run executed, 0 seconds each): ' +
-  `<core>/pipeline/scripts/telemetry-send.sh build "${feature}" 0 "${built.map(() => 'ok').join(',') || 'error'}" || true; ` +
-  `<core>/pipeline/scripts/telemetry-send.sh smoke "${feature}" 0 "${smokePass ? 'PASS' : 'FAIL:' + smokeFails.length}" || true; ` +
+  `{"ts":"<ISO now>","feature":"${feature}","phase":"cycle","seconds":0,"rounds":${rounds},"smoke":"${smokeLabel}","surfaces":{${surfaceResults}}}\n` +
+  '5. Chain the opt-in usage pings (all funnel phases this run executed, 0 seconds each; ' +
+  '<core> = .claude if .claude/pipeline/scripts/telemetry-send.sh exists, else ~/.claude — script on neither ⇒ skip the pings): ' +
+  // One result per DECLARED surface, not per survivor: `built` holds only the
+  // implementers that returned, so mapping over it reported 2-of-3 as "ok,ok" and
+  // the dead one vanished from the funnel entirely.
+  `<core>/pipeline/scripts/telemetry-send.sh build "${feature}" 0 "${
+    surfaces.map(s => (built.some(b => b.key === s.key) ? 'ok' : 'error')).join(',') || 'error'}" || true; ` +
+  (SMOKE_ON ? `<core>/pipeline/scripts/telemetry-send.sh smoke "${feature}" 0 "${smokePass ? 'PASS' : 'FAIL:' + smokeFails.length}" || true; ` : '') +
+  (fixRounds ? `<core>/pipeline/scripts/telemetry-send.sh fix "${feature}" 0 "rounds:${fixRounds}" || true; ` : '') +
   `<core>/pipeline/scripts/telemetry-send.sh review "${feature}" 0 "${verdict || 'none'}:${open.length}" || true\n` +
   'Return the single word: done.',
   { model: 'haiku', label: 'close', effort: 'low' },
 )
 
+// The close agent is what actually writes the report, ticks the DoD, stamps the
+// freshness gate and appends the metrics. If it died, NONE of that is on disk —
+// and "SHIP-READY · /ship is a straight shot" would be a claim about a stamp that
+// was never written (/ship's freshness gate skips silently when the fields are
+// absent, so the human would ship on it).
+const closeOk = closed != null && /done/i.test(String(closed))
+if (!closeOk) {
+  questions.push(
+    'the close agent died — the report, DoD ticks, freshness stamp and metrics were NEVER written. ' +
+    'The verdict above is real, but nothing landed on disk: rerun the cycle, or run /review ' +
+    `${feature} to re-stamp before /ship.`)
+}
+
 return {
-  outcome: success ? 'SHIP-READY' : 'STOPPED',
+  outcome: success && closeOk ? 'SHIP-READY' : 'STOPPED',
   rounds,
   verdict: verdict || 'not reached',
-  smoke: smokePass ? 'PASS' : 'FAIL',
+  smoke: smokeLabel,
   contractChanges,   // re-authorings the loop performed itself — review them in the diff
+  unreviewedSurfaces: unreviewed,   // reviewers that died — these carry NO verdict
   openFindings: open.slice(0, 10).map(f => `[${f.severity}] ${f.file}:${f.line} — ${f.problem}`),
   questions,         // everything deferred to you — empty when /brainstorm + /spec did their job
-  report: `specs/reports/${feature}.md`,
-  next: success
-    ? `/ship ${feature} — DoD ticked + freshness stamped, ship is a straight shot (human confirm stays)`
+  report: closeOk ? `specs/reports/${feature}.md` : '(NOT written — the close agent died)',
+  next: !closeOk
+    ? `nothing was written to disk (close agent died) — rerun the cycle, or /review ${feature} to re-stamp`
+    : success
+    ? (SMOKE_ON
+      ? `/ship ${feature} — DoD ticked + freshness stamped, ship is a straight shot (human confirm stays)`
+      : `/ship ${feature} — or /smoke ${feature} first: the cycle skipped it (opt-in), nobody has RUN this code; the runtime DoD boxes are unticked`)
     : `answer the questions, then rerun the cycle — or continue with /fix ${feature} + /review (Remediation is up to date)`,
 }

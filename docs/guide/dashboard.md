@@ -52,6 +52,21 @@ because anyone who reaches the port can run the actions. The headless-claude run
 the commands (`/init-pipeline`, `/update-pipeline`, `/audit`) — no arbitrary injection into
 `claude -p`.
 
+**Loopback binding alone is not a boundary against a browser**, so the API adds two checks:
+
+- **Host header must be a loopback origin** — this is what stops **DNS rebinding**, where an
+  attacker-controlled domain resolves to `127.0.0.1`; the browser still sends *that* domain in
+  `Host`. Skipped when you explicitly bound a non-loopback host (you were warned).
+- **State-changing requests must carry `content-type: application/json`** — that header forces a
+  CORS preflight, which this server never answers, so a page you visit cannot deliver a
+  `POST /api/action` cross-origin (**CSRF**). HTML forms can only send urlencoded/multipart/text.
+
+Reads stay protected by the absence of CORS headers: a cross-origin page can fire the request but
+cannot read the response.
+
+**Reset refuses to touch the shared core** — a project path whose `.claude` *is* the global core
+(e.g. your home directory) is rejected outright rather than backed up and moved.
+
 ## Architecture (for contributors)
 
 ```

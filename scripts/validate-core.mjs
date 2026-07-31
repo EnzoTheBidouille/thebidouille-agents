@@ -168,6 +168,11 @@ else for (const f of readdirSync(workflowsDir)) {
     fail(path, "phase 0 must read the profile via the profile-reader agent");
   if (/\bDate\.now\(\)|\bMath\.random\(\)|new Date\(\)/.test(text))
     fail(path, "Date.now()/Math.random()/new Date() are unavailable in workflow scripts");
+  // Prompts hand agents literal `<core>/…` paths; an agent can only resolve that
+  // token if the same script also spells out what <core> means. A bare token +
+  // `|| true` = the command fails silently and the ping/metrics never happen.
+  if (text.includes("<core>/") && !/<core> = /.test(text))
+    fail(path, "uses <core>/ paths in prompts without defining `<core> = …` anywhere");
   try {
     new AsyncFunction("agent", "parallel", "pipeline", "phase", "log", "args",
       "budget", "workflow", text.replace(/^export const meta/m, "const meta"));
@@ -181,6 +186,50 @@ if (!installSh.includes("core/workflows"))
   fail("install.sh", "does not copy core/workflows (copy_core)");
 if (!installPs1.includes("core\\workflows"))
   fail("install.ps1", "does not copy core\\workflows (Copy-Core)");
+
+// A new workflow script must also be KNOWN to the things that check for it, or it
+// ships and nothing notices when an installer stops copying it. cycle.js shipped in
+// 1.3.0 while three call sites still said "review/audit/refactor".
+const workflowNames = existsSync(workflowsDir)
+  ? readdirSync(workflowsDir).filter((f) => f.endsWith(".js"))
+  : [];
+const ci = existsSync(join(root, ".github/workflows/ci.yml")) ? read(".github/workflows/ci.yml") : "";
+const dashDoctor = read("dashboard/server/doctor.js");
+for (const f of workflowNames) {
+  if (!ci.includes(`workflows/${f}`))
+    fail(".github/workflows/ci.yml", `install dry-run never asserts .claude/workflows/${f}`);
+  if (!dashDoctor.includes(`'${f}'`))
+    fail("dashboard/server/doctor.js", `checkWorkflows() does not list ${f}`);
+}
+
+// ── dashboard: the metrics phase list is duplicated server/client ────────────
+// A phase present in one and not the other parses fine and renders in no column —
+// silently invisible data, which is how the cycle batch went unnoticed.
+const phaseList = (text, file) => {
+  const m = text.match(/const PHASES = \[([^\]]*)\]/);
+  if (!m) { fail(file, "no `const PHASES = [...]` found"); return null; }
+  return m[1].split(",").map((s) => s.trim().replace(/^['"]|['"]$/g, "")).filter(Boolean);
+};
+const serverPhases = phaseList(read("dashboard/server/metrics.js"), "dashboard/server/metrics.js");
+const clientPhases = phaseList(read("dashboard/app/src/components/MetricsPanel.jsx"),
+  "dashboard/app/src/components/MetricsPanel.jsx");
+if (serverPhases && clientPhases && serverPhases.join("|") !== clientPhases.join("|"))
+  fail("dashboard/app/src/components/MetricsPanel.jsx",
+    `PHASES drifted from dashboard/server/metrics.js ([${clientPhases}] vs [${serverPhases}])`);
+
+// ── packaging: no build artifacts in the published tarball ──────────────────
+// `.npmignore` is INERT under an explicit package.json `files` allowlist, so its
+// `__pycache__/` rule never fired — a maintainer who had compiled gate.py shipped
+// their machine's bytecode cache. The negations in `files` are what actually work.
+const pkg = JSON.parse(read("package.json"));
+for (const negation of ["!core/hooks/__pycache__", "!**/*.pyc"])
+  if (!(pkg.files || []).includes(negation))
+    fail("package.json", `\`files\` must carry the ${negation} negation (.npmignore cannot do this)`);
+for (const [name, src] of Object.entries(installers))
+  if (!src.includes("__pycache__"))
+    fail(name, "never scrubs hooks/__pycache__ — cp -R would carry it into the user's .claude");
+if (!read("bin/cli.js").includes("__pycache__"))
+  fail("bin/cli.js", "copyCore() never excludes __pycache__ from the hooks copy");
 
 // ── report ──────────────────────────────────────────────────────────────────
 if (errors.length) {

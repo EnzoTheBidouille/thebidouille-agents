@@ -30,7 +30,15 @@ export default function ProjectCard({ p, onOpen, onRemove }) {
   const s = p.summary;
 
   return (
-    <div className="project-card" onClick={onOpen} role="button" tabIndex={0}>
+    <div
+      className="project-card"
+      onClick={onOpen}
+      role="button"
+      tabIndex={0}
+      // role="button" + tabIndex made the card focusable but not activatable:
+      // a keyboard user could tab to it and nothing would open.
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
+    >
       <div className="pc-head">
         <span className="pc-name">{p.name}</span>
         <button
@@ -58,6 +66,6 @@ export default function ProjectCard({ p, onOpen, onRemove }) {
 }
 
 function shorten(p) {
-  const parts = p.split('/');
+  const parts = p.split(/[\\/]/); // Windows fleet paths use backslashes
   return parts.length > 3 ? '…/' + parts.slice(-2).join('/') : p;
 }

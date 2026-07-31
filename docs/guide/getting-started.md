@@ -53,10 +53,12 @@ curl -fsSL https://raw.githubusercontent.com/TheBidouilleAgency/cohorte/main/ins
 Both mirror the npm CLI exactly (same files, same scrub of retired artifacts, same config seeding).
 
 ::: tip What lands where
-Either mode installs: `commands/` (the slash commands), `agents/` (review, release, smoke,
-profile-reader + the implementer template), `hooks/gate.py`, `templates/`, `workflows/` (the four
-workflow scripts), and `pipeline/` (the profile templates, `SCHEMA.md`, the shipped scripts —
-`preflight.sh`, `kanban-move.sh`, `telemetry-send.sh` — and `VERSION` + `CHANGELOG.md`). A
+Either mode installs: `commands/` (the slash commands), `agents/` (the four fixed agents —
+review, release, smoke, profile-reader), `hooks/gate.py`, `templates/`, `workflows/` (the four
+workflow scripts), and `pipeline/` (the profile templates, `SCHEMA.md`,
+`implementer.template.md` — the surface-agent template lives here, *not* in `agents/`, so it is
+never mistaken for a dispatchable agent — the shipped scripts `preflight.sh`, `kanban-move.sh`,
+`telemetry-send.sh`, and `VERSION` + `CHANGELOG.md`). A
 user-level `~/.claude/cohorte.config.yaml` is seeded once (kanban + telemetry config; never
 clobbered on update).
 :::
@@ -121,7 +123,7 @@ comes with its exact fix command.
 /clear
 /spec                ← freeze specs/<id>.md — the single source of truth
 /clear
-/cycle <id>          ← the autonomous loop: build → smoke ∥ review → fix, until zero findings
+/cycle <id> [smoke]  ← the autonomous loop: build → review → fix, until zero findings (`smoke` = also run the app each round)
 /ship <id>           ← commit, push, PR (the one human-confirmed step)
 ```
 

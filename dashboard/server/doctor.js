@@ -101,7 +101,7 @@ function checkAgents(profile, projectRoot) {
 
 function checkGate(profile, projectRoot) {
   const gate = profile && profile.gate;
-  if (!gate || (!gate.deny && !gate.ask && !gate.ask_on_default_branch)) {
+  if (!gate || (!gate.deny && !gate.ask && !gate.ask_on_default_branch && !gate.preflight)) {
     return mk('gate', 'Gate config', 'skip', 'no gate block in the profile');
   }
   const cfg = readJson(path.join(projectRoot, '.claude', 'gate-config.json'));
@@ -114,6 +114,15 @@ function checkGate(profile, projectRoot) {
   if (!sameSet(cfg.ask, gate.ask)) drifted.push('ask');
   if (!sameSet(cfg.ask_on_default_branch, gate.ask_on_default_branch)) drifted.push('ask_on_default_branch');
   if ((cfg.default_branch || 'main') !== (gate.default_branch || 'main')) drifted.push('default_branch');
+  // The phase gate (1.3.0) lives in the same file: a profile that enables
+  // gate.preflight with a pre-1.3.0 gate-config.json silently never fires it.
+  const wantPf = gate.preflight || {};
+  const havePf = (cfg.preflight && typeof cfg.preflight === 'object') ? cfg.preflight : {};
+  if (!!wantPf.enabled !== !!havePf.enabled
+      || !sameSet(wantPf.agents || ['review', 'smoke'], havePf.agents || ['review', 'smoke'])
+      || Number(wantPf.max_age_minutes || 30) !== Number(havePf.max_age_minutes || 30)) {
+    drifted.push('preflight');
+  }
   if (drifted.length) {
     return mk('gate', 'Gate config', 'warn',
       `gate-config.json drifted from PIPELINE.md gate block (${drifted.join(', ')})`,
@@ -125,36 +134,67 @@ function checkGate(profile, projectRoot) {
     (branchGated ? `, ${branchGated} gated on ${gate.default_branch || 'main'}` : '') + ')');
 }
 
-function checkHooks(projectRoot, globalDir, installMode) {
-  const settingsPath = installMode === 'global'
-    ? path.join(globalDir, 'settings.json')
-    : path.join(projectRoot, '.claude', 'settings.json');
+function gateRegs(settingsPath) {
   const data = readJson(settingsPath);
   const pre = data && data.hooks && Array.isArray(data.hooks.PreToolUse) ? data.hooks.PreToolUse : [];
-  const regs = pre.filter(e => (e.hooks || []).some(
-    h => typeof h.command === 'string' && h.command.trim().endsWith('gate.py')));
+  // Trailing-quote tolerant, like the installers since 1.3.2: the Windows form is
+  // `py "C:\…\gate.py"` — a bare .endsWith() reports every healthy Windows install
+  // as "not registered".
+  return pre.filter(e => (e.hooks || []).some(
+    h => typeof h.command === 'string' && h.command.trim().replace(/"+$/, '').endsWith('gate.py')));
+}
 
-  if (regs.length === 0) {
-    return mk('hooks', 'Gate hook', 'warn', `gate.py not registered in ${installMode} settings.json`,
+function checkHooks(projectRoot, globalDir, installMode) {
+  // A registration in EITHER scope serves the project: bundled repos get it from
+  // /init-pipeline in project settings, but on a machine with the global core the
+  // hook usually lives (correctly, exactly once) in global settings — warning
+  // there would prescribe a re-registration that double-prompts.
+  const scopes = [
+    { label: 'project', path: path.join(projectRoot, '.claude', 'settings.json') },
+    { label: 'global', path: path.join(globalDir, 'settings.json') },
+  ];
+  if (installMode === 'global') scopes.reverse();
+  const found = scopes.map(s => ({ ...s, regs: gateRegs(s.path) })).filter(s => s.regs.length);
+
+  if (!found.length) {
+    return mk('hooks', 'Gate hook', 'warn', 'gate.py not registered in project or global settings.json',
       installMode === 'global'
         ? 'npx cohorte install --global   (re-registers the hook)'
         : '/init-pipeline   (register the PreToolUse gate hook)');
   }
-  if (regs.length > 1) {
-    return mk('hooks', 'Gate hook', 'warn', `gate.py registered ${regs.length}× — it will double-prompt`,
-      'remove the duplicate PreToolUse entry in settings.json');
+  const total = found.reduce((n, s) => n + s.regs.length, 0);
+  if (total > 1) {
+    return mk('hooks', 'Gate hook', 'warn',
+      `gate.py registered ${total}× (${found.map(s => `${s.regs.length} in ${s.label}`).join(', ')}) — it will double-prompt`,
+      'keep exactly one PreToolUse entry (drop the project-level one when the global core is installed)');
   }
-  return mk('hooks', 'Gate hook', 'ok', `registered once (${installMode} settings.json)`);
+  const matcher = String(found[0].regs[0].matcher || '');
+  if (!/\bTask\b/.test(matcher) || !/\bBash\b/.test(matcher)) {
+    return mk('hooks', 'Gate hook', 'warn',
+      `registered with matcher "${matcher}" — it must cover both Bash (command gating) and Task (preflight phase gate)`,
+      'npx cohorte@latest update --global   (reconciles the matcher to Bash|Task)');
+  }
+  return mk('hooks', 'Gate hook', 'ok', `registered once, matcher ${matcher} (${found[0].label} settings.json)`);
 }
 
-function checkRetrieval(profile) {
+function checkRetrieval(profile, projectRoot) {
   const provider = profile && profile.retrieval && profile.retrieval.provider;
   if (!provider || provider === 'none' || String(provider).startsWith('<')) {
     return mk('retrieval', 'Code retrieval', 'skip', 'provider: none');
   }
-  // Connectivity (server actually connects) needs a live session — note it, don't fake green.
+  // The profile alone isn't proof the provider was ever wired: /init-pipeline
+  // registers it at project scope in .mcp.json. Verify the entry exists on disk;
+  // live connectivity still needs a session — note it, don't fake green.
+  const mcp = readJson(path.join(projectRoot, '.mcp.json'));
+  const servers = (mcp && mcp.mcpServers) || {};
+  const wired = Object.keys(servers).some(k => k.toLowerCase().includes(String(provider).toLowerCase()));
+  if (!wired) {
+    return mk('retrieval', 'Code retrieval', 'warn',
+      `profile says provider: ${provider} but .mcp.json has no matching server entry`,
+      '/init-pipeline or /update-pipeline   (re-wire the retrieval provider)');
+  }
   return mk('retrieval', 'Code retrieval', 'ok',
-    `provider: ${provider} — connectivity not checked here (run /doctor in-session)`);
+    `provider: ${provider} — registered in .mcp.json (connectivity needs /doctor in-session)`);
 }
 
 function checkDesign(profile, projectRoot) {
@@ -186,7 +226,7 @@ function checkIsolation(profile, projectRoot) {
   return mk('isolation', 'Isolation', 'ok', 'feature scripts rendered (worktree state not checked here)');
 }
 
-// Workflow variants (review/audit/refactor as deterministic multi-agent runs) are opt-in;
+// Workflow variants (cycle/review/audit/refactor as deterministic multi-agent runs) are opt-in;
 // the conversational commands stay the default path, so nothing here is ever 'bad'.
 // Whether the session has workflows ENABLED needs a live Claude session — /doctor
 // in-session checks that; here we only check what's on disk.
@@ -230,11 +270,12 @@ function scanSpecs(projectRoot) {
     const fm = txt.match(/^---\r?\n([\s\S]*?)\r?\n---/);
     const body = fm ? fm[1] : '';
     const get = k => { const m = body.match(new RegExp(`^${k}:\\s*(.*)$`, 'm')); return m ? m[1].trim() : null; };
+    const status = get('status');
     specs.push({
       file: f,
       id: get('feature_id') || f.replace(/\.md$/, ''),
       title: get('title'),
-      status: get('status') ? get('status').split('#')[0].trim() : null,
+      status: status ? status.split('#')[0].trim() : null,
       branch: get('branch'),
     });
   }
@@ -270,7 +311,7 @@ async function state({ projectRoot, globalDir, cliVersion }) {
     checkAgents(profile, projectRoot),
     checkGate(profile, projectRoot),
     checkHooks(projectRoot, globalDir, v.installMode),
-    checkRetrieval(profile),
+    checkRetrieval(profile, projectRoot),
     checkDesign(profile, projectRoot),
     checkIsolation(profile, projectRoot),
     checkWorkflows(projectRoot, globalDir, v.installMode),

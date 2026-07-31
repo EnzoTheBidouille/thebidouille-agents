@@ -2,7 +2,9 @@
 #
 # new-feature.sh — spin up an ISOLATED git worktree for one feature so features
 # can be built fully in parallel. Rendered from a template by /init-pipeline;
-# the __TOKENS__ below are substituted from PIPELINE.md §isolation.
+# the double-underscore tokens below are substituted from PIPELINE.md §isolation.
+# (This comment deliberately avoids spelling the token pattern: /doctor flags any
+# leftover double-underscore-caps token in the RENDERED script as unrendered.)
 #
 # Usage:  scripts/new-feature.sh <feature_id>
 #

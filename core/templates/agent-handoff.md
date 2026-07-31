@@ -1,6 +1,11 @@
-# HANDOFF — <surface> · `<feature_id>`
+# HANDOFF — <surface> · <feature_id>
 
-<!-- Keep it tight: the lead only acts on mismatches, test failures, remediation ticks, and TODOs.
+<!-- REFERENCE COPY — not read at runtime. The AUTHORITATIVE shape is inlined in
+     core/agents/implementer.template.md (§"Your return"), because a rendered agent must
+     not need a second file read to know its own output format. This file exists for humans
+     reading the core; keep it byte-aligned with the template, or delete both together.
+
+     Keep it tight: the lead only acts on mismatches, test failures, remediation ticks, and TODOs.
      Never list files one by one — the lead has `git diff --stat`. Never paste code excerpts —
      a file:line reference is enough, the code is on disk. One line per item. -->
 

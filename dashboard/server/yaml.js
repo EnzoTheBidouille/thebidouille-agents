@@ -62,10 +62,13 @@ function scalar(raw) {
   return v;
 }
 
+// Split "key: rest" on the FIRST colon. A colon inside the value (a URL, a
+// chained shell command) is therefore kept in `rest`, which is what we want;
+// callers are responsible for not feeding this a flow scalar (`[a, b]` /
+// `{a: 1}`) — the block parser checks the first character before calling.
 function keyValue(text) {
   const idx = text.indexOf(':');
   if (idx === -1) return null;
-  // Guard against flow-map values being mistaken for a key split.
   return { key: text.slice(0, idx).trim(), rest: text.slice(idx + 1).trim() };
 }
 

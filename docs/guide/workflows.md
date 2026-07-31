@@ -40,14 +40,22 @@ Every script follows the same skeleton:
 
 ## `cycle.js` — the full dev cycle {#cycle-js-the-full-dev-cycle}
 
-**Launcher: `/cycle <feature_id> [max_rounds]`** — resolves the script, checks the runtime,
-sanity-checks the spec, launches in the background (watch with `/workflows`), then relays the
-result when it lands.
+**Launcher: `/cycle <feature_id> [max_rounds] [smoke]`** — resolves the script, checks the
+runtime, sanity-checks the spec, launches in the background (watch with `/workflows`), then relays
+the result when it lands.
 
 ```
-Profile → Ready → Contract → Build ─┬─▶ Preflight ─▶ Smoke ∥ Review(+cross-check) ─▶ SHIP+PASS? ──▶ Close
+Profile → Ready → Contract → Build ─┬─▶ Preflight ─▶ Review(+cross-check) [∥ Smoke] ─▶ clean? ──▶ Close
                                     └──────────────── Fix (surfaces with findings) ◀── no ─┘
 ```
+
+::: warning Smoke is opt-in
+By default the cycle verifies by **review only** — booting the app every round is expensive, and a
+library project has nothing to smoke. Add the literal token `smoke` (`/cycle my-feat smoke`, or
+`args.smoke: true`) to run the smoke agent alongside each review round. Without it the run reports
+`smoke: "SKIPPED"`, the **runtime-flow DoD boxes stay unticked**, and `next` tells you nobody has
+actually *run* the code — `/smoke <id>` standalone before `/ship` remains the answer.
+:::
 
 - **Readiness gate** (before spending anything): the spec must be `frozen`. Other gaps — empty
   `design_files` on a UI feature, §5 placeholders, tasks missing for an implied surface — ride
@@ -55,15 +63,20 @@ Profile → Ready → Contract → Build ─┬─▶ Preflight ─▶ Smoke ∥
 - **Contract** authored by a lead-equivalent agent from spec §5, then **build**: one implementer
   per surface, parallel, TDD-first.
 - **Rounds** (default max 5, and the token budget if one is set — both are runaway protection,
-  not targets; the real exit is *zero findings + PASS*):
+  not targets; the real exit is *zero open findings on fully-reviewed surfaces*, plus a smoke
+  `PASS` when smoke is on):
   1. **Preflight** — typecheck + lint + tests via `preflight.sh`. Red short-circuits straight to
      a mechanical fix round on the surfaces whose paths appear in the failure tail.
   2. **Stage** — one `git diff --stat`, per-surface patches staged for the reviewers.
-  3. **Smoke ∥ Review** — both *observe*, neither edits, so they run **concurrently**: the smoke
-     agent exercises the running app while one reviewer per touched surface audits the staged
-     diff. Every CRITICAL/security finding then faces an **adversarial cross-check** — a second
-     reviewer prompted to *refute* it; a refuted finding never triggers a fix round.
-  4. **Exit check** — review `SHIP` + smoke `PASS` ⇒ done.
+  3. **Review** (∥ **Smoke** when opted in) — both *observe*, neither edits, so they run
+     **concurrently**: one reviewer per touched surface audits the staged diff while the smoke
+     agent exercises the running app. Every CRITICAL/security finding then faces an **adversarial
+     cross-check** — a second reviewer prompted to *refute* it; a refuted finding never triggers a
+     fix round.
+  4. **Exit check** — zero surviving findings, **every touched surface actually reviewed**, and
+     smoke `PASS` when smoke is on. A reviewer that dies leaves its surface with no verdict: the
+     round cannot score `SHIP`, and the surface comes back in `unreviewedSurfaces` + `questions`
+     rather than passing as clean.
   5. **Fix** — findings grouped by owning surface (smoke failures mapped by their file hint);
      only those surfaces re-dispatch, each with its items verbatim.
 - **Contract changes stay inside the loop.** A finding whose file lives under `contract.path`
@@ -71,7 +84,8 @@ Profile → Ready → Contract → Build ─┬─▶ Preflight ─▶ Smoke ∥
   what conversational `/fix` does — implementers still never touch it), then the consuming
   surfaces re-dispatch. The re-authorings are reported as `contractChanges` for you to eyeball in
   the diff.
-- **Close** — reports staged; on success the DoD boxes the cycle verified are ticked and the
+- **Close** — reports staged; on success the DoD boxes the cycle verified are ticked (the
+  runtime-flow boxes only when smoke actually ran) and the
   **freshness gate is stamped**, so `/ship <id>` right after is a straight shot (ship keeps its
   human confirmation — it's the outward-facing, irreversible step and deliberately stays outside
   the workflow). On a stop, the open findings are appended to the spec's `## Remediation` — a
@@ -83,8 +97,9 @@ The result object:
 {
   "outcome": "SHIP-READY" | "STOPPED" | "NOT-READY" | "ABORTED",
   "rounds": 2,
-  "verdict": "SHIP", "smoke": "PASS",
+  "verdict": "SHIP", "smoke": "PASS" | "FAIL" | "SKIPPED",   // SKIPPED = smoke not opted in
   "contractChanges": [],          // re-authorings the loop performed — review them in the diff
+  "unreviewedSurfaces": [],       // reviewers that died — these surfaces carry NO verdict
   "openFindings": [],
   "questions": [],                // your inbox from the run — empty when the spec pre-answered everything
   "report": "specs/reports/<id>.md",

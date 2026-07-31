@@ -1,6 +1,8 @@
 import React from 'react';
 
-const PHASES = ['build', 'review', 'fix', 'smoke'];
+// Mirrors dashboard/server/metrics.js PHASES — `cycle` is the workflow variant's
+// own batch, and a phase missing here renders in no column at all.
+const PHASES = ['build', 'review', 'fix', 'smoke', 'cycle'];
 
 function fmtSeconds(s) {
   if (s == null) return '—';
@@ -67,6 +69,11 @@ function FeatureMetrics({ f }) {
           <span className={`badge ${f.fixRounds > 1 ? 'warn' : 'neutral'}`}>
             {f.fixRounds} fix round{f.fixRounds === 1 ? '' : 's'}
           </span>
+          {f.cycleRounds > 0 && (
+            <span className="badge neutral" title="verify→fix rounds inside the cycle workflow">
+              cycle ×{f.cycleRounds}
+            </span>
+          )}
         </span>
       </div>
 

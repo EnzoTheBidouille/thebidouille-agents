@@ -28,28 +28,44 @@ done
 
 tmp="${board}.kanban-move.$$"
 ID="$id" COL="$col" PR="$pr" TITLE="${title:-$id}" awk '
+  # Emit one line, collapsing runs of blank lines to a single one. Without this
+  # every move netted +1 blank line in the target column (the card is inserted
+  # with its own separator, right after the blank that already preceded the next
+  # heading) — ten moves of one card padded a board with fifteen blank lines.
+  function emit(s) {
+    if (s == "") { if (lastblank) return; lastblank = 1 } else lastblank = 0
+    print s
+  }
+  function put_card(   k) {
+    emit(card)
+    for (k = 1; k <= sn; k++) emit(snote[k])
+  }
   BEGIN {
     id = ENVIRON["ID"]; col = tolower(ENVIRON["COL"])
     pr = ENVIRON["PR"]; title = ENVIRON["TITLE"]
-    n = 0; card = ""; incard = 0; found = 0; colseen = 0
+    n = 0; card = ""; found = 0; colseen = 0; sn = 0; lastblank = 0
   }
   { lines[++n] = $0 }
   END {
     # pass 1: extract the FIRST card block tagged #id; mark every block for removal
     for (i = 1; i <= n; i++) {
       l = lines[i]
-      if (l ~ /^- \[.\] / && index(l, "#" id) > 0) {
-        # word-boundary check: char after the tag must not extend the id
-        rest = substr(l, index(l, "#" id) + length(id) + 1, 1)
-        if (rest != "" && rest ~ /[A-Za-z0-9_-]/) continue
-        del[i] = 1
-        if (!found) { found = 1; card = l }
-        for (j = i + 1; j <= n && lines[j] ~ /^[ \t]/; j++) {
-          del[j] = 1
-          if (found && card == lines[i]) sub_notes = sub_notes lines[j] "\n"
-        }
-        i = j - 1
+      if (l !~ /^- \[.\] /) continue
+      p = index(l, "#" id)
+      if (p == 0) continue
+      # word-boundary check: char after the tag must not extend the id
+      rest = substr(l, p + length(id) + 1, 1)
+      if (rest != "" && rest ~ /[A-Za-z0-9_-]/) continue
+      # Capture the sub-notes of the FIRST match only. Testing `card == lines[i]`
+      # instead also captured a later duplicate whose text happened to match.
+      isfirst = 0
+      if (!found) { found = 1; card = l; isfirst = 1 }
+      del[i] = 1
+      for (j = i + 1; j <= n && lines[j] ~ /^[ \t]/; j++) {
+        del[j] = 1
+        if (isfirst) snote[++sn] = lines[j]
       }
+      i = j - 1
     }
     if (!found) card = "- [ ] " title "  #" id
     if (pr != "" && index(card, "PR #") == 0) card = card " — PR #" pr
@@ -63,22 +79,20 @@ ID="$id" COL="$col" PR="$pr" TITLE="${title:-$id}" awk '
       atheading = (l ~ /^## /)
       atsettings = (l ~ /^%% kanban:settings/)
       if (intarget && (atheading || atsettings)) {
-        # back up over trailing blank lines already printed is not possible;
-        # instead print card just before this boundary
-        print card
-        if (sub_notes != "") printf "%s", sub_notes
-        print ""
+        # can not back up over already-printed lines; place the card just before
+        # this boundary instead
+        put_card()
+        emit("")
         intarget = 0; placed = 1
       }
       if (atheading) {
         h = tolower(l); sub(/^## +/, "", h); gsub(/ +$/, "", h)
         if (h == col) { intarget = 1; colseen = 1 }
       }
-      print l
+      emit(l)
     }
     if (intarget && !placed) {
-      print card
-      if (sub_notes != "") printf "%s", sub_notes
+      put_card()
       placed = 1
     }
     if (!colseen) exit 3

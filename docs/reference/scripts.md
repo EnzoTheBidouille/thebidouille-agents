@@ -57,9 +57,29 @@ prefix, install/dev/migrate commands, per-surface env stanzas).
 
 - `scripts/validate-core.mjs` — CI's structural validator for the core itself: command/agent
   frontmatter + model pins, template placeholders, cross-references, telemetry funnel coverage,
-  installer coverage of every shipped script, and workflow-script invariants (parses each
-  `core/workflows/*.js` exactly as the runtime does — async body wrap — plus meta literal,
-  `profile-reader` phase 0, no `Date.now()`).
+  installer coverage of every shipped script, dashboard phase-list parity, packaging negations,
+  and workflow-script invariants (parses each `core/workflows/*.js` exactly as the runtime does —
+  async body wrap — plus meta literal, `profile-reader` phase 0, no `Date.now()`).
+- `scripts/test-workflows.mjs` — **behavioural** tests for `core/workflows/*.js`: runs each script
+  with stub agents and asserts the returned verdict object. Structural checks cannot see verdict
+  logic, and one failure mode needs exactly this — `agent()` returns `null` when a subagent dies,
+  so a crashed reviewer yields zero findings, indistinguishable from a clean surface. Both
+  `review.js` and `cycle.js` scored that as `SHIP` until this test existed.
+- `scripts/test-gate.mjs` — **behavioural** tests for `hooks/gate.py`, driving its real
+  stdin→stdout contract with PreToolUse payloads: the deny/ask tiers, chained-command splitting
+  (`&&`, `;`, `|`, `||`, newlines), branch-conditional gating resolved at the *payload's* cwd,
+  the `bypassPermissions` ask⇒deny escalation, config robustness (missing/unparseable ⇒ silent),
+  the preflight phase gate (missing/stale/HEAD-moved/unreadable stamp), and worktree-aware HEAD
+  matching. The gate is the only component that can block a user's command; `py_compile` proves
+  only that it parses.
+- `scripts/test-dashboard.mjs` — tests for `dashboard/server/*.js`, all shipped runtime code: the
+  block-YAML parser (against the real `PIPELINE.template.md`), the metrics aggregator (new +
+  legacy line formats), the JS port of `/doctor` (each check green, then each one made to fail),
+  the Obsidian board parser, the fleet registry, and the HTTP guards — driven over a real socket,
+  because `fetch` silently drops a forged `Host` header and would pass against no guard at all.
+- `scripts/assert-gate-hook.mjs` — post-install assertion on a `settings.json`: exactly one
+  `gate.py` registration (callers install twice first), with a matcher covering both `Bash` and
+  `Task`. Both invariants are shipped regressions.
 - `.github/workflows/ci.yml` — runs the validator, syntax-checks CLI/server/hook/installers,
   and **dry-runs both installers** into scratch homes, asserting the exact postconditions
   (agents present, scripts executable, workflows shipped, templates-not-rendered).

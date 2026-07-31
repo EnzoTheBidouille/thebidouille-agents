@@ -100,18 +100,33 @@ def current_branch(cwd: str):
     return None
 
 
-def current_head(cwd: str):
-    """HEAD sha at `cwd`, or None."""
+def known_heads(cwd: str):
+    """Every HEAD sha this repo currently has checked out: `cwd`'s plus each
+    linked worktree's. The preflight may legitimately have run in a feature
+    worktree while the Task dispatch fires from the main checkout (or vice
+    versa) — comparing against a single HEAD flags those runs as stale."""
+    heads = set()
     try:
         out = subprocess.run(
             ["git", "rev-parse", "HEAD"],
             cwd=cwd, capture_output=True, text=True, timeout=3,
         )
-        if out.returncode == 0:
-            return out.stdout.strip() or None
+        if out.returncode == 0 and out.stdout.strip():
+            heads.add(out.stdout.strip())
     except Exception:
         pass
-    return None
+    try:
+        out = subprocess.run(
+            ["git", "worktree", "list", "--porcelain"],
+            cwd=cwd, capture_output=True, text=True, timeout=3,
+        )
+        if out.returncode == 0:
+            for line in out.stdout.splitlines():
+                if line.startswith("HEAD "):
+                    heads.add(line.split(" ", 1)[1].strip())
+    except Exception:
+        pass
+    return heads
 
 
 def check_preflight(payload: dict, cfg: dict) -> int:
@@ -140,8 +155,8 @@ def check_preflight(payload: dict, cfg: dict) -> int:
             if age_min > max_age:
                 why = f"the preflight stamp is {age_min:.0f} min old (max {max_age:.0f})"
             else:
-                head = current_head(session_cwd(payload))
-                if head and sha not in ("", "none") and head != sha:
+                heads = known_heads(session_cwd(payload))
+                if heads and sha not in ("", "none") and sha not in heads:
                     why = "HEAD moved since the preflight ran"
         except Exception:
             why = "the preflight stamp is unreadable (expected `<epoch> <sha>`)"

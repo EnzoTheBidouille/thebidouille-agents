@@ -41,7 +41,7 @@ function KanbanCard({ card }) {
         <div className="kc-tags">
           {prs.map(pr => {
             const cls = `kc-pr state-${(pr.state || 'unknown').toLowerCase()}${pr.draft ? ' draft' : ''}`;
-            const label = `PR #${pr.num}${pr.inferred ? '' : ''}`;
+            const label = `PR #${pr.num}${pr.inferred ? ' ≈' : ''}`; // ≈ = matched by branch, not written on the card
             return pr.url
               ? <a key={pr.num} className={cls} href={pr.url} target="_blank" rel="noreferrer"
                    title={pr.inferred ? 'matched by branch' : ''}>{label}</a>

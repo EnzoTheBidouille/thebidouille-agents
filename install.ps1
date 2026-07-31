@@ -137,6 +137,10 @@ try {
         Copy-Tree (Join-Path $src 'core\hooks')     (Join-Path $dest 'hooks')
         Copy-Tree (Join-Path $src 'core\templates') (Join-Path $dest 'templates')
         Copy-Tree (Join-Path $src 'core\workflows') (Join-Path $dest 'workflows')
+        # A Python bytecode cache appears in a source checkout the moment anyone compiles
+        # or imports gate.py (CI does) and Copy-Item carries it along — machine- and
+        # interpreter-specific, and copy-over would never delete it later.
+        Remove-Item -LiteralPath (Join-Path $dest 'hooks\__pycache__') -Recurse -Force -ErrorAction SilentlyContinue
         # 0.1.19 renamed questionnaire-domain-brief.md -> research-brief.md; drop the stale copy.
         Remove-Item -LiteralPath (Join-Path $dest 'templates\questionnaire-domain-brief.md') -Force -ErrorAction SilentlyContinue
         New-Item -ItemType Directory -Force -Path (Join-Path $dest 'pipeline\scripts') | Out-Null

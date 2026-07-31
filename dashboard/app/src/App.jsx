@@ -40,7 +40,7 @@ export default function App() {
       </header>
 
       {selected ? (
-        <ProjectDetail project={selected} onBack={() => setSelected(null)} />
+        <ProjectDetail project={selected} />
       ) : (
         <FleetView
           fleet={fleet}

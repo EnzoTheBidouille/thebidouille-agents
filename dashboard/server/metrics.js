@@ -11,7 +11,10 @@
 const fs = require('fs');
 const path = require('path');
 
-const PHASES = ['build', 'review', 'fix', 'smoke'];
+// `cycle` is the workflow variant's own batch (cycle.js §Close). Without it in this
+// list its per-surface results parse fine but render in no column — the surface table
+// showed rows with every cell empty.
+const PHASES = ['build', 'review', 'fix', 'smoke', 'cycle'];
 
 // Parse the raw JSONL into normalized batches ({ts, feature, phase, seconds, surfaces}),
 // skipping malformed lines. Legacy per-surface lines are folded into their batch.
@@ -25,7 +28,12 @@ function parseBatches(raw) {
     if (!e || typeof e !== 'object' || !e.feature || !e.phase) continue;
     const seconds = Number(e.seconds) || 0;
     if (e.surfaces && typeof e.surfaces === 'object') {
-      batches.push({ ts: e.ts || '', feature: String(e.feature), phase: String(e.phase), seconds, surfaces: e.surfaces });
+      // `rounds` / `smoke` are run-level facts the cycle workflow reports alongside
+      // (never inside) `surfaces` — carry them through for the aggregate.
+      batches.push({
+        ts: e.ts || '', feature: String(e.feature), phase: String(e.phase), seconds,
+        surfaces: e.surfaces, rounds: e.rounds, smoke: e.smoke,
+      });
     } else if (e.surface) {
       const key = `${e.ts}|${e.feature}|${e.phase}`;
       let b = legacy.get(key);
@@ -43,10 +51,11 @@ function parseBatches(raw) {
 }
 
 // A surface result string counts as a failure when it is "error" or a BLOCK/REVISE verdict
-// (verdict lines look like "REVISE:2"), or a non-ok/pass word.
+// (verdict lines look like "REVISE:2"), or a non-ok/pass word. "skipped" is neutral —
+// the cycle workflow reports smoke:SKIPPED when the human opted out, not a failure.
 function isFailure(result) {
   const head = String(result).split(':')[0].trim().toLowerCase();
-  return head !== '' && head !== 'ok' && head !== 'ship' && head !== 'pass';
+  return head !== '' && head !== 'ok' && head !== 'ship' && head !== 'pass' && head !== 'skipped';
 }
 
 // Aggregate batches per feature (newest feature first).
@@ -65,6 +74,8 @@ function aggregate(batches) {
       };
       byFeature.set(b.feature, f);
     }
+    // cycle.js reports its round count outside `surfaces` (that map is for surfaces).
+    if (b.phase === 'cycle' && Number(b.rounds) > 0) f.cycleRounds = Number(b.rounds);
     if (b.ts && (!f.firstTs || b.ts < f.firstTs)) f.firstTs = b.ts;
     if (b.ts && b.ts > f.lastTs) f.lastTs = b.ts;
     f.totalSeconds += b.seconds;

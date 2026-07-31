@@ -28,23 +28,40 @@ dashboard/
 | `yaml.js` | minimal block-YAML subset parser (for the `pipeline-profile` block + the config) |
 | `fleet.js` | tracked-project registry (`~/.claude/cohorte-dashboard.json`) + folder browse |
 | `kanban.js` | linked Obsidian board → columns/cards; PR enrichment + ship-date sort via `gh` |
+| `metrics.js` | `.claude/pipeline-metrics.jsonl` → per-feature phase/surface aggregate |
 
 ## API
 
 Read: `GET /api/versions`, `/api/state?project=`, `/api/fleet`, `/api/browse?dir=`,
-`/api/kanban?project=`. Mutate: `POST /api/projects` (add) · `DELETE /api/projects` (remove);
+`/api/kanban?project=`, `/api/metrics?project=`. Mutate: `POST /api/projects` (add) ·
+`DELETE /api/projects` (remove);
 `POST /api/action` — `{action:'install'|'update', scope, project}` (spawns the CLI),
 `{action:'reset', project, purgeSpecs}` (backup+wipe+reinstall), or
-`{action:'claude', command:'/init-pipeline'|'/update-pipeline', project}` (headless `claude -p`).
+`{action:'claude', command:'/init-pipeline'|'/update-pipeline'|'/audit', project}` (headless
+`claude -p`).
 Action responses stream chunked plain text ending in `__EXIT__ <code>`; the client reads the
 `ReadableStream` (`app/src/api.js` `streamAction`).
 
 ## Security
 
 Binds `127.0.0.1` by default — the action endpoints **execute code**. `--host=ADDR` opts into
-exposing it (prints a warning). CORS is not enabled: the frontend is same-origin (served by the
-agent). If a hosted-frontend model is ever added, lock CORS to the exact frontend origin (never `*`),
-or any site could drive the local agent.
+exposing it (prints a warning).
+
+Loopback binding is **not** a boundary against a browser: any page the user visits can fire
+requests at `127.0.0.1`, and DNS rebinding can make the responses readable. `guardBrowser()` in
+`index.js` closes both on every `/api/` route, without a token round-trip:
+
+- **Host must be a loopback origin** — kills rebinding (an attacker domain resolving to
+  `127.0.0.1` still sends its own `Host`). Skipped when the user bound a non-loopback host.
+- **State-changing methods must send `content-type: application/json`** — that header triggers a
+  CORS preflight this server never answers, so a browser cannot deliver it cross-origin; forms
+  can only send urlencoded/multipart/text.
+
+CORS response headers are never set, so a cross-origin page can fire a GET but cannot read it. If
+a hosted-frontend model is ever added, lock CORS to the exact frontend origin (never `*`).
+
+`runReset()` additionally refuses a project whose `.claude` resolves to the shared global core —
+the endpoint's whole promise is that `~/.claude` is never touched, and nothing else enforced it.
 
 ## Dev loop
 
