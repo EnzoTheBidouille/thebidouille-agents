@@ -18,6 +18,13 @@ const FIXED_AGENTS = new Set([
 
 const VALID_STATUS = ['draft', 'frozen', 'in-review', 'shipped'];
 
+// Artifacts the pipeline itself writes into specs/ that are NOT feature specs and have no
+// front-matter status. `/audit` writes specs/refactor-backlog.md by design, so scanning it
+// as a spec made /doctor warn about a file cohorte had just created — a false positive that
+// fired in every project that had ever run /audit. `_`-prefixed files (e.g. _template.md)
+// are already skipped by the reader below.
+const NON_SPEC_FILES = new Set(['refactor-backlog.md']);
+
 const exists = p => { try { return fs.existsSync(p); } catch { return false; } };
 const readText = p => { try { return fs.readFileSync(p, 'utf8'); } catch { return null; } };
 const readJson = p => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; } };
@@ -226,7 +233,7 @@ function checkIsolation(profile, projectRoot) {
   return mk('isolation', 'Isolation', 'ok', 'feature scripts rendered (worktree state not checked here)');
 }
 
-// Workflow variants (cycle/review/audit/refactor as deterministic multi-agent runs) are opt-in;
+// Workflow variants (review/audit/refactor as deterministic multi-agent runs) are opt-in;
 // the conversational commands stay the default path, so nothing here is ever 'bad'.
 // Whether the session has workflows ENABLED needs a live Claude session — /doctor
 // in-session checks that; here we only check what's on disk.
@@ -238,7 +245,7 @@ function checkWorkflows(projectRoot, globalDir, installMode) {
   const agentsDir = installMode === 'bundled'
     ? path.join(projectRoot, '.claude', 'agents')
     : path.join(globalDir, 'agents');
-  const scripts = ['review.js', 'audit.js', 'refactor.js', 'cycle.js'];
+  const scripts = ['review.js', 'audit.js', 'refactor.js'];
   const missing = scripts.filter(s => !exists(path.join(dir, s)));
   if (missing.length === scripts.length) {
     return mk('workflows', 'Workflows', 'warn',
@@ -263,7 +270,7 @@ function scanSpecs(projectRoot) {
   const dir = path.join(projectRoot, 'specs');
   const specs = [];
   let files = [];
-  try { files = fs.readdirSync(dir).filter(f => f.endsWith('.md') && !f.startsWith('_')); }
+  try { files = fs.readdirSync(dir).filter(f => f.endsWith('.md') && !f.startsWith('_') && !NON_SPEC_FILES.has(f)); }
   catch { return specs; }
   for (const f of files) {
     const txt = readText(path.join(dir, f)) || '';

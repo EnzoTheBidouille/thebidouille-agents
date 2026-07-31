@@ -11,9 +11,9 @@
 const fs = require('fs');
 const path = require('path');
 
-// `cycle` is the workflow variant's own batch (cycle.js §Close). Without it in this
-// list its per-surface results parse fine but render in no column — the surface table
-// showed rows with every cell empty.
+// `cycle` is a RETIRED phase, kept so metrics files written before its removal still render.
+// Without it in this list its per-surface results parse fine but land in no column — the
+// surface table showed rows with every cell empty.
 const PHASES = ['build', 'review', 'fix', 'smoke', 'cycle'];
 
 // Parse the raw JSONL into normalized batches ({ts, feature, phase, seconds, surfaces}),
@@ -74,7 +74,8 @@ function aggregate(batches) {
       };
       byFeature.set(b.feature, f);
     }
-    // cycle.js reports its round count outside `surfaces` (that map is for surfaces).
+    // The retired cycle phase reported its round count outside `surfaces` (that map is for
+    // surfaces); historical files still carry it.
     if (b.phase === 'cycle' && Number(b.rounds) > 0) f.cycleRounds = Number(b.rounds);
     if (b.ts && (!f.firstTs || b.ts < f.firstTs)) f.firstTs = b.ts;
     if (b.ts && b.ts > f.lastTs) f.lastTs = b.ts;

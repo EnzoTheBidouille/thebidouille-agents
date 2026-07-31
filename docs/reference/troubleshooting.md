@@ -19,7 +19,7 @@ the only thing that sees it; the fix is re-running the installer.
 Global-mode drift: the shared core can't know which repos point at it. Warn-level, not broken —
 `/update-pipeline` syncs the field (and tells you to commit it).
 
-**`/cycle` says the Workflow runtime is unavailable.**
+**A workflow says the Workflow runtime is unavailable.**
 `/doctor` check 8 tells you which prerequisite fails: Claude Code < 2.1.154, workflows disabled
 for the session, scripts missing (`<core>/workflows/`), or the `profile-reader` agent missing.
 The conversational commands are the designed fallback — nothing is broken.
@@ -62,11 +62,6 @@ The spec's `## Remediation` checkboxes are the state. If a prior round's fixes w
 **A worktree's review diffs against ancient code.**
 The worktree is behind main. `/doctor` check 6 shows "behind by N commits" per live worktree;
 `git rebase main` in the worktree before the next review.
-
-**The cycle workflow returns the same `questions` every run.**
-That's the signal the spec is vague, not that the loop is stuck — every recurring question maps
-to a spec section to sharpen (§5 contract precision, design links, role matrix). Fix upstream in
-`/spec`; the readiness gate stops flagging it.
 
 **A workflow run died mid-flight (session killed, headless audit interrupted).**
 There is no resume for headless runs. Disk state is safe by design: reports staged, remediation

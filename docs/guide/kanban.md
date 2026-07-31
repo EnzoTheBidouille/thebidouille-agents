@@ -48,9 +48,9 @@ as a clickable link with live open/merged/closed status.
 | `/brainstorm` picks it up | `brainstorm` |
 | `/spec` opens (draft) | `spec` |
 | `/spec` freezes | `ready` |
-| `/build` · `/cycle` launch | `building` |
-| `/review` (and `/cycle` landing SHIP-READY) | `review` |
-| `/fix` (and `/cycle` landing stopped) | `fix` |
+| `/build` | `building` |
+| `/review` | `review` |
+| `/fix` | `fix` |
 | `/ship` starts | `ship` |
 | PR opened | `shipped` (+ `PR #<num>`) |
 

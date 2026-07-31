@@ -64,7 +64,7 @@ prefix, install/dev/migrate commands, per-surface env stanzas).
   with stub agents and asserts the returned verdict object. Structural checks cannot see verdict
   logic, and one failure mode needs exactly this — `agent()` returns `null` when a subagent dies,
   so a crashed reviewer yields zero findings, indistinguishable from a clean surface. Both
-  `review.js` and `cycle.js` scored that as `SHIP` until this test existed.
+  `review.js` scored that as `SHIP` until this test existed.
 - `scripts/test-gate.mjs` — **behavioural** tests for `hooks/gate.py`, driving its real
   stdin→stdout contract with PreToolUse payloads: the deny/ask tiers, chained-command splitting
   (`&&`, `;`, `|`, `||`, newlines), branch-conditional gating resolved at the *payload's* cwd,

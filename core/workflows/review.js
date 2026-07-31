@@ -26,10 +26,73 @@ export const meta = {
   ],
 }
 
-const feature = typeof args === 'string' ? args.trim() : args && args.feature
+// The Workflow runtime hands `args` to a script verbatim, so a caller that passes a
+// JSON-ENCODED STRING instead of a real object gets that string back here. The old
+// `typeof args === 'string' ? args.trim()` then took the whole blob as the value — which
+// is how a report landed on disk named `specs/reports/{"feature": "x"}.md`, and how
+// maxRounds/smoke were silently dropped on the same run. Parse it back into the object
+// it was meant to be; a bare slug stays valid shorthand.
+const ARGS = (() => {
+  if (typeof args === 'string') {
+    const t = args.trim()
+    if (t.startsWith('{')) {
+      try { const o = JSON.parse(t); if (o && typeof o === 'object' && !Array.isArray(o)) return o } catch {}
+    }
+    return { feature: t, target: t }
+  }
+  return args && typeof args === 'object' ? args : {}
+})()
+const isSlug = s => typeof s === 'string' && /^[A-Za-z0-9._-]+$/.test(s)
+const feature = ARGS.feature
 if (!feature) throw new Error('cohorte-review needs args = {feature: "<feature_id>"}')
+if (!isSlug(feature)) {
+  throw new Error(`cohorte-review got a feature id that is not a slug: ${JSON.stringify(feature)}. ` +
+    'Pass args as a real object, e.g. {feature: "titlebar-project-switcher"} — not a JSON string.')
+}
 
-const PROFILE = { type: 'object', additionalProperties: true }
+// The profile-reader returns through a StructuredOutput tool call, and a haiku agent
+// intermittently nests the whole profile as a JSON *string* under a single wrapper field
+// ({"output": "{\"surfaces\": …}"}) instead of putting the profile's keys at the top level.
+// The schema here used to be {type:'object', additionalProperties:true} — no declared
+// properties, no required keys — so that wrapper validated cleanly and every field then read
+// as undefined: `surfaces` fell back to [], parallel([]) dispatched zero agents, the
+// dead-agent guard had no surfaces to find missing, and the run reported a verdict having
+// done nothing. On the surface it is indistinguishable from a clean run with an empty diff.
+// Declaring the shape gives the tool layer something to validate and the agent something to
+// aim at; unwrapProfile() salvages a wrapped return that still gets through; and the
+// zero-surface abort below makes the silent-success path impossible either way.
+// See also the structured-output section of core/agents/profile-reader.md.
+const PROFILE = {
+  type: 'object', additionalProperties: true,
+  properties: {
+    error: { type: 'string', description: 'set ONLY when PIPELINE.md is missing or unparseable' },
+    surfaces: {
+      type: 'array',
+      description: "one entry per surface, at the TOP LEVEL of this object — never a JSON string",
+      items: {
+        type: 'object', required: ['key'], additionalProperties: true,
+        properties: { key: { type: 'string' }, path: { type: 'string' }, agent: { type: 'string' } },
+      },
+    },
+  },
+}
+
+// Salvage a profile handed back as JSON text rather than as an object — either the whole
+// return, or nested under a single wrapper field. Anything already shaped like a profile
+// (has `surfaces`, or is the documented `{error}` failure shape) passes through untouched.
+const unwrapProfile = p => {
+  if (typeof p === 'string') { try { return JSON.parse(p) } catch { return null } }
+  if (!p || typeof p !== 'object') return null
+  if (Array.isArray(p.surfaces) || p.error) return p
+  for (const v of Object.values(p)) {
+    if (typeof v !== 'string') continue
+    try {
+      const inner = JSON.parse(v)
+      if (inner && typeof inner === 'object' && !Array.isArray(inner)) return inner
+    } catch {}
+  }
+  return p
+}
 
 const PREFLIGHT = {
   type: 'object', required: ['pass'], additionalProperties: false,
@@ -88,16 +151,22 @@ const VERDICT = {
 
 // ── Phase 0 — profile ────────────────────────────────────────────────────────
 phase('Profile')
-const profile = await agent(
+const profile = unwrapProfile(await agent(
   'Return this project\'s PIPELINE.md `yaml pipeline-profile` block as JSON, per your instructions.',
   { agentType: 'profile-reader', label: 'profile', schema: PROFILE, effort: 'low' },
-)
+))
 if (!profile || profile.error) {
   return { verdict: 'ABORTED', reason: `profile unreadable: ${(profile && profile.error) || 'profile-reader returned nothing'}` }
 }
 const cmds = profile.commands || {}
 const base = (profile.vcs && profile.vcs.default_branch) || 'main'
 const surfaces = Array.isArray(profile.surfaces) ? profile.surfaces : []
+// A profile with no surfaces cannot do this workflow's work, and every later
+// guard compares against `surfaces` — an empty list makes them all vacuously
+// pass. Fail loudly here instead of finishing with nothing done.
+if (!surfaces.length) {
+  return { verdict: 'ABORTED', reason: 'profile has no surfaces — nothing would be reviewed. the `yaml pipeline-profile` block in PIPELINE.md is empty or unparseable, or the profile-reader mis-returned; run /doctor' }
+}
 const quiet = (q, full) => (q && !String(q).startsWith('<') ? q : full ? `${full} 2>&1 | tail -40` : '')
 const checks = [cmds.typecheck, quiet(cmds.lint_quiet, cmds.lint), quiet(cmds.test_quiet, cmds.test)]
   .filter(c => c && !String(c).startsWith('<'))

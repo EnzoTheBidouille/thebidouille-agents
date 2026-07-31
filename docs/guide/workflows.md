@@ -11,7 +11,7 @@ bounded retries are *code* — free and exact — and the lead stops paying for 
   (CLI version, scripts present, `profile-reader` agent, runtime available in-session) and which
   path your session will take.
 - **The conversational commands stay the default and the fallback.** A workflow runs only when
-  you explicitly ask ("run the review workflow") or use the `/cycle` launcher command. If the
+  you explicitly ask ("run the review workflow"). If the
   runtime is unavailable, nothing breaks — the commands are the same pipeline.
 
 ## Shared design
@@ -29,7 +29,7 @@ Every script follows the same skeleton:
   `## Remediation`) — so switching between workflow and conversational mid-feature always works.
 - **No input mid-run.** A workflow runs to completion without questions. Decisions move to the
   edges: readiness gates refuse doomed launches up front, and everything genuinely human comes
-  back in the result (the `questions` array for `/cycle`).
+  back in the result.
 - **The gate still applies.** `hooks/gate.py` fires on workflow subagents too (they run in
   `acceptEdits`, which auto-approves Write/Edit but *not* Bash or Task). In unattended runs,
   gate confirms are escalated to hard denies — nobody is there to answer a prompt.
@@ -37,81 +37,6 @@ Every script follows the same skeleton:
   `settings.json` allow-list with what workflow agents need (quiet commands, the shipped
   `pipeline/scripts/*.sh`, read-only git incl. `git rev-parse`, the retrieval MCP tools) so a
   run never stalls on a permission prompt nobody is watching.
-
-## `cycle.js` — the full dev cycle {#cycle-js-the-full-dev-cycle}
-
-**Launcher: `/cycle <feature_id> [max_rounds] [smoke]`** — resolves the script, checks the
-runtime, sanity-checks the spec, launches in the background (watch with `/workflows`), then relays
-the result when it lands.
-
-```
-Profile → Ready → Contract → Build ─┬─▶ Preflight ─▶ Review(+cross-check) [∥ Smoke] ─▶ clean? ──▶ Close
-                                    └──────────────── Fix (surfaces with findings) ◀── no ─┘
-```
-
-::: warning Smoke is opt-in
-By default the cycle verifies by **review only** — booting the app every round is expensive, and a
-library project has nothing to smoke. Add the literal token `smoke` (`/cycle my-feat smoke`, or
-`args.smoke: true`) to run the smoke agent alongside each review round. Without it the run reports
-`smoke: "SKIPPED"`, the **runtime-flow DoD boxes stay unticked**, and `next` tells you nobody has
-actually *run* the code — `/smoke <id>` standalone before `/ship` remains the answer.
-:::
-
-- **Readiness gate** (before spending anything): the spec must be `frozen`. Other gaps — empty
-  `design_files` on a UI feature, §5 placeholders, tasks missing for an implied surface — ride
-  along as deferred questions rather than blocking.
-- **Contract** authored by a lead-equivalent agent from spec §5, then **build**: one implementer
-  per surface, parallel, TDD-first.
-- **Rounds** (default max 5, and the token budget if one is set — both are runaway protection,
-  not targets; the real exit is *zero open findings on fully-reviewed surfaces*, plus a smoke
-  `PASS` when smoke is on):
-  1. **Preflight** — typecheck + lint + tests via `preflight.sh`. Red short-circuits straight to
-     a mechanical fix round on the surfaces whose paths appear in the failure tail.
-  2. **Stage** — one `git diff --stat`, per-surface patches staged for the reviewers.
-  3. **Review** (∥ **Smoke** when opted in) — both *observe*, neither edits, so they run
-     **concurrently**: one reviewer per touched surface audits the staged diff while the smoke
-     agent exercises the running app. Every CRITICAL/security finding then faces an **adversarial
-     cross-check** — a second reviewer prompted to *refute* it; a refuted finding never triggers a
-     fix round.
-  4. **Exit check** — zero surviving findings, **every touched surface actually reviewed**, and
-     smoke `PASS` when smoke is on. A reviewer that dies leaves its surface with no verdict: the
-     round cannot score `SHIP`, and the surface comes back in `unreviewedSurfaces` + `questions`
-     rather than passing as clean.
-  5. **Fix** — findings grouped by owning surface (smoke failures mapped by their file hint);
-     only those surfaces re-dispatch, each with its items verbatim.
-- **Contract changes stay inside the loop.** A finding whose file lives under `contract.path`
-  routes to a lead-equivalent agent that updates spec §5 + re-authors the contract file (exactly
-  what conversational `/fix` does — implementers still never touch it), then the consuming
-  surfaces re-dispatch. The re-authorings are reported as `contractChanges` for you to eyeball in
-  the diff.
-- **Close** — reports staged; on success the DoD boxes the cycle verified are ticked (the
-  runtime-flow boxes only when smoke actually ran) and the
-  **freshness gate is stamped**, so `/ship <id>` right after is a straight shot (ship keeps its
-  human confirmation — it's the outward-facing, irreversible step and deliberately stays outside
-  the workflow). On a stop, the open findings are appended to the spec's `## Remediation` — a
-  rerun of `/cycle`, or a conversational `/fix`, picks up exactly there.
-
-The result object:
-
-```jsonc
-{
-  "outcome": "SHIP-READY" | "STOPPED" | "NOT-READY" | "ABORTED",
-  "rounds": 2,
-  "verdict": "SHIP", "smoke": "PASS" | "FAIL" | "SKIPPED",   // SKIPPED = smoke not opted in
-  "contractChanges": [],          // re-authorings the loop performed — review them in the diff
-  "unreviewedSurfaces": [],       // reviewers that died — these surfaces carry NO verdict
-  "openFindings": [],
-  "questions": [],                // your inbox from the run — empty when the spec pre-answered everything
-  "report": "specs/reports/<id>.md",
-  "next": "/ship <id> — …"
-}
-```
-
-::: tip The spec is the answer sheet
-`questions` is the exact measure of how sharp your `/brainstorm` + `/spec` were. Recurring
-questions mean a vague spec — fix it upstream, and the cycle runs spec-freeze → SHIP-READY
-untouched.
-:::
 
 ## `review.js` — one review pass
 

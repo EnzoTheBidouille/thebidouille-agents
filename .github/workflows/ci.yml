@@ -49,6 +49,13 @@ jobs:
       - name: Dashboard server tests
         run: node scripts/test-dashboard.mjs
 
+      # The metrics collector reports money. Its failure mode is not a crash but a
+      # confidently wrong number — double-billed responses, runs split by a background
+      # agent's completion notice, subagent spend attributed nowhere. Each of those is
+      # pinned by a case here.
+      - name: Metrics collector tests
+        run: node scripts/test-metrics.mjs
+
       - name: Shell-check installers (syntax)
         run: bash -n install.sh && sh -n install.sh
 
@@ -72,7 +79,6 @@ jobs:
           test -f "$scratch/.claude/workflows/review.js"
           test -f "$scratch/.claude/workflows/audit.js"
           test -f "$scratch/.claude/workflows/refactor.js"
-          test -f "$scratch/.claude/workflows/cycle.js"
           test -f "$scratch/.claude/agents/profile-reader.md"
           # Install a SECOND time before asserting the hook: until 1.3.2 the
           # registration appended if-absent behind a quote-blind "already?" test,
@@ -110,7 +116,6 @@ jobs:
           test -f "$scratch/.claude/workflows/review.js"
           test -f "$scratch/.claude/workflows/audit.js"
           test -f "$scratch/.claude/workflows/refactor.js"
-          test -f "$scratch/.claude/workflows/cycle.js"
           # The per-project rendered scripts must NOT ship — only their templates.
           test ! -e "$scratch/.claude/pipeline/scripts/new-feature.sh"
           test -f "$scratch/.claude/pipeline/scripts/new-feature.sh.template"
@@ -128,7 +133,6 @@ jobs:
           node bin/cli.js install "$scratch"
           test -f "$scratch/.claude/pipeline/VERSION"
           test -f "$scratch/.claude/hooks/gate.py"
-          test -f "$scratch/.claude/workflows/cycle.js"
           test -f "$scratch/.claude/agents/smoke.md"
           test -f "$scratch/specs/_template.md"
 

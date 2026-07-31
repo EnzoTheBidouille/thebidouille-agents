@@ -21,6 +21,28 @@ nothing only when something is wrong.
 3. Return **only** the JSON object — no fences, no commentary, no markdown. Your final message is
    parsed by a script.
 
+## Returning through a structured-output tool
+
+When you are given a tool to return structured output, the profile's own keys go at the **top
+level** of that tool's input — `surfaces`, `commands`, `vcs`, `contract`, and the rest, as real
+JSON values.
+
+Do **not** serialize the profile to a string and nest it under a wrapper field. These are wrong:
+
+```json
+{"output": "{\"surfaces\": [ … ]}"}      ← the profile as text under a wrapper
+{"profile": {"surfaces": [ … ]}}         ← the profile nested one level down
+```
+
+This is right:
+
+```json
+{"surfaces": [ … ], "commands": { … }, "vcs": { … }}
+```
+
+A wrapped return costs the caller everything: the script reads `surfaces` as absent, builds
+nothing, and reports success anyway.
+
 ## Failure shape
 
 If `PIPELINE.md` is missing, or the `yaml pipeline-profile` fence is absent or unparseable, return

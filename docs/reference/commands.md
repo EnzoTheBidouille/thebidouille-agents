@@ -11,7 +11,6 @@ model — their value is the conversation.
 | `/brainstorm` | inherit | Persona panel pressure-tests a feature idea. |
 | `/spec` | inherit | Freeze the spec + contract; also applies review returns (Mode B). |
 | `/build <id>` | sonnet | Author the contract, dispatch one implementer per surface, parallel. |
-| `/cycle <id> [rounds] [smoke]` | sonnet | Launch the full dev-cycle **workflow**; relay verdict + questions. |
 | `/smoke <id>` | sonnet | Preflight, then run the feature for real (infra, contract, UI flows). |
 | `/review <id>` | sonnet | Preflight, staged diff, one reviewer per touched surface, merged verdict. |
 | `/fix <id>` | sonnet | Apply a report; re-dispatch only the surfaces with findings. |
@@ -63,18 +62,6 @@ rendered immediately per the shared procedure). §2 authors the contract (postco
 file exists). §3 dispatches all implementers in one message, byte-stable prompts, variable slots
 last. §4 integrates handoffs, appends the batch metrics line + telemetry ping, recommends
 `/smoke` then `/review`, and a `/clear`.
-
-## `/cycle <id> [max_rounds] [smoke]`
-
-The launcher for [`cycle.js`](/guide/workflows#cycle-js-the-full-dev-cycle). Fails fast (script
-present? Workflow runtime available? spec frozen?), otherwise hands you the conversational path.
-The optional literal token `smoke` opts the smoke agent into every verify round — **off by
-default**, because booting the app each round is expensive and a library project has nothing to
-smoke; without it the runtime-flow DoD boxes stay unticked and `/smoke <id>` stays available
-standalone before `/ship`. Launches in the background (`/workflows` to watch), then relays:
-outcome, rounds, verdict/smoke, `contractChanges` to eyeball, any `unreviewedSurfaces` (a reviewer
-died — no verdict there), the **`questions` array verbatim**, and the next step.
-Kanban: → Building at launch; → Review (SHIP-READY) or Fix on landing.
 
 ## `/smoke <id>`
 
