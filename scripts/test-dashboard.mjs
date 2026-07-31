@@ -116,8 +116,14 @@ console.log("doctor.js — the /doctor port");
   writeFileSync(join(d, "specs", "b.md"), spec("feature_id: b\nstatus: shipped   # done"));
   writeFileSync(join(d, "specs", "c.md"), "no front-matter at all");
   writeFileSync(join(d, "specs", "_template.md"), spec("status: draft"));
+  // /audit writes this file by design and it has no front-matter. Scanning it as a
+  // spec made /doctor warn about a file cohorte itself had just created — it fired in
+  // every project that had ever run /audit.
+  writeFileSync(join(d, "specs", "refactor-backlog.md"), "# Refactor Backlog\n\n## backend\n- [ ] x\n");
   const specs = scanSpecs(d);
   eq("_template.md is excluded", specs.length, 3);
+  eq("the /audit backlog is not scanned as a spec",
+    specs.some(s => s.file === "refactor-backlog.md"), false);
   eq("front-matter fields are read", specs.find(s => s.id === "a").title, "A");
   eq("a trailing comment is stripped from status", specs.find(s => s.id === "b").status, "shipped");
   eq("no front-matter ⇒ id falls back to the filename", specs.find(s => s.file === "c.md").id, "c");
@@ -158,7 +164,7 @@ console.log("doctor.js — the /doctor port");
   writeFileSync(join(d, ".claude", "gate-config.json"), JSON.stringify(gate));
   writeFileSync(join(d, ".mcp.json"), JSON.stringify({ mcpServers: { serena: {} } }));
   mkdirSync(join(d, ".claude", "workflows"), { recursive: true });
-  for (const w of ["review.js", "audit.js", "refactor.js", "cycle.js"]) {
+  for (const w of ["review.js", "audit.js", "refactor.js"]) {
     writeFileSync(join(d, ".claude", "workflows", w), "x");
   }
   writeFileSync(join(d, ".claude", "agents", "profile-reader.md"), "x");

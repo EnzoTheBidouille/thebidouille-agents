@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - **Claude Code** — any recent version for the conversational pipeline; **≥ 2.1.154 with
-  workflows enabled** if you want the [workflow variants](/guide/workflows) (`/cycle`, review /
+  workflows enabled** if you want the [workflow variants](/guide/workflows) (review /
   audit / refactor workflows). `/doctor` tells you which path your session will take.
 - **Node ≥ 18** for `npx cohorte` (the shell installers work without Node).
 - **Python 3** on PATH — the destructive-command gate hook (`gate.py`) runs through it.
@@ -123,7 +123,6 @@ comes with its exact fix command.
 /clear
 /spec                ← freeze specs/<id>.md — the single source of truth
 /clear
-/cycle <id> [smoke]  ← the autonomous loop: build → review → fix, until zero findings (`smoke` = also run the app each round)
 /ship <id>           ← commit, push, PR (the one human-confirmed step)
 ```
 

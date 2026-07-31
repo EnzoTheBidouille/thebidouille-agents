@@ -40,6 +40,7 @@ jobs:
           node scripts/test-workflows.mjs
           node scripts/test-gate.mjs
           node scripts/test-dashboard.mjs
+          node scripts/test-metrics.mjs
           python3 -m py_compile core/hooks/gate.py
           rm -rf core/hooks/__pycache__   # never let it reach the tarball
 
@@ -59,7 +60,6 @@ jobs:
         run: |
           npm pack --dry-run --ignore-scripts 2>&1 | tee /tmp/pack.txt
           grep -q 'dashboard/dist/index.html' /tmp/pack.txt   # the built app must ship
-          grep -q 'core/workflows/cycle.js' /tmp/pack.txt
           if grep -qiE '__pycache__|\.pyc' /tmp/pack.txt; then
             echo "::error::the npm tarball contains Python bytecode"; exit 1
           fi

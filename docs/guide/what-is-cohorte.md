@@ -75,7 +75,7 @@ agents at render time, byte-stable dispatch prompts for prompt-cache hits. See
 
 Every phase can run **conversationally** (the slash commands — interactive, the default) and the
 heavyweight phases also ship as **deterministic workflow scripts** for the Claude Code Workflow
-runtime: `/cycle` (the full dev cycle), review, audit, refactor. Same agents, same disk artifacts,
+runtime: review, audit, refactor. Same agents, same disk artifacts,
 same gate — a different orchestration engine. Workflows are opt-in and can't ask questions
 mid-run; their design moves every human decision to the edges. See
 [Workflows](/guide/workflows).

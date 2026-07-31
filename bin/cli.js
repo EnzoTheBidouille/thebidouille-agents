@@ -35,6 +35,7 @@ Usage:
   cohorte install   [target] [--global]
   cohorte update    [target] [--global]
   cohorte dashboard [target] [--port=N] [--host=ADDR] [--open]
+  cohorte metrics   [target] [--days=N] [--since=ISO] [--runs] [--json]
   cohorte version
 
 Commands:
@@ -49,6 +50,11 @@ Commands:
             by default (loopback only — its actions execute code). --host=ADDR
             to expose (e.g. --host=0.0.0.0, prints a security warning). --open
             to launch the browser.
+  metrics   Cost and runtime per command, reconstructed from Claude Code's own
+            transcripts (tokens, USD, wall/active time, subagent count). Reads
+            ~/.claude/projects — nothing to enable, and it covers runs that
+            already happened. Worktree-aware, so a feature adds up. --json for
+            the raw rollup, --runs to include every individual invocation.
   version   Print the installed CLI version.`);
   process.exit(code);
 }
@@ -64,8 +70,16 @@ let port = parseInt(process.env.COHORTE_DASHBOARD_PORT, 10) || 4317;
 let host = process.env.COHORTE_DASHBOARD_HOST || '127.0.0.1';
 let openBrowser = false;
 
+// Flags that belong to `metrics` and are forwarded verbatim to the collector. They are
+// listed here rather than parsed, so the collector stays the single source of truth for
+// its own options — but the generic "unknown flag" guard below must not reject them.
+const metricsFlags = [];
+const isMetricsFlag = (a) =>
+  a === '--json' || a === '--runs' || a.startsWith('--days=') || a.startsWith('--since=');
+
 for (const a of args) {
-  if (a === 'install' || a === 'update' || a === 'dashboard') mode = a;
+  if (a === 'install' || a === 'update' || a === 'dashboard' || a === 'metrics') mode = a;
+  else if (isMetricsFlag(a)) metricsFlags.push(a);
   else if (a === 'version' || a === '--version' || a === '-v') { console.log(VERSION); process.exit(0); }
   else if (a === '--global' || a === '-g') scope = 'global';
   else if (a.startsWith('--port=')) {
@@ -94,6 +108,19 @@ if (mode === 'dashboard') {
   const globalDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
   require('../dashboard/server')({ projectRoot: target, globalDir, port, host, openBrowser, pkgRoot, version: VERSION });
   return;
+}
+
+// --- metrics: cost + runtime per command ------------------------------------
+// The collector is ESM and this CLI is CommonJS, so it runs as a child process rather
+// than being required. stdio is inherited so --json stays pipeable.
+if (mode === 'metrics') {
+  const script = path.join(pkgRoot, 'scripts', 'metrics', 'collect.mjs');
+  if (!fs.existsSync(script)) {
+    console.error(`error: metrics collector not found at ${script}`);
+    process.exit(1);
+  }
+  const r = spawnSync(process.execPath, [script, target, ...metricsFlags], { stdio: 'inherit' });
+  process.exit(r.status == null ? 1 : r.status);
 }
 
 // --- paths -------------------------------------------------------------------

@@ -3,6 +3,49 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 1.4.0 — 2026-08-01
+
+> **Re-run `npx cohorte@latest update --global` (or `update`)** — the workflow fixes only apply
+> once the installed core is refreshed. Both the workflow scripts and the `profile-reader` agent
+> are replaced by the update.
+
+- **BREAKING — `/cycle` and `cycle.js` are removed.** The full-cycle workflow is gone: the command
+  file, the script, its tests and its documentation. The conversational path it wrapped is
+  unchanged and remains the way to run a feature — `/build` → `/smoke` → `/review` → `/fix` →
+  `/ship`, with `/clear` safe between each. `review.js`, `audit.js` and `refactor.js` are
+  untouched. Nothing else in the pipeline depended on it; a `/cycle` in an old habit will simply
+  report an unknown command. Metrics files and dashboards that already carry `phase: "cycle"`
+  lines keep rendering them.
+- **A workflow could dispatch zero agents and still report a verdict.** Phase 0's `profile-reader`
+  (haiku) intermittently returned the profile as a JSON *string* nested under a wrapper field
+  (`{"output": "{\"surfaces\": …}"}`) instead of at the top level. The schema was
+  `{type: 'object', additionalProperties: true}` — no declared properties, no required keys — so
+  the wrapper validated cleanly and every field then read as `undefined`: `surfaces` fell back to
+  `[]`, `parallel([])` dispatched **nothing**, and because every later guard compares against
+  `surfaces`, an empty list made them all vacuously pass. The run finished with a verdict, no code
+  written, and no complaint — indistinguishable from a clean run with an empty diff. Fixed in three
+  places: `profile-reader.md` now states that the profile's keys go at the top level of the
+  structured-output tool (with the wrong shapes shown), the schema declares what it expects, and a
+  profile with no surfaces **aborts loudly** instead of proceeding. All three workflows.
+- **`args` given as a JSON string became the feature id.** A caller that JSON-encoded its arguments
+  got that whole blob used as the id — which is how a report was written to
+  `specs/reports/{"feature": "x"}.md` — and the other options (`maxRounds`, `smoke`) silently read
+  as `undefined` on the same run, so a run could skip smoke without saying so. `args` is now parsed
+  back into an object (a bare slug is still valid shorthand), and a feature id that is not a slug
+  throws with an actionable message **before** anything touches the filesystem — so no junk file
+  can be written, and a path-shaped id is rejected.
+- **`/doctor` warned about a file cohorte itself had written.** `/audit` writes
+  `specs/refactor-backlog.md` by design; the spec scanner globbed `specs/*.md` and flagged it for
+  having no valid front-matter `status`. It fired in every project that had ever run `/audit`. Both
+  the conversational `/doctor` and the dashboard port now exclude it.
+- **New: `cohorte metrics` — real cost and runtime per command.** Reconstructs tokens, USD,
+  wall/active time and subagent counts from Claude Code's own transcripts, so it needs nothing
+  enabled and works retroactively on runs that already happened. It is worktree-aware (a feature
+  built across worktrees adds up instead of being dropped), attributes subagent spend back to the
+  command that spawned it, and de-duplicates the repeated `usage` blocks a single API response
+  writes across several transcript lines — summing those naively inflates tokens ~1.8×.
+  `--json`, `--runs`, `--days=N`, `--since=ISO`. Prices live in `scripts/metrics/prices.json`.
+
 ## 1.3.4 — 2026-07-31
 
 > **Re-run `npx cohorte@latest update --global` (or `update`)** — the workflow and script

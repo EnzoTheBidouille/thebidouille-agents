@@ -37,7 +37,7 @@ fix only with the human's go-ahead (or hand them the command).
    (`review.md`, `release.md`, `smoke.md`, `profile-reader.md` — repo or `~/.claude/agents/`) must
    each carry their `model:` line too (sonnet/haiku/sonnet/haiku). **Command pins:** every mechanical command file
    (`build`, `review`, `fix`, `smoke`, `ship`, `audit`, `refactor`, `doctor`, `align-ds`,
-   `update-pipeline`, `cycle` — in `.claude/commands/` or `~/.claude/commands/`) carries `model: sonnet` in
+   `update-pipeline` — in `.claude/commands/` or `~/.claude/commands/`) carries `model: sonnet` in
    its frontmatter — ⚠️ if missing (the lead's orchestration turn then bills at the session model,
    e.g. Opus/Fable). `brainstorm`, `spec`, and `init-pipeline` are intentionally unpinned
    (interactive — they inherit the session model).
@@ -73,7 +73,7 @@ fix only with the human's go-ahead (or hand them the command).
    take and why:
    - **Claude Code version** ≥ 2.1.154 (`claude --version 2>/dev/null | head -1`) — older or no CLI
      on PATH ⇒ conversational only.
-   - **Scripts present:** `<core>/workflows/review.js` + `audit.js` + `refactor.js` + `cycle.js` —
+   - **Scripts present:** `<core>/workflows/review.js` + `audit.js` + `refactor.js` —
      missing on a current core ⇒ half-done install, re-run install/update.
    - **Phase-0 agent present:** `<agents dir>/profile-reader.md` (repo `.claude/agents/` bundled or
      `~/.claude/agents/` global) — the workflows abort without it.
@@ -84,7 +84,9 @@ fix only with the human's go-ahead (or hand them the command).
    End the check with ONE summary line, e.g.
    `workflows: available (opt-in — ask to "run the review workflow")` or
    `workflows: unavailable (<first failing prerequisite>) — conversational commands (the default)`.
-9. **Specs & metrics.** Every `specs/*.md` front-matter `status` is a valid stage; `shipped` specs
+9. **Specs & metrics.** Every `specs/*.md` front-matter `status` is a valid stage — excluding
+   `_`-prefixed files and `specs/refactor-backlog.md`, which `/audit` writes as a backlog, not a
+   spec, and which has no front-matter to check; `shipped` specs
    with a live worktree flagged (see 6). `.claude/pipeline-metrics.jsonl` and `specs/reports/` (the
    `/review`·`/smoke` report buffer that lets a `/fix` survive a `/clear`) are gitignored. Metrics
    belong to the **main checkout** — a `pipeline-metrics.jsonl` inside a live feature worktree is a

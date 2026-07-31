@@ -23,7 +23,7 @@ const frontmatter = (text) => {
 // orchestration turn silently bills at the session model — Opus/Fable).
 // Interactive commands must stay unpinned (they inherit on purpose).
 const PINNED = ["build", "review", "fix", "smoke", "ship", "audit",
-  "refactor", "doctor", "align-ds", "update-pipeline", "cycle"];
+  "refactor", "doctor", "align-ds", "update-pipeline"];
 const UNPINNED = ["brainstorm", "spec", "init-pipeline"];
 
 for (const f of readdirSync(join(root, "core/commands"))) {
@@ -188,8 +188,9 @@ if (!installPs1.includes("core\\workflows"))
   fail("install.ps1", "does not copy core\\workflows (Copy-Core)");
 
 // A new workflow script must also be KNOWN to the things that check for it, or it
-// ships and nothing notices when an installer stops copying it. cycle.js shipped in
-// 1.3.0 while three call sites still said "review/audit/refactor".
+// ships and nothing notices when an installer stops copying it. This check exists
+// because a workflow once shipped while three call sites still named only the
+// three that preceded it.
 const workflowNames = existsSync(workflowsDir)
   ? readdirSync(workflowsDir).filter((f) => f.endsWith(".js"))
   : [];

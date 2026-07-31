@@ -2,7 +2,7 @@
 
 This page walks one feature through the whole pipeline, conversationally — what each command
 does, what lands on disk, and where the human decisions sit. (The autonomous alternative for the
-middle of this loop is [`/cycle`](/guide/workflows#cycle-js-the-full-dev-cycle).)
+middle of this loop is run command by command.)
 
 ```
 /brainstorm → /spec → /build → /smoke → /review → (/fix → /review)* → /ship

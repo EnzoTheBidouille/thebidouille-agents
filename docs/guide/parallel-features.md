@@ -4,7 +4,7 @@ Two distinct kinds of parallelism, and the invariants that keep both safe.
 
 ## Within a feature: parallel surfaces
 
-`/build` (and `cycle.js`) dispatch **one implementer per surface in a single message** — build
+`/build` dispatches **one implementer per surface in a single message** — build
 wall-clock is the slowest surface, not the sum. This is safe because of two invariants the whole
 pipeline enforces:
 

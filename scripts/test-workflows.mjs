@@ -8,9 +8,8 @@
 //
 // This exists because of one specific failure mode: agent() resolves to `null`
 // when a subagent dies, and a dead reviewer produces zero findings — which is
-// byte-identical to a clean surface. Both review.js and cycle.js scored that as
-// SHIP, and cycle.js went on to tick the DoD and stamp the freshness gate over
-// code no reviewer had read. A unit test is the only thing that catches it: the
+// byte-identical to a clean surface. review.js scored that as SHIP over code no
+// reviewer had read. A unit test is the only thing that catches it: the
 // structural checks in validate-core.mjs cannot see verdict logic.
 //
 //   node scripts/test-workflows.mjs
@@ -99,17 +98,6 @@ const BASE_REVIEW = [
   ["stage-report", "done"],
 ];
 
-const BASE_CYCLE = [
-  ["profile", PROFILE],
-  ["ready", { frozen: true, gaps: [], designLinks: "none" }],
-  ["preflight", { pass: true }],
-  ["stage-diff", { surfaces: TOUCHED }],
-  ["build:", "handoff ok"],
-  ["fix:", "handoff ok"],
-  ["close", "done"],
-];
-
-// ── review.js ────────────────────────────────────────────────────────────────
 console.log("review.js");
 {
   const { result } = await run("review.js", replier([
@@ -172,165 +160,74 @@ console.log("review.js");
     !calls.some(c => c.startsWith("review:")), calls.join(","));
 }
 
-// ── cycle.js ─────────────────────────────────────────────────────────────────
-console.log("cycle.js");
+// ── args normalisation ───────────────────────────────────────────────────────
+// The runtime passes `args` through verbatim, so a caller that JSON-encodes it
+// hands the script a string. That string used to become the feature id itself —
+// which is how a report was written to `specs/reports/{"feature": "x"}.md`.
+console.log("args");
 {
-  const { result } = await run("cycle.js", replier([
-    ["review:", { verdict: "SHIP", findings: [] }], ...BASE_CYCLE,
+  const { result } = await run("review.js", replier([
+    ["review:", { verdict: "SHIP", findings: [] }], ...BASE_REVIEW,
+  ]), JSON.stringify({ feature: "feat-x" }));
+  check("review: a JSON-encoded args string is parsed, not used as the id",
+    result.verdict === "SHIP", `got ${result.verdict}`);
+}
+{
+  let threw = "";
+  try {
+    await run("review.js", replier([...BASE_REVIEW]), { feature: '{"feature": "feat-x"}' });
+  } catch (e) { threw = e.message; }
+  check("review: a non-slug feature id throws before anything is written",
+    /not a slug/.test(threw), threw || "(did not throw)");
+}
+{
+  let threw = "";
+  try {
+    await run("review.js", replier([...BASE_REVIEW]), { feature: "../../etc/passwd" });
+  } catch (e) { threw = e.message; }
+  check("review: a path-shaped feature id is rejected",
+    /not a slug/.test(threw), threw || "(did not throw)");
+}
+
+// ── Phase 0 profile handling ─────────────────────────────────────────────────
+// A haiku profile-reader intermittently returns the profile as a JSON *string*
+// under a wrapper field instead of at the top level. The old schema accepted that
+// wrapper, so `surfaces` read as undefined ⇒ [] ⇒ parallel([]) ⇒ zero agents
+// dispatched — and because every later guard compares against `surfaces`, an
+// empty list made them all vacuously pass: a run reported a verdict having done
+// nothing, indistinguishable from a clean run with an empty diff. Two properties
+// are pinned per workflow: a wrapped return is recovered, an empty one aborts.
+console.log("profile phase");
+const WRAPPED = { output: JSON.stringify(PROFILE) };
+const EMPTY_PROFILE = { ...PROFILE, surfaces: [] };
+{
+  const { result } = await run("review.js", replier([
+    ["profile", WRAPPED],
+    ["review:", { verdict: "SHIP", findings: [] }], ...BASE_REVIEW,
   ]));
-  check("clean run, smoke off ⇒ SHIP-READY", result.outcome === "SHIP-READY", `got ${result.outcome}`);
-  check("smoke off ⇒ smoke: SKIPPED", result.smoke === "SKIPPED", result.smoke);
-  check("smoke off ⇒ next warns nobody ran the code",
-    /\/smoke/.test(result.next), result.next);
-  check("clean run ⇒ no questions", (result.questions || []).length === 0, JSON.stringify(result.questions));
+  check("review: a string-wrapped profile is unwrapped, not silently empty",
+    result.verdict === "SHIP", `got ${result.verdict}`);
 }
 {
-  const { result } = await run("cycle.js", replier([
-    ["smoke", { pass: true, failures: [] }],
-    ["review:", { verdict: "SHIP", findings: [] }], ...BASE_CYCLE,
-  ]), { feature: "feat-x", smoke: true });
-  check("clean run, smoke on ⇒ SHIP-READY", result.outcome === "SHIP-READY", `got ${result.outcome}`);
-  check("smoke on ⇒ smoke: PASS", result.smoke === "PASS", result.smoke);
-  check("smoke on + clean ⇒ next is a straight /ship",
-    /straight shot/.test(result.next), result.next);
+  const { result, calls } = await run("review.js", replier([["profile", EMPTY_PROFILE], ...BASE_REVIEW]));
+  check("review: no surfaces ⇒ ABORTED, not a verdict",
+    result.verdict === "ABORTED", `got ${result.verdict}`);
+  check("review: no surfaces ⇒ zero reviewers spawned",
+    !calls.some(c => c.startsWith("review:")), calls.join(","));
 }
 {
-  // THE regression, cycle-side: dead reviewers used to exit SHIP-READY, which
-  // ticks the DoD and stamps the freshness gate.
-  const { result } = await run("cycle.js", replier([
-    ["review:", null], ...BASE_CYCLE,
-  ]), { feature: "feat-x", maxRounds: 2 });
-  check("all reviewers dead ⇒ not SHIP-READY", result.outcome !== "SHIP-READY", `got ${result.outcome}`);
-  check("all reviewers dead ⇒ verdict not SHIP", result.verdict !== "SHIP", result.verdict);
-  check("all reviewers dead ⇒ surfaces reported",
-    (result.unreviewedSurfaces || []).length === 2, JSON.stringify(result.unreviewedSurfaces));
-  check("all reviewers dead ⇒ a question names them",
-    (result.questions || []).some(q => /not reviewed/i.test(q)), JSON.stringify(result.questions));
+  const { result } = await run("audit.js", replier([
+    ["profile", EMPTY_PROFILE], ["gates", { failures: [] }], ["write-backlog", "done"],
+  ]), {});
+  check("audit: no surfaces ⇒ error, not an empty backlog",
+    /no surfaces/.test(result.error || ""), JSON.stringify(result));
 }
 {
-  // …and it must retry the review round rather than dispatching an empty fix round.
-  const { calls } = await run("cycle.js", replier([
-    ["review:", null], ...BASE_CYCLE,
-  ]), { feature: "feat-x", maxRounds: 3 });
-  check("dead reviewers ⇒ review retried across rounds",
-    calls.filter(c => c.startsWith("review:")).length > 2,
-    `review calls: ${calls.filter(c => c.startsWith("review:")).length}`);
-  check("dead reviewers ⇒ no empty fix round dispatched",
-    !calls.some(c => c.startsWith("fix:")), calls.join(","));
-}
-{
-  const { result } = await run("cycle.js", replier([
-    ["ready", { frozen: false, gaps: ["status is draft"], designLinks: "none" }], ...BASE_CYCLE,
-  ]));
-  check("unfrozen spec ⇒ NOT-READY", result.outcome === "NOT-READY", `got ${result.outcome}`);
-  check("unfrozen spec ⇒ the gap is in questions",
-    (result.questions || []).some(q => /draft/.test(q)), JSON.stringify(result.questions));
-}
-{
-  const { result } = await run("cycle.js", replier([
-    ["smoke", { pass: false, failures: ["❌ POST /x · expected 201 got 500 · apps/api/a.ts"] }],
-    ["review:", { verdict: "SHIP", findings: [] }], ...BASE_CYCLE,
-  ]), { feature: "feat-x", smoke: true, maxRounds: 1 });
-  check("smoke on + FAIL ⇒ not SHIP-READY", result.outcome !== "SHIP-READY", `got ${result.outcome}`);
-  check("smoke on + FAIL ⇒ smoke: FAIL", result.smoke === "FAIL", result.smoke);
-}
-{
-  // A finding in round 1 that the fix clears must let round 2 exit clean.
-  let round = 0;
-  const { result } = await run("cycle.js", (prompt, opts) => {
-    const l = opts.label || "";
-    if (l.startsWith("review:")) {
-      round++;
-      return round <= 2 ? { verdict: "REVISE", findings: [finding({ severity: "CRITICAL" })] }
-        : { verdict: "SHIP", findings: [] };
-    }
-    if (l.startsWith("verify:")) return { refuted: false, reason: "holds" };
-    return replier(BASE_CYCLE)(prompt, opts);
-  }, { feature: "feat-x", maxRounds: 4 });
-  check("findings then clean ⇒ SHIP-READY", result.outcome === "SHIP-READY", `got ${result.outcome}`);
-  check("findings then clean ⇒ took >1 round", result.rounds > 1, `rounds ${result.rounds}`);
-}
-{
-  // A refuted CRITICAL must not force a fix round.
-  const { result, calls } = await run("cycle.js", (prompt, opts) => {
-    const l = opts.label || "";
-    if (l.startsWith("review:")) return { verdict: "REVISE", findings: [finding({ severity: "CRITICAL" })] };
-    if (l.startsWith("verify:")) return { refuted: true, reason: "guarded upstream" };
-    return replier(BASE_CYCLE)(prompt, opts);
-  }, { feature: "feat-x", maxRounds: 2 });
-  check("cross-check refutes the only CRITICAL ⇒ SHIP-READY",
-    result.outcome === "SHIP-READY", `got ${result.outcome}`);
-  check("refuted finding ⇒ no fix round", !calls.some(c => c.startsWith("fix:")), calls.join(","));
-}
-{
-  const { result } = await run("cycle.js", replier([
-    ["build:", null], ["review:", { verdict: "SHIP", findings: [] }], ...BASE_CYCLE,
-  ]));
-  check("dead implementers ⇒ a question names them",
-    (result.questions || []).some(q => /implementer\(s\) died/.test(q)), JSON.stringify(result.questions));
-}
-{
-  const { result } = await run("cycle.js", replier([
-    ["profile", { error: "PIPELINE.md not found" }], ...BASE_CYCLE,
-  ]));
-  check("unreadable profile ⇒ ABORTED", result.outcome === "ABORTED", `got ${result.outcome}`);
-}
-{
-  // A DEAD contract agent must not be reported as a successful re-authoring, and
-  // must not hand every surface a "the contract was RE-AUTHORED, realign" item
-  // pointing at a file nobody touched.
-  const CONTRACT_PROFILE = {
-    ...PROFILE,
-    contract: { enabled: true, path: "packages/shared/src", ext: "ts", mechanism: "shared-types-zod", index: "" },
-  };
-  const contractFinding = finding({ severity: "CRITICAL", file: "packages/shared/src/feat-x.ts" });
-  const { result, calls } = await run("cycle.js", (prompt, opts) => {
-    const l = opts.label || "";
-    if (l === "profile") return CONTRACT_PROFILE;
-    if (l === "contract-fix") return null;              // the agent dies
-    if (l.startsWith("review:")) return { verdict: "REVISE", findings: [contractFinding] };
-    if (l.startsWith("verify:")) return { refuted: false, reason: "holds" };
-    return replier(BASE_CYCLE)(prompt, opts);
-    // maxRounds ≥ 2: the loop breaks at the cap BEFORE the fix block, so a
-    // 1-round run never reaches the contract path at all (a vacuous test).
-  }, { feature: "feat-x", maxRounds: 2 });
-  check("dead contract agent ⇒ no fabricated contractChanges entry",
-    (result.contractChanges || []).length === 0, JSON.stringify(result.contractChanges));
-  check("dead contract agent ⇒ a question says the contract is UNCHANGED",
-    (result.questions || []).some(q => /contract agent died/.test(q)), JSON.stringify(result.questions));
-  check("dead contract agent ⇒ no surface told to realign against it",
-    !calls.some(c => c.startsWith("fix:")), calls.join(","));
-}
-{
-  // Preflight red with no owning surface used to spin the loop doing nothing
-  // until the round cap, then report a stale verdict.
-  const { result, calls } = await run("cycle.js", replier([
-    ["preflight", { pass: false, tail: "error in vendor/thing.go: boom" }],
-    ["build:", null],                                   // no implementer survives
-    ...BASE_CYCLE,
-  ]), { feature: "feat-x", maxRounds: 5 });
-  check("red preflight with no owning surface ⇒ stops instead of spinning",
-    result.rounds === 1, `burned ${result.rounds} round(s)`);
-  check("…and dispatches no fix agent", !calls.some(c => c.startsWith("fix:")), calls.join(","));
-  check("…and the question carries the failure tail",
-    (result.questions || []).some(q => /no surface owns the failure/.test(q)),
-    JSON.stringify(result.questions));
-}
-{
-  // A finding under no surface path has no owner: it keeps the loop from exiting
-  // clean while nobody is ever dispatched to fix it. Reachable because `touched`
-  // is agent-supplied — the stage-diff agent can name a key the profile lacks.
-  const orphan = finding({ severity: "CRITICAL", file: "tools/thing.sh", line: 9 });
-  const { result } = await run("cycle.js", (prompt, opts) => {
-    const l = opts.label || "";
-    if (l === "stage-diff") return { surfaces: [{ key: "tools", diff: "d", files: ["tools/thing.sh"] }] };
-    if (l.startsWith("review:")) return { verdict: "REVISE", findings: [orphan] };
-    if (l.startsWith("verify:")) return { refuted: false, reason: "holds" };
-    return replier(BASE_CYCLE)(prompt, opts);
-  }, { feature: "feat-x", maxRounds: 3 });
-  check("a finding owned by no surface names the file, not just 'run /fix manually'",
-    (result.questions || []).some(q => /never dispatched/.test(q) && /tools\/thing\.sh:9/.test(q)),
-    JSON.stringify(result.questions));
+  const { result } = await run("refactor.js", replier([
+    ["profile", EMPTY_PROFILE], ["read-backlog", { domains: [] }],
+  ]), { domains: "all" });
+  check("refactor: no surfaces ⇒ error, not a no-op success",
+    /no surfaces/.test(result.error || ""), JSON.stringify(result));
 }
 
 // ── the dead-agent family, swept across every terminal/staging agent ─────────
@@ -355,25 +252,6 @@ console.log("dead-agent sweep");
     !/^specs\//.test(String(result.report)), result.report);
   check("review: dead report-stager ⇒ next says nothing was written",
     /NEVER written/.test(result.next), result.next);
-}
-{
-  const { result } = await run("cycle.js", replier([
-    ["stage-diff", null], ["review:", { verdict: "SHIP", findings: [] }], ...BASE_CYCLE,
-  ]));
-  check("cycle: dead diff-stager ⇒ diagnosed as such, not 'wrong branch'",
-    (result.questions || []).some(q => /diff-staging agent died/.test(q)),
-    JSON.stringify(result.questions));
-}
-{
-  const { result } = await run("cycle.js", replier([
-    ["close", null], ["review:", { verdict: "SHIP", findings: [] }], ...BASE_CYCLE,
-  ]));
-  check("cycle: dead close agent ⇒ NOT SHIP-READY",
-    result.outcome !== "SHIP-READY", `got ${result.outcome}`);
-  check("cycle: dead close agent ⇒ a question says nothing was written",
-    (result.questions || []).some(q => /NEVER written/.test(q)), JSON.stringify(result.questions));
-  check("cycle: dead close agent ⇒ report path not claimed",
-    !/^specs\//.test(String(result.report)), result.report);
 }
 {
   const { result } = await run("audit.js", replier([
