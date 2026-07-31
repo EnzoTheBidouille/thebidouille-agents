@@ -44,7 +44,9 @@ fix only with the human's go-ahead (or hand them the command).
 3. **Hooks & gate.** `.claude/gate-config.json` exists and mirrors the profile's `gate` block
    (regenerate if drifted). The PreToolUse gate hook is registered **once** for the install mode
    (bundled: repo `settings.json`; global: `~/.claude/settings.json` — flag double registration,
-   it double-prompts). Hook files exist at the registered paths.
+   it double-prompts) **with a matcher covering both `Bash` and `Task`** — a `Bash`-only matcher
+   leaves the preflight phase gate dead (the 1.3.0–1.3.1 regression). Hook files exist at the
+   registered paths.
 4. **Retrieval** (if `retrieval.provider` ≠ `none`). Run the SCHEMA.md §Code retrieval health
    check: CLI resolvable from PATH, `.mcp.json` entry present in PATH-proof launcher form,
    `.serena/` gitignored, server actually connects.

@@ -43,12 +43,26 @@ case "$phase" in
   *) exit 0 ;;
 esac
 
+# The payload is hand-built JSON: a non-numeric seconds or a quote in results
+# would silently produce an invalid document the collector drops.
+case "$seconds" in ''|*[!0-9]*) seconds=0 ;; esac
+results=$(printf '%s' "$results" | tr -d '"\\\n\r' | cut -c1-80)
+
 if command -v shasum >/dev/null 2>&1; then
   fhash=$(printf '%s' "$feature" | shasum -a 256 | cut -c1-12)
 else
   fhash=$(printf '%s' "$feature" | sha256sum | cut -c1-12)
 fi
-ver=$(cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pipeline/VERSION" 2>/dev/null | head -1)
+# The core that shipped THIS script is the one whose version we report. Bundled
+# installs live at <project>/.claude/pipeline/scripts/, where the global VERSION is
+# either absent or a DIFFERENT core — reading only the global path made every
+# bundled repo report an empty core_version.
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd 2>/dev/null) || here=""
+ver=""
+for v in "$here/../VERSION" "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pipeline/VERSION"; do
+  [ -n "$ver" ] && break
+  ver=$(head -1 "$v" 2>/dev/null | tr -d '"\\')
+done
 os=$(uname -s 2>/dev/null || echo unknown)
 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 

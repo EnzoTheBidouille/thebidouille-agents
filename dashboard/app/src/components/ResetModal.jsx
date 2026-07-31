@@ -36,7 +36,7 @@ export default function ResetModal({ project, onClose, onChanged }) {
           <h3>⚠ Reset pipeline</h3>
           {status === 'done' && (
             <span className={`badge ${exit === 0 ? 'ok' : 'bad'}`}>
-              {exit === 0 ? 'done' : `exit ${exit}`}
+              {exit === 0 ? 'done' : exit == null ? 'disconnected' : `exit ${exit}`}
             </span>
           )}
         </div>

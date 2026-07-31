@@ -32,6 +32,10 @@ function pointerAt(projectRoot) {
 // briefly so the dashboard's poll doesn't hammer the network. null only if both fail.
 let _cache = { value: null, at: 0 };
 const CACHE_MS = 5 * 60 * 1000;
+// Failures are cached too, briefly. Without this an offline machine paid the FULL
+// 5s fetch timeout + 8s `npm view` timeout on every call — and /api/fleet calls
+// this once per tracked project, so the dashboard's 15s poll never finished.
+const FAIL_CACHE_MS = 60 * 1000;
 
 async function fetchRegistry() {
   const ctrl = new AbortController();
@@ -51,10 +55,16 @@ async function fetchRegistry() {
   }
 }
 
+// Fallback only — spawnSync blocks the single-threaded server for up to its
+// timeout, so it must stay behind latestNpm()'s cache + in-flight dedupe (at most
+// one call a minute, and only when the registry fetch already failed).
 function npmView() {
   try {
-    const r = spawnSync('npm', ['view', 'cohorte', 'version'],
-      { encoding: 'utf8', timeout: 8000, shell: process.platform === 'win32' });
+    // One static string on Windows (npm is npm.cmd — needs a shell; the
+    // shell+args-array combination is DEP0190-deprecated). Nothing dynamic.
+    const r = process.platform === 'win32'
+      ? spawnSync('npm view cohorte version', { encoding: 'utf8', timeout: 8000, shell: true })
+      : spawnSync('npm', ['view', 'cohorte', 'version'], { encoding: 'utf8', timeout: 8000 });
     if (r.status === 0 && r.stdout) {
       const v = r.stdout.trim();
       return /^\d+\.\d+\.\d+/.test(v) ? v : null;
@@ -63,11 +73,23 @@ function npmView() {
   return null;
 }
 
+let _inflight = null;
 async function latestNpm() {
-  if (_cache.value && (Date.now() - _cache.at) < CACHE_MS) return _cache.value;
-  const v = (await fetchRegistry()) || npmView();
-  if (v) _cache = { value: v, at: Date.now() };
-  return v;
+  const age = Date.now() - _cache.at;
+  if (_cache.at && age < (_cache.value ? CACHE_MS : FAIL_CACHE_MS)) return _cache.value;
+  // /api/fleet resolves N projects concurrently — without this, N lookups race and
+  // each pays the full timeout instead of sharing one.
+  if (_inflight) return _inflight;
+  _inflight = (async () => {
+    try {
+      const v = (await fetchRegistry()) || npmView();
+      _cache = { value: v || null, at: Date.now() };
+      return v || null;
+    } finally {
+      _inflight = null;
+    }
+  })();
+  return _inflight;
 }
 
 // Naive semver compare — returns -1|0|1 (a<b|a==b|a>b). Ignores pre-release tags.

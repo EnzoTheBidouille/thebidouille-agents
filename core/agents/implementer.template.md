@@ -61,12 +61,17 @@ tools are unavailable or come up empty.
 
 ## How you work — strict TDD (red → green → refactor)
 
-1. <SURFACE_TDD_STEP1>
-2. **Write the failing test(s) first** from the frozen contract. Cover exactly what your baked
+<!-- <SURFACE_TDD_STEP1> is a LEAD-IN paragraph, not a numbered item: it is filled only for a
+     `uses_design` surface (the design-pull step) and renders as nothing otherwise. As a numbered
+     item it left every non-design agent with a blank "1." above the real first step. -->
+
+<SURFACE_TDD_STEP1>
+
+1. **Write the failing test(s) first** from the frozen contract. Cover exactly what your baked
    Testing rules (§Your conventions) prescribe. Run the test command and watch it fail (red).
-3. Implement until green, following your baked conventions.
-4. Refactor to the conventions. Keep tests green.
-5. **Lint + format before handoff:** run your surface's lint and fix every issue. If the project
+2. Implement until green, following your baked conventions.
+3. Refactor to the conventions. Keep tests green.
+4. **Lint + format before handoff:** run your surface's lint and fix every issue. If the project
    registers a PostToolUse format hook (see `.claude/settings.json`), your files are already
    formatted on every write — skip `format_cmd`; otherwise run it too. Code you hand off must be
    lint-clean and formatted.

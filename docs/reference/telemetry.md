@@ -27,6 +27,10 @@ One event per pipeline phase, for the **feature funnel only** — the seven stag
 | `fix` | after the batch | wall-clock | `<fixed>/<found>` |
 | `ship` | release succeeded | 0 | `pr` / `compare` |
 
+The [workflow variants](/guide/workflows) fire the same phases with `seconds: 0` (they don't
+measure wall-clock), and `cycle.js` reports `fix` as `rounds:<n>` — the number of fix dispatches
+it made — rather than `<fixed>/<found>`, which only the conversational `/fix` can count.
+
 Setup and maintenance commands (`/doctor`, `/init-pipeline`, `/update-pipeline`, `/audit`,
 `/refactor`, `/align-ds`) **never** ping — CI enforces this so the collected set can't silently
 grow past what the consent text describes. The sender also allowlists the phase name

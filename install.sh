@@ -32,8 +32,22 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --update) mode="update"; shift ;;
     --global) scope="global"; shift ;;
+    -h|--help)
+      cat <<'USAGE'
+install.sh — install the cohorte pipeline core.
+
+  sh install.sh [target_dir]        per-project: bundle the core into <target>/.claude
+  sh install.sh --global            one shared core in ~/.claude (recommended)
+  sh install.sh --update [target]   refresh the core in place, keep every generated file
+  sh install.sh --update --global
+
+Honours $CLAUDE_CONFIG_DIR for the global destination and $PIPELINE_REPO for the
+source when piped through curl. The npm CLI (`npx cohorte install`) does the same
+thing and is the documented route; this script exists for Node-less environments.
+USAGE
+      exit 0 ;;
     --)       shift; break ;;
-    -*)       echo "error: unknown flag: $1" >&2; exit 2 ;;
+    -*)       echo "error: unknown flag: $1 (try --help)" >&2; exit 2 ;;
     *)        positional="$1"; shift ;;
   esac
 done
@@ -79,6 +93,10 @@ copy_core() {
   cp -R "$src/core/hooks"     "$dest/"
   cp -R "$src/core/templates" "$dest/"
   cp -R "$src/core/workflows" "$dest/"
+  # A Python bytecode cache appears in a source checkout the moment anyone compiles
+  # or imports gate.py (CI does) and `cp -R` carries it along — machine- and
+  # interpreter-specific, and copy-over would never delete it later.
+  rm -rf "$dest/hooks/__pycache__"
   # 0.1.19 renamed questionnaire-domain-brief.md → research-brief.md; drop the stale copy.
   rm -f "$dest/templates/questionnaire-domain-brief.md"
   mkdir -p "$dest/pipeline/scripts"

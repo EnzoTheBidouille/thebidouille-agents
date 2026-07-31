@@ -41,7 +41,7 @@ export default function ActionRunner({ title, action, scope, project, command, c
           <h3>{title}</h3>
           {status === 'done' && (
             <span className={`badge ${exit === 0 ? 'ok' : 'bad'}`}>
-              {exit === 0 ? 'success' : `exit ${exit}`}
+              {exit === 0 ? 'success' : exit == null ? 'disconnected' : `exit ${exit}`}
             </span>
           )}
         </div>

@@ -42,9 +42,16 @@ function write(globalDir, projects) {
 
 // Add the launch project on first use so the fleet is never empty.
 function ensureSeed(globalDir, projectRoot) {
+  if (!projectRoot) return;
+  // Normalize like add(), or launching from `.` vs an absolute path (or a
+  // differently-cased Windows path) seeds the same project twice.
+  let abs;
+  try { abs = normalizeDir(projectRoot); } catch { abs = path.resolve(projectRoot); }
   const projects = read(globalDir);
-  if (projectRoot && !projects.includes(projectRoot)) {
-    projects.push(projectRoot);
+  const known = projects.some(p => p === abs
+    || (process.platform === 'win32' && p.toLowerCase() === abs.toLowerCase()));
+  if (!known) {
+    projects.push(abs);
     write(globalDir, projects);
   }
 }
@@ -59,7 +66,10 @@ function add(globalDir, dir) {
 }
 
 function remove(globalDir, dir) {
-  const abs = path.resolve(dir);
+  // normalizeDir like add() — a bare path.resolve leaves `~/…` unexpanded, the
+  // filter matches nothing, and the endpoint reports `removed` for a no-op.
+  let abs;
+  try { abs = normalizeDir(dir); } catch { abs = path.resolve(dir); }
   const projects = read(globalDir).filter(p => p !== abs);
   write(globalDir, projects);
 }
@@ -76,7 +86,7 @@ async function summarize(projectRoot, globalDir, cliVersion) {
       exists: true,
       name: (s.profile && s.profile.name) || path.basename(projectRoot),
       hasProfile: !!s.profile,
-      surfaces: s.profile ? s.profile.surfaces.length : 0,
+      surfaces: s.profile ? ((s.profile.surfaces || []).length) : 0,
       specs: s.specs.length,
       versions: {
         installMode: s.versions.installMode,
@@ -87,7 +97,11 @@ async function summarize(projectRoot, globalDir, cliVersion) {
       summary: s.summary,
     };
   } catch (e) {
-    return { path: projectRoot, exists: true, error: String((e && e.message) || e) };
+    return {
+      path: projectRoot, exists: true,
+      name: path.basename(projectRoot), // the card header must still identify the project
+      error: String((e && e.message) || e),
+    };
   }
 }
 

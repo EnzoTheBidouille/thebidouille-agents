@@ -9,7 +9,11 @@ export default function FolderPicker({ onPick, onClose }) {
   async function load(dir) {
     try {
       setError(null);
-      setData(await getJson('/api/browse' + (dir ? `?dir=${encodeURIComponent(dir)}` : '')));
+      const d = await getJson('/api/browse' + (dir ? `?dir=${encodeURIComponent(dir)}` : ''));
+      setData(d);
+      // browse() reports unreadable dirs INSIDE a 200 body — surface it, or a
+      // permissions failure renders as an innocent-looking "no sub-folders".
+      if (d.error) setError(d.error);
     } catch (e) {
       setError(e.message);
     }

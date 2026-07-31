@@ -162,7 +162,11 @@ Coarse first, specialize on evidence: start with one `frontend` / `backend` surf
 surface that's proven slow and cleanly separable. The evidence lives in
 the **main checkout's** `.claude/pipeline-metrics.jsonl` (gitignored) — one JSONL line per phase batch
 (`ts`/`feature`/`phase`/`seconds`/`surfaces:{key: result}`), appended by `/build`, `/review`, `/fix`
-and `/smoke`. Always the main checkout, never the feature worktree (which dies at teardown while
+and `/smoke`, plus a `phase: "cycle"` line from the cycle workflow.
+**`surfaces` keys are surface keys, nothing else** — run-level facts go in their own top-level
+fields (the cycle line carries `rounds` and `smoke` there). Anything put inside `surfaces` is read
+as a surface: the dashboard renders it as a row in the per-surface table and scores a non-`ok`
+value as that surface failing. Always the main checkout, never the feature worktree (which dies at teardown while
 metrics must accumulate across features) — resolve from anywhere with
 `$(dirname "$(git rev-parse --git-common-dir)")/.claude/pipeline-metrics.jsonl`. Read it before
 proposing a split: split the surface that actually dominates wall-clock, not the one that feels big.
@@ -268,7 +272,9 @@ this exact procedure so a surface is always defined the same way. To add surface
      this feature also changes. The link is self-contained — no stored project id. Build with the code UI
      kit (the `design_system_project`'s materialization: `@/components/ui/*` + tokens); read a primitive
      via `get_file` only if it's missing/stale in code. Mobile-first."_
-   - `<SURFACE_TDD_STEP1>` — _"**Pull the feature design first** (skip if your dispatch's design slot
+   - `<SURFACE_TDD_STEP1>` — a **lead-in paragraph** above the TDD list (not a numbered item; it
+     renders as nothing for a non-design surface, which is why the list must not start at it):
+     _"**Pull the feature design first** (skip if your dispatch's design slot
      says `none`): `DesignSync get_file(<projectId>, <file>)` for each link in the slot and translate
      each into the code design system (`@/components/ui/*`, `cn()` + CVA), mobile-first — never ad-hoc
      CSS. Then:"_
@@ -313,9 +319,9 @@ itself changes in ways `/build` §1.5 can't auto-grow (e.g. package manager or c
 
 ## Workflows — deterministic multi-agent runs (opt-in)
 
-Three phases have a **workflow variant** — a deterministic orchestration script the Claude Code
+Four phases have a **workflow variant** — a deterministic orchestration script the Claude Code
 Workflow runtime executes instead of the lead reasoning out the fan-out turn by turn:
-`<core>/workflows/review.js`, `audit.js`, `refactor.js` (installed to `.claude/workflows/` bundled or
+`<core>/workflows/review.js`, `audit.js`, `refactor.js`, `cycle.js` (installed to `.claude/workflows/` bundled or
 `~/.claude/workflows/` global). The conversational commands (`/review`, `/audit`, `/refactor`)
 **remain the default path and the fallback** — a workflow runs only when the human explicitly asks
 for it ("run the review workflow", or via the `/cycle <id>` launcher command, which resolves
@@ -325,7 +331,7 @@ enabled.
 `/brainstorm`, `/spec`) and the dispatch-only ones (`/build`, `/ship`) have **no** workflow variant on
 purpose: they're interviews or already a single parallel dispatch — a script adds nothing.
 
-Shared design, all three scripts:
+Shared design, all four scripts:
 
 - **Phase 0 is always `profile-reader`** — workflow scripts have no filesystem or shell access, so a
   dedicated agent (`core/agents/profile-reader.md`, haiku, read-only) reads `PIPELINE.md` and returns
@@ -336,6 +342,12 @@ Shared design, all three scripts:
 - **Only the verdict comes back.** Bulk (diffs, reports, backlogs) is staged to the same disk
   buffers the commands use (`specs/reports/`, `specs/refactor-backlog.md`); the workflow's return is
   counts + verdict + paths.
+- **A dead agent is never a clean result.** `agent()` resolves to `null` when a subagent dies, and a
+  dead *reviewer* returns zero findings — byte-identical to a surface that is genuinely clean. Any
+  script that derives a verdict from "how many findings came back" must first subtract the agents
+  that never answered: `review.js` and `cycle.js` name them in `unreviewedSurfaces`, refuse to score
+  `SHIP`, and (in the cycle) never tick the DoD or stamp the freshness gate. `scripts/test-workflows.mjs`
+  pins this — it is the one invariant the structural checks in `validate-core.mjs` cannot see.
 - **`review.js`** — preflight gate (aborts red, zero agents), one `git diff --stat` staged per
   touched surface, one reviewer per surface in parallel, then an **adversarial cross-check** phase
   that tries to refute each CRITICAL/security finding before it can trigger a fix loop.
@@ -345,8 +357,8 @@ Shared design, all three scripts:
   conversational `/refactor` is cheaper there): `shared` first and alone, then the other domains'
   implementers in parallel, each verified per-domain.
 - **`cycle.js`** — the **full dev cycle** on a frozen spec: contract → parallel build → rounds of
-  [preflight → smoke ∥ review(+cross-check) → fix on the surfaces with findings], looping until
-  **zero open findings + a PASS smoke** (`maxRounds`, default 5, and the token budget are runaway
+  [preflight → review(+cross-check) (∥ smoke if opted in) → fix on the surfaces with findings], looping until
+  **zero open findings (+ a PASS smoke when opted in)** (`maxRounds`, default 5, and the token budget are runaway
   protection, not targets). Since a workflow can't ask anything mid-run, the decisions move to the
   edges: a **readiness gate** aborts up front if the spec isn't frozen (other gaps ride along as
   deferred questions), and everything genuinely human comes back at the END in the result's
@@ -355,7 +367,8 @@ Shared design, all three scripts:
   contract file (exactly what conversational `/fix` §1 does — implementers still never touch it),
   the consuming surfaces re-dispatch, and the loop continues; the re-authorings are reported in the
   result's `contractChanges` for the human to review in the diff. A clean exit ticks the DoD and
-  stamps the freshness gate so `/ship <id>` is a straight shot; a stopped run appends its open
+  stamps the freshness gate (when smoke was skipped — the default — the runtime-flows DoD box stays
+  unticked and `/ship` flags it); a stopped run appends its open
   findings to the spec's `## Remediation` so a rerun of the cycle — or a conversational `/fix` —
   continues seamlessly. `/ship` itself stays outside on purpose — outward-facing and irreversible,
   it keeps its human confirmation.
@@ -416,7 +429,7 @@ card created in the target column if missing.
 | `/spec` opens (draft)                   | `spec`          |
 | `/spec` freezes (`status: frozen`)      | `ready`         |
 | `/build`                                | `building`      |
-| `/smoke` · `/review`                    | `review`        |
+| `/review` (owns the move — `/smoke` never moves the card) | `review`        |
 | `/fix`                                  | `fix`           |
 | `/ship` starts                          | `ship`          |
 | PR opened (`status: shipped`)           | `shipped` (+ `PR #<num>` on the card) |
@@ -456,6 +469,12 @@ see where features stall, so every stage of `idea → PR` reports and nothing el
 | `review` | after the merged verdict | wall-clock | `<verdict>:<count>` |
 | `fix` | after the batch metrics line | wall-clock | `<fixed>/<found>` |
 | `ship` | the release agent succeeded | `0` | `pr` / `compare` |
+
+> Workflow-variant runs (`review.js`, `cycle.js`) report `seconds: 0` for their phases — only the
+> conversational commands measure wall-clock. `cycle.js` also reports `fix` as `rounds:<n>` (the
+> number of fix dispatches it made) rather than `<fixed>/<found>`: it never counts items the way a
+> conversational `/fix` does. `results` is a free-text summary field, so both forms are valid — but
+> read the `fix` column knowing which path produced it.
 
 `seconds: 0` marks a phase whose duration is human thinking time, not pipeline wall-clock — the
 funnel signal there is the event, not how long it took. `/doctor`, `/audit`, `/refactor`,

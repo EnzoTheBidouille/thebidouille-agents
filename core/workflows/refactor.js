@@ -87,7 +87,10 @@ const backlog = await agent(
   `Requested domains: ${wanted === 'all' ? 'all' : wanted.join(', ')} — return only those (all ⇒ every domain with open items).`,
   { model: 'haiku', label: 'read-backlog', schema: OPEN, effort: 'low' },
 )
-const open = ((backlog && backlog.domains) || []).filter(d => d.items.length)
+// A dead reader is not "the backlog is empty" — reporting it as such sends the
+// human to re-run /audit on a backlog that is already there.
+if (!backlog) return { error: 'the backlog-reading agent died — nothing was read; re-run the refactor workflow' }
+const open = (backlog.domains || []).filter(d => d.items.length)
 if (!open.length) return { error: 'no open backlog items for the requested domains — run /audit (or the audit workflow) first' }
 
 const big = open.filter(d => d.items.length >= MIN_ITEMS)
@@ -167,12 +170,16 @@ results.push(...restResults.filter(Boolean))
 // ── Phase 5 — tick the cleared items ─────────────────────────────────────────
 phase('Tick')
 const clearedAll = results.flatMap(r => r.cleared)
+let tickedOk = true
 if (clearedAll.length) {
-  await agent(
+  const ticked = await agent(
     'In specs/refactor-backlog.md flip EXACTLY these open `- [ ]` item lines to `- [x]` (match verbatim, ' +
     'leave every other line untouched), then return the single word done:\n' + clearedAll.join('\n'),
     { model: 'haiku', label: 'tick-backlog', effort: 'low' },
   )
+  // Reporting items as cleared while the backlog still shows them open means the
+  // next /refactor re-dispatches work that is already done.
+  tickedOk = ticked != null && /done/i.test(String(ticked))
 }
 
 return {
@@ -181,7 +188,11 @@ return {
   }])),
   skippedSmall: Object.fromEntries(small.map(d => [d.key, d.items.length])),
   stillOpen: results.flatMap(r => r.remaining.map(line => `[${r.key}] ${line}`)).slice(0, 15),
-  next: results.some(r => r.remaining.length || !r.gatesGreen)
-    ? 'items remain — finish them with the conversational /refactor <domain>'
-    : 'all dispatched domains clean — optionally close with one final /audit',
+  backlogTicked: tickedOk,
+  next: !tickedOk
+    ? `${clearedAll.length} item(s) were cleared in code but NOT ticked off specs/refactor-backlog.md ` +
+      '(the ticking agent died) — tick them by hand, or the next /refactor re-dispatches finished work'
+    : results.some(r => r.remaining.length || !r.gatesGreen)
+      ? 'items remain — finish them with the conversational /refactor <domain>'
+      : 'all dispatched domains clean — optionally close with one final /audit',
 }

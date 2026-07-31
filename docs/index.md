@@ -28,7 +28,7 @@ features:
     details: /build authors a frozen contract, then dispatches one stateless implementer per code surface concurrently — TDD-first, each owning exactly one tree, syncing only through the contract.
   - icon: 🔁
     title: A full autonomous dev cycle
-    details: /cycle runs contract → build → smoke ∥ review → fix in a loop until zero findings, with adversarial cross-checks. Human decisions come back as questions at the end — never mid-run.
+    details: /cycle runs contract → build → review → fix in a loop until zero findings (smoke opt-in), with adversarial cross-checks. Human decisions come back as questions at the end — never mid-run.
   - icon: 🪙
     title: Token-frugal by design
     details: Deterministic preflight aborts before spawning agents on red code. Quiet commands, staged diffs, capped reports, baked conventions, byte-stable prompts for cache hits, /clear-safe at every boundary.
@@ -45,7 +45,7 @@ features:
 ```
 /brainstorm   →  a persona panel pressure-tests the idea
 /spec         →  the frozen spec + contract — the single source of truth
-/cycle <id>   →  contract → build → smoke ∥ review → fix … until zero findings
+/cycle <id>   →  contract → build → review → fix … until zero findings (+ smoke if asked)
 /ship <id>    →  commit, push, PR, CI watch — the one human-confirmed gate
 ```
 

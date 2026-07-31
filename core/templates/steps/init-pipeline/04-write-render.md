@@ -14,7 +14,8 @@
    PIPELINE.md you just wrote), and the surface-specific blocks
    (`<SURFACE_EXTRA_NEVER>`, `<SURFACE_DESIGN_INPUT>`, `<SURFACE_TDD_STEP1>` — fill design-related ones
    only when `uses_design`).
-   Leave `review.md` + `release.md` + `profile-reader.md` as-is (generic).
+   Leave the fixed agents as-is (generic, shipped by the installer): `review.md`, `release.md`,
+   `smoke.md`, `profile-reader.md`.
 4. **Generate `.claude/gate-config.json`** from the `gate` block — copy all five keys verbatim:
    `{"deny": [...], "ask": [...], "ask_on_default_branch": [...], "default_branch": "<vcs.default_branch>",
    "preflight": {"enabled": <gate.preflight.enabled>, "agents": [...], "max_age_minutes": <n>}}`

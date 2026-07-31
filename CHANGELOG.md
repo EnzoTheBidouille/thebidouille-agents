@@ -3,6 +3,96 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 1.3.4 — 2026-07-31
+
+> **Re-run `npx cohorte@latest update --global` (or `update`)** — the workflow and script
+> fixes only apply once the installed core is refreshed.
+
+- **The dashboard server now has tests.** `dashboard/server/*.js` is shipped runtime code — a
+  hand-rolled YAML parser every `/doctor` check derives from, the metrics aggregator, the JS port
+  of `/doctor`, the board parser, the fleet registry, and the HTTP guards — with no coverage at
+  all. `scripts/test-dashboard.mjs` (83 assertions, in CI) pins each module, including every
+  `/doctor` check both green and deliberately broken.
+- **The gate hook now has tests.** `hooks/gate.py` is the one component that can block a command,
+  and CI only ever checked that it *parsed* — every one of its shipped regressions reached users
+  first. `scripts/test-gate.mjs` drives its real stdin→stdout contract (42 assertions: deny/ask
+  tiers, chained-command splitting, branch-conditional gating at the payload's cwd, the
+  `bypassPermissions` ask⇒deny escalation, config robustness, the preflight phase gate, worktree
+  HEAD matching) and runs in CI. No new defect was found in the gate itself — the behaviour is
+  now pinned.
+- **A crashed reviewer scored as a clean surface.** `agent()` returns `null` when a subagent dies,
+  and a dead reviewer returns zero findings — byte-identical to a surface with nothing wrong. Both
+  `review.js` and `cycle.js` read that as `SHIP`: the review workflow answered "`/ship`" when
+  *every* reviewer had crashed, and the cycle workflow exited **SHIP-READY**, ticked the DoD and
+  stamped the freshness gate over code nobody had read. Unreviewed surfaces are now named in
+  `unreviewedSurfaces` + `questions`, can never score `SHIP`, and the cycle re-reviews instead of
+  dispatching an empty fix round. `scripts/test-workflows.mjs` (new, run in CI) pins this.
+- **Swept the whole "dead agent read as success" family across all four workflows** — the same
+  root cause as the two above, found at eight more call sites by auditing every `agent()` result
+  in `cycle.js` · `review.js` · `audit.js` · `refactor.js`. The worst: a dead **diff-staging**
+  agent in `review.js` returned `verdict: SHIP` ("no diff — nothing to review") for a feature
+  nobody had looked at; and a dead **close/staging** agent let both `/cycle` and the review
+  workflow report `SHIP-READY` + a report path + "ship is a straight shot" when the report, the
+  DoD ticks, the freshness stamp and the metrics had never been written (and `/ship`'s freshness
+  gate skips silently when those fields are absent, so the human would have shipped on it). Also:
+  a dead auditor made a domain look **clean** instead of unaudited; a dead backlog writer/reader
+  and a dead item-ticker were each reported as success. Every one of these now distinguishes
+  "died" from "succeeded with nothing to say", and `scripts/test-workflows.mjs` pins all of them.
+- **A dead contract agent was reported as a successful re-authoring.** Same failure shape as the
+  crashed reviewer: when the lead-equivalent agent that re-authors spec §5 + the contract file
+  died, `/cycle` still pushed a `contractChanges` entry and handed **every** consuming surface a
+  CRITICAL "the contract was RE-AUTHORED — re-read it and realign" item, pointing at a file
+  nobody had touched. It now reports the contract as UNCHANGED and ripples nothing.
+- **A red preflight nobody owns burned every remaining round.** When no surface path appeared in
+  the failure tail and no implementer had survived the build, the fix round dispatched *zero*
+  agents, the next round found the same red gates, and the loop spun to the cap doing literally
+  nothing before reporting a stale verdict. It now stops immediately with the failure tail.
+- **Findings belonging to no surface were dropped silently.** A finding whose file sits outside
+  every surface tree — reachable when the diff-staging agent names a key the profile lacks —
+  stayed in the open set (so the loop could never exit clean) while nobody was ever dispatched to
+  fix it. They are now named, with their `file:line`, in `questions`.
+- **`/cycle` build telemetry hid dead implementers**: results were mapped over the *survivors*, so
+  two of three surfaces reported `ok,ok` and the dead one vanished from the funnel entirely.
+- **The review workflow sent HIGH findings straight to `/ship`.** A `SHIP` verdict can legitimately
+  carry HIGH/MEDIUM findings (only CRITICAL and security force a fix), but the conversational
+  `/review` routes any surviving HIGH to `/fix` — the workflow said `/ship`. It now only recommends
+  shipping when nothing above LOW survived, and stamps the freshness gate on that same condition.
+- **Smoke is now opt-in in the cycle workflow** — `/cycle <id> smoke` (or `args.smoke: true`).
+  Booting the app every round is expensive and a library project has nothing to smoke. Without it
+  the run reports `smoke: "SKIPPED"`, leaves the runtime-flow DoD boxes unticked, and says so.
+- **The dashboard reset could move the shared global core.** Nothing stopped a project path of
+  `~` — reset would then rename `~/.claude` into a backup dir and break every repo on the machine,
+  while the UI promised the global core is never touched. It now refuses that path outright.
+- **The cycle workflow polluted the metrics with phantom surfaces.** It wrote `rounds` / `verdict` /
+  `smoke` inside the metrics line's `surfaces` map, so the dashboard rendered them as three surface
+  rows and scored `rounds: "1"` as a failing surface. Run-level facts now sit outside `surfaces`,
+  and the dashboard knows the `cycle` phase.
+- **Telemetry from bundled installs reported no core version.** `telemetry-send.sh` read `VERSION`
+  only from the *global* core; it now resolves the core that ships it. Payloads are also hardened —
+  a quote or newline in the results string used to produce JSON the collector dropped.
+- **Every kanban card move added a blank line.** Ten moves of one card padded a board with fifteen
+  of them, and every phase command moves cards. Runs of blank lines are now collapsed; a board is
+  byte-stable across moves. Sub-notes of a duplicate card are no longer duplicated either.
+- **Python bytecode could reach the published package and users' `.claude`.** `.npmignore` is inert
+  under an explicit `files` allowlist, so its `__pycache__/` rule never fired, and all three
+  installers copied the directory verbatim. Excluded at both ends, asserted in CI.
+- **Every non-design surface agent rendered with a blank first TDD step.** `<SURFACE_TDD_STEP1>`
+  sat as numbered item 1 of the TDD list but is filled only for `uses_design` surfaces, so every
+  other agent got an empty "1." above its real first step. It is now a lead-in paragraph.
+- Doc/template corrections found by reading the whole core against the code: the spec template's
+  `## 6+. Surface tasks` could collide with the `§8`/`§9` sections the pipeline references by
+  number; `/init-pipeline` step 04 forgot `smoke.md` in its "leave the fixed agents as-is" list;
+  the getting-started page placed `implementer.template.md` in `agents/` (it ships in `pipeline/`);
+  the dashboard docs never documented the CSRF/DNS-rebinding guard; `dashboard/README.md` was
+  missing `metrics.js`, `/api/metrics` and `/audit`; the two reference-only templates
+  (`agent-handoff.md`, `review-feedback.md`) are unreferenced copies of shapes that live in the
+  agents — `review-feedback.md` had drifted and is re-synced, and both now say so.
+- Smaller: the dashboard no longer stalls for 13 s per project when npm is unreachable (failed
+  lookups are cached and de-duplicated); `--port=` rejects a non-numeric value instead of listening
+  on a random port; a missing hashed asset 404s instead of being served `index.html`; a project
+  card is now keyboard-activatable; long headless logs are trimmed instead of growing unbounded;
+  `install.sh --help` exists; the preflight stamp is written once per distinct directory.
+
 ## 1.3.3 — 2026-07-30
 
 > **Re-run `npx cohorte@latest update --global` (or `update`)** — the gate fixes only apply once

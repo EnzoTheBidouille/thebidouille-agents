@@ -68,8 +68,18 @@ for (const a of args) {
   if (a === 'install' || a === 'update' || a === 'dashboard') mode = a;
   else if (a === 'version' || a === '--version' || a === '-v') { console.log(VERSION); process.exit(0); }
   else if (a === '--global' || a === '-g') scope = 'global';
-  else if (a.startsWith('--port=')) { port = parseInt(a.slice(7), 10); }
-  else if (a.startsWith('--host=')) { host = a.slice(7); }
+  else if (a.startsWith('--port=')) {
+    // A bad value used to land as NaN, which http.listen() silently treats as
+    // "any free port" — the banner then printed `localhost:NaN` and nothing worked.
+    port = parseInt(a.slice(7), 10);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      console.error(`error: --port must be an integer 1-65535 (got "${a.slice(7)}")`);
+      process.exit(2);
+    }
+  } else if (a.startsWith('--host=')) {
+    host = a.slice(7).trim();
+    if (!host) { console.error('error: --host= needs an address (e.g. --host=0.0.0.0)'); process.exit(2); }
+  }
   else if (a === '--open') { openBrowser = true; }
   else if (a === 'help' || a === '--help' || a === '-h') usage(0);
   else if (a.startsWith('-')) { console.error(`error: unknown flag: ${a}`); usage(2); }
@@ -99,12 +109,20 @@ fs.mkdirSync(dest, { recursive: true });
 
 // --- helpers (mirror install.sh) --------------------------------------------
 function copyCore() {
-  // `workflows` = the deterministic orchestration scripts (review/audit/refactor) the
+  // `workflows` = the deterministic orchestration scripts (cycle/review/audit/refactor) the
   // Workflow runtime resolves from .claude/workflows (bundled) or ~/.claude/workflows
   // (global) — same copy rule in both modes, like commands.
   for (const d of ['commands', 'hooks', 'templates', 'workflows']) {
-    fs.cpSync(path.join(src, 'core', d), path.join(dest, d), { recursive: true, force: true });
+    fs.cpSync(path.join(src, 'core', d), path.join(dest, d), {
+      recursive: true,
+      force: true,
+      // Never carry a Python bytecode cache into a user's .claude. It appears in a
+      // source checkout the moment anyone compiles or imports gate.py (CI does), it
+      // is machine- and interpreter-specific, and copy-over never deletes it later.
+      filter: s => !s.split(/[\\/]/).includes('__pycache__') && !s.endsWith('.pyc'),
+    });
   }
+  fs.rmSync(path.join(dest, 'hooks', '__pycache__'), { recursive: true, force: true });
   // 0.1.19 renamed questionnaire-domain-brief.md → research-brief.md; drop the stale copy.
   fs.rmSync(path.join(dest, 'templates', 'questionnaire-domain-brief.md'), { force: true });
   const pipelineDir = path.join(dest, 'pipeline');

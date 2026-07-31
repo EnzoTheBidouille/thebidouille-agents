@@ -34,13 +34,32 @@ export async function streamAction(body, onChunk) {
   const reader = res.body.getReader();
   const dec = new TextDecoder();
   let buf = '';
+  // The marker is only trusted at the END of the buffer: the stream relays raw
+  // child stdout (claude logs, installer output), which may legitimately quote
+  // "__EXIT__ N" mid-stream — an unanchored match would mis-report the exit code.
+  const stripMarker = s => s.replace(/\n__EXIT__ \d+\s*$/, '');
+  // A headless `claude -p --verbose` run emits megabytes. The log is a scrollback
+  // pane, not an archive: keep the tail so neither the string nor the <pre> grows
+  // without bound (onChunk re-renders the WHOLE buffer on every chunk).
+  const MAX_CHARS = 400_000;
+  let trimmed = false;
+  const clamp = () => {
+    if (buf.length <= MAX_CHARS) return;
+    buf = buf.slice(buf.length - MAX_CHARS);
+    trimmed = true;
+  };
+  const emit = () => onChunk((trimmed ? '… [earlier output trimmed]\n' : '') + stripMarker(buf));
   // eslint-disable-next-line no-constant-condition
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
     buf += dec.decode(value, { stream: true });
-    onChunk(buf.replace(/\n__EXIT__ \d+\n?/, ''));
+    clamp();
+    emit();
   }
-  const m = buf.match(/__EXIT__ (\d+)/);
+  buf += dec.decode(); // flush a multi-byte char split at the final chunk boundary
+  clamp();
+  emit();
+  const m = buf.match(/__EXIT__ (\d+)\s*$/);
   return m ? parseInt(m[1], 10) : null;
 }
