@@ -3,6 +3,29 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 1.5.0 — 2026-08-01
+
+> **Re-run `npx cohorte@latest update --global` (or `update`)** to pick up the collector; the
+> new dashboard panel comes with `npx cohorte dashboard`.
+
+- **The cockpit now shows what a feature actually cost.** The dashboard's only metrics source
+  was `pipeline-metrics.jsonl`, written by the model itself — so it misses any run that ended
+  early and can never report tokens. On a real project it had captured 18 phase batches where
+  the transcripts hold 53 runs. The new **Cost & runtime** panel reads
+  `cohorte metrics` instead: per command, the number of runs, $ per run, $ total, tokens, wall
+  and active time, and the median number of subagents dispatched. That last column is the one
+  that makes a broken run obvious — a `/build` reporting 0 agents did no fan-out at all.
+- **Both metrics sources are kept, because they answer different questions.** `pipeline-metrics.jsonl`
+  carries per-surface verdicts (`ok`, `REVISE:2`, `error`) that only the model knows and the
+  transcripts never contain; the collector carries money and time, which the model cannot report
+  and the transcripts record exactly. The two panels sit side by side and each says what it is
+  for. Neither replaces the other.
+- **Fixed: discussing a command counted as running it.** An inline command mention was treated
+  as an invocation regardless of context, so a long message *about* `/review` billed that whole
+  conversation to `/review` — in cohorte's own repo it invented five `/cycle` runs out of a
+  design discussion. Inline mentions are now length-gated (an instruction is short; a discussion
+  is not); an explicit slash-command invocation is always counted.
+
 ## 1.4.0 — 2026-08-01
 
 > **Re-run `npx cohorte@latest update --global` (or `update`)** — the workflow fixes only apply
