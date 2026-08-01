@@ -60,14 +60,14 @@ function knownCommands() {
   }
   // Fallback for a collector run outside the package (e.g. copied into a repo on its own).
   if (!names.size) {
-    for (const n of ['brainstorm', 'spec', 'build', 'smoke', 'review', 'fix', 'ship',
+    for (const n of ['brainstorm', 'spec', 'build', 'review', 'fix', 'ship',
                      'audit', 'refactor', 'align-ds', 'doctor', 'init-pipeline', 'update-pipeline']) names.add(n);
   }
   // Retired commands. The list above is read from the shipped core, so a command that is
   // removed stops being recognised — and every run of it already in the transcripts silently
   // reclassifies as (chat), rewriting history and inflating the catch-all bucket. Keep the
   // names here so past runs stay attributed to what actually ran.
-  for (const n of ['cycle']) names.add(n);
+  for (const n of ['cycle', 'smoke']) names.add(n);
   return names;
 }
 const COMMANDS = knownCommands();

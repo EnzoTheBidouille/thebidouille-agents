@@ -5,7 +5,7 @@ install a generic core once (globally in `~/.claude`, or bundled per repo in `<p
 run `/init-pipeline` inside a project, and the pipeline adapts itself to that project: its stack,
 its surfaces, its commands, its conventions, its guardrails.
 
-From then on, features move through a disciplined loop — idea → spec → parallel build → smoke →
+From then on, features move through a disciplined loop — idea → spec → parallel build →
 review → fix → ship — where a **lead** (your main Claude session) orchestrates **stateless
 specialized agents**, and every handoff between stages lives **on disk**, not in the conversation.
 
@@ -32,8 +32,6 @@ the interview.
 - **`review`** — a read-only reviewer (no Write, no Bash). Checks spec conformance, correctness,
   security, conventions, RBAC and mobile-first (when the profile enables them), TDD coverage.
   Emits a capped, machine-actionable report.
-- **`smoke`** — actually *runs* the feature: infra up, migrations, real HTTP calls against the
-  contract, UI flows mobile-first, visual check against the design. Observes honestly, never fixes.
 - **`release`** — the git/host ritual at `/ship`: conventional commits, push, PR. Never edits
   source, never force-pushes.
 - **`profile-reader`** — a tiny read-only agent that turns `PIPELINE.md` into JSON; phase 0 of
@@ -64,7 +62,7 @@ input price on every turn.
 **Guard-railed autonomy.** A profile-driven PreToolUse hook inspects every Bash command (of every
 agent, subagents included) and hard-denies destructive ones, confirm-gates risky ones —
 branch-aware, so agents move fast on feature branches while the default branch stays protected —
-and enforces a preflight phase gate before review/smoke dispatches.
+and enforces a preflight phase gate before review dispatches.
 
 **Token frugality is a feature.** Deterministic preflight (no agents spawned on red code), quiet
 command variants, diffs computed once and staged, capped report schemas, conventions baked into

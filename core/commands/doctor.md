@@ -34,9 +34,9 @@ fix only with the human's go-ahead (or hand them the command).
    its `surfaces[].model` — ❌ if missing, mismatched, or a literal `<SURFACE_MODEL>` placeholder
    (all three silently fall back to inheriting the lead session's model — often Opus — on every
    dispatch); ⚠️ any `inherit` with the note that it bills at the lead's tier. The generic agents
-   (`review.md`, `release.md`, `smoke.md`, `profile-reader.md` — repo or `~/.claude/agents/`) must
-   each carry their `model:` line too (sonnet/haiku/sonnet/haiku). **Command pins:** every mechanical command file
-   (`build`, `review`, `fix`, `smoke`, `ship`, `audit`, `refactor`, `doctor`, `align-ds`,
+   (`review.md`, `release.md`, `profile-reader.md` — repo or `~/.claude/agents/`) must
+   each carry their `model:` line too (sonnet/haiku/haiku). **Command pins:** every mechanical command file
+   (`build`, `review`, `fix`, `ship`, `audit`, `refactor`, `doctor`, `align-ds`,
    `update-pipeline` — in `.claude/commands/` or `~/.claude/commands/`) carries `model: sonnet` in
    its frontmatter — ⚠️ if missing (the lead's orchestration turn then bills at the session model,
    e.g. Opus/Fable). `brainstorm`, `spec`, and `init-pipeline` are intentionally unpinned
@@ -88,7 +88,7 @@ fix only with the human's go-ahead (or hand them the command).
    `_`-prefixed files and `specs/refactor-backlog.md`, which `/audit` writes as a backlog, not a
    spec, and which has no front-matter to check; `shipped` specs
    with a live worktree flagged (see 6). `.claude/pipeline-metrics.jsonl` and `specs/reports/` (the
-   `/review`·`/smoke` report buffer that lets a `/fix` survive a `/clear`) are gitignored. Metrics
+   `/review` report buffer that lets a `/fix` survive a `/clear`) are gitignored. Metrics
    belong to the **main checkout** — a `pipeline-metrics.jsonl` inside a live feature worktree is a
    stale-core sign (its lines die at teardown) ⇒ suggest appending its lines to the main checkout's
    file and deleting the stray.

@@ -149,8 +149,10 @@ PY
 copy_fixed_agents() {
   mkdir -p "$dest/agents"
   cp "$src/core/agents/review.md" "$src/core/agents/release.md" \
-     "$src/core/agents/smoke.md" "$src/core/agents/profile-reader.md" \
+     "$src/core/agents/profile-reader.md" \
      "$dest/agents/"
+  # 1.5.0 removed the /smoke phase; copy-over never deletes, so scrub the orphan agent.
+  rm -f "$dest/agents/smoke.md" "$dest/commands/smoke.md"
   # 0.1.19 split the bi-mode questionnaire-researcher into research-agent + questionnaire-architect;
   # copy-over never deletes, so scrub the retired agent lest a dead subagent_type linger.
   rm -f "$dest/agents/questionnaire-researcher.md"

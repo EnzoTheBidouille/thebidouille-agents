@@ -30,7 +30,7 @@ with `test -x`); note the epoch (`date +%s`) in the same call — §3's metrics 
   and spawn NO agent** — a compiler/test failure needs `/fix` (or the human), not a review that
   rediscovers it at agent prices. This abort is the whole point of the step.
 - **Zero exit** ⇒ it stamped `.claude/preflight.ok`, which the gate hook checks before letting
-  `review`/`smoke` dispatches through (SCHEMA.md §Preflight). Continue.
+  `review` dispatches through (SCHEMA.md §Preflight). Continue.
 - Script absent (older core) ⇒ run the three commands yourself, each redirected into
   `specs/reports/$ARGUMENTS.preflight.txt`, aborting on the first failure the same way.
 
@@ -98,9 +98,11 @@ would sit in this session's history, re-sent every turn). Then:
 - **SHIP** → a SHIP verdict *is* the pipeline's statement that the feature meets its Definition of
   Done, so **tick the DoD**: in `specs/$ARGUMENTS.md` §`Acceptance criteria / DoD`, flip each `- [ ]`
   → `- [x]` for the criteria the pipeline has actually verified — spec conformance + `ui_language`
-  copy (this review), tests · lint · typecheck (a green `/build`), mobile-first + runtime flows (a
-  prior `/smoke`). **Leave `- [ ]` (and say which) any item whose verifying stage didn't run this
-  cycle** — e.g. no `/smoke` ⇒ the mobile-first / runtime item stays open. Ticking is the lead's job
+  copy (this review), tests · lint · typecheck (a green `/build`), mobile-first as far as the code
+  shows it (this review). **Leave `- [ ]` (and say which) any item no stage actually verified** —
+  nothing in the pipeline *runs* the feature, so any criterion that needs the app up (runtime flows,
+  a visual check against the design) stays open unless the human says they exercised it by hand and
+  it held. Ticking is the lead's job
   (the reviewer is read-only). **Then stamp the freshness gate** so `/ship` can refuse to ship code
   edited after this verdict: compute `BASE=$(git merge-base <default_branch> HEAD)` and write into the
   spec front-matter `reviewed_base: $BASE` plus

@@ -92,7 +92,7 @@ commands:
   format: pnpm format
   typecheck: pnpm check-types
   test: pnpm test
-  test_quiet: pnpm test --reporter=dot   # what the /review·/smoke preflight runs
+  test_quiet: pnpm test --reporter=dot   # what the /review preflight runs
   migrate: "cd apps/api && node ace migration:run"
   make_migration: "cd apps/api && node ace make:migration"
 ```
@@ -112,8 +112,7 @@ design:
   tokens_path: apps/web/src/index.css
 ```
 
-`rbac.enabled` turns on the role personas in `/brainstorm`, the authz audit in `/review`, and
-per-role denial checks in `/smoke`. See [Design system](/guide/design-system) for the design
+`rbac.enabled` turns on the role personas in `/brainstorm`, and the authz audit in `/review`. See [Design system](/guide/design-system) for the design
 block.
 
 ### Isolation
@@ -140,7 +139,7 @@ gate:
   deny:  ["node ace migration:fresh", "node ace db:wipe", …]   # hard-blocked, any branch
   ask:   ["node ace migration:run", "psql", …]                 # confirm, any branch
   ask_on_default_branch: ["git commit", "git push", "git merge", "git rebase", "git reset", "docker compose"]
-  preflight: { enabled: true, agents: [review, smoke], max_age_minutes: 30 }
+  preflight: { enabled: true, agents: [review], max_age_minutes: 30 }
 ```
 
 See [Gate & permissions](/reference/gate) for how `hooks/gate.py` enforces this.

@@ -1,7 +1,7 @@
 import React from 'react';
 
-// Mirrors dashboard/server/metrics.js PHASES — `cycle` is the workflow variant's
-// own batch, and a phase missing here renders in no column at all.
+// Mirrors dashboard/server/metrics.js PHASES — `smoke` and `cycle` are retired but kept
+// so older metrics files still render; a phase missing here renders in no column at all.
 const PHASES = ['build', 'review', 'fix', 'smoke', 'cycle'];
 
 function fmtSeconds(s) {
@@ -43,8 +43,8 @@ export default function MetricsPanel({ data }) {
 
       {(!data.present || features.length === 0) ? (
         <p className="muted">
-          No metrics yet — <code>/build</code>, <code>/review</code>, <code>/fix</code> and{' '}
-          <code>/smoke</code> append them to <code>.claude/pipeline-metrics.jsonl</code>.
+          No metrics yet — <code>/build</code>, <code>/review</code> and <code>/fix</code>{' '}
+          append them to <code>.claude/pipeline-metrics.jsonl</code>.
         </p>
       ) : (
         <div className="board-scroll">

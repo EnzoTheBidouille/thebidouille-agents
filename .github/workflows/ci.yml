@@ -66,9 +66,12 @@ jobs:
           # GitHub main instead of installing the checked-out working tree
           HOME="$scratch" sh ./install.sh --global
           test -f "$scratch/.claude/pipeline/VERSION"
-          test -f "$scratch/.claude/agents/smoke.md"
+          test -f "$scratch/.claude/agents/review.md"
           test -f "$scratch/.claude/commands/build.md"
           grep -q "^model: sonnet" "$scratch/.claude/commands/build.md"
+          # 1.5.0 retired /smoke — the installer must scrub it, not just stop copying it.
+          test ! -e "$scratch/.claude/agents/smoke.md"
+          test ! -e "$scratch/.claude/commands/smoke.md"
           # Every caller chains these with `|| true`, so one the installer forgets
           # is a silent no-op on the user's machine, never an error. Assert them.
           test -x "$scratch/.claude/pipeline/scripts/telemetry-send.sh"
@@ -101,14 +104,16 @@ jobs:
           test -f "$scratch/.claude/pipeline/VERSION"
           test -f "$scratch/.claude/commands/build.md"
           # The command is useless without the agent it dispatches: until 1.2.6 this
-          # port copied a hardcoded review+release and shipped /smoke with no `smoke`
+          # port copied a hardcoded review+release and shipped a command with no
           # agent. The shell dry-run above asserted it; this one didn't, so CI stayed
           # green. Assert every non-template agent here too.
-          test -f "$scratch/.claude/agents/smoke.md"
           test -f "$scratch/.claude/agents/review.md"
           test -f "$scratch/.claude/agents/release.md"
           test -f "$scratch/.claude/agents/profile-reader.md"
           test ! -e "$scratch/.claude/agents/implementer.template.md"
+          # 1.5.0 retired /smoke — the port must scrub it too.
+          test ! -e "$scratch/.claude/agents/smoke.md"
+          test ! -e "$scratch/.claude/commands/smoke.md"
           test -x "$scratch/.claude/pipeline/scripts/telemetry-send.sh"
           test -x "$scratch/.claude/pipeline/scripts/kanban-move.sh"
           test -x "$scratch/.claude/pipeline/scripts/preflight.sh"
@@ -133,7 +138,7 @@ jobs:
           node bin/cli.js install "$scratch"
           test -f "$scratch/.claude/pipeline/VERSION"
           test -f "$scratch/.claude/hooks/gate.py"
-          test -f "$scratch/.claude/agents/smoke.md"
+          test -f "$scratch/.claude/agents/review.md"
           test -f "$scratch/specs/_template.md"
 
       # The tarball is the release artifact — assert what it does and does NOT

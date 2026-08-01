@@ -155,7 +155,7 @@ console.log("doctor.js — the /doctor port");
   const d = scratch();
   const gate = {
     deny: ["x"], ask: ["y"], ask_on_default_branch: ["git push"], default_branch: "main",
-    preflight: { enabled: true, agents: ["review", "smoke"], max_age_minutes: 30 },
+    preflight: { enabled: true, agents: ["review"], max_age_minutes: 30 },
   };
   writeFileSync(join(d, "PIPELINE.md"), [
     "```yaml pipeline-profile",
@@ -173,7 +173,7 @@ console.log("doctor.js — the /doctor port");
     '  ask_on_default_branch: ["git push"]',
     "  preflight:",
     "    enabled: true",
-    "    agents: [review, smoke]",
+    "    agents: [review]",
     "    max_age_minutes: 30",
     "```",
   ].join("\n"));

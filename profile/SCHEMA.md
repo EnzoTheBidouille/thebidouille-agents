@@ -34,7 +34,7 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
 | `contract.path` `.ext` `.index`      | string       | build                             | Where `<feature_id>` contract is authored + barrel.           |
 | `contract.authored_by`               | const `lead` | build                             | Implementers import it read-only, never edit.                 |
 | `commands.*`                         | string       | all                               | Repo-wide install/dev/lint/format/typecheck/test + migrate.   |
-| `commands.test_quiet` `.lint_quiet`  | string       | review, smoke, audit, workflows   | Repo-wide bridled variants — what the `/review`·`/smoke` pre-flight runs. Same fallback as the per-surface ones. |
+| `commands.test_quiet` `.lint_quiet`  | string       | review, audit, workflows          | Repo-wide bridled variants — what the `/review` pre-flight runs. Same fallback as the per-surface ones. |
 | `rbac.enabled`                       | bool         | brainstorm, review                | Toggle RBAC personas + authz audit.                           |
 | `rbac.hierarchy`                     | list         | review                            | Highest→lowest role list.                                     |
 | `design.enabled`                     | bool         | build, frontend, align-ds         | `false` ⇒ design steps are no-ops.                            |
@@ -52,8 +52,8 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
 | `gate.ask[]`                         | list         | hooks/gate.py, settings           | Command substrings that require confirm, on any branch.       |
 | `gate.ask_on_default_branch[]`       | list         | hooks/gate.py                     | Confirm ONLY on `default_branch`; free on feature branches.   |
 | `gate.default_branch`                | string       | hooks/gate.py                     | Protected branch (default `main`); gate resolves via git.     |
-| `gate.preflight.enabled`             | bool         | hooks/gate.py, review, smoke      | Phase gate: review/smoke dispatches need a fresh preflight stamp. See §Preflight. |
-| `gate.preflight.agents[]`            | list         | hooks/gate.py                     | `subagent_type`s the stamp gates (default `[review, smoke]`). |
+| `gate.preflight.enabled`             | bool         | hooks/gate.py, review             | Phase gate: review dispatches need a fresh preflight stamp. See §Preflight. |
+| `gate.preflight.agents[]`            | list         | hooks/gate.py                     | `subagent_type`s the stamp gates (default `[review]`).        |
 | `gate.preflight.max_age_minutes`     | number       | hooks/gate.py                     | Stamp freshness window (default 30).                          |
 
 ## Prose sections
@@ -161,8 +161,8 @@ the frozen contract as the only cross-surface channel**. So specialization means
 Coarse first, specialize on evidence: start with one `frontend` / `backend` surface each; split only a
 surface that's proven slow and cleanly separable. The evidence lives in
 the **main checkout's** `.claude/pipeline-metrics.jsonl` (gitignored) — one JSONL line per phase batch
-(`ts`/`feature`/`phase`/`seconds`/`surfaces:{key: result}`), appended by `/build`, `/review`, `/fix`
-and `/smoke`.
+(`ts`/`feature`/`phase`/`seconds`/`surfaces:{key: result}`), appended by `/build`, `/review`
+and `/fix`.
 **`surfaces` keys are surface keys, nothing else** — run-level facts go in their own top-level
 fields. Anything put inside `surfaces` is read
 as a surface: the dashboard renders it as a row in the per-surface table and scores a non-`ok`
@@ -188,7 +188,7 @@ to log it. For what's EXPENSIVE, use Claude Code's own accounting:
   per-subagent attribution needs traces (`CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`, beta).
 
 **Lead context discipline — the silent bill.** The lead session's conversation history is re-sent as
-input on EVERY turn; a session that spans spec→build→smoke→review→fix without clearing re-pays the
+input on EVERY turn; a session that spans spec→build→review→fix without clearing re-pays the
 accumulated spec walk-through, handoffs, and reports on each turn. The pipeline is built so this is
 never necessary: every phase handoff (spec, contract, diff, staged reports) lives on disk, so `/clear`
 at each phase boundary is always safe — each command's closing line recommends it. Corollaries the
@@ -219,7 +219,7 @@ storing a bare `pnpm test` as the thing agents execute; `/update-pipeline` tops 
 
 ## Preflight — the deterministic phase gate
 
-`/review` and `/smoke` start by running `pipeline/scripts/preflight.sh` — a plain shell script (no
+`/review` starts by running `pipeline/scripts/preflight.sh` — a plain shell script (no
 agent) that executes the profile's mechanical checks in order (typecheck → lint → tests, quiet
 variants) with all output redirected to `specs/reports/<id>.preflight.txt`:
 
@@ -231,7 +231,7 @@ variants) with all output redirected to `specs/reports/<id>.preflight.txt`:
 
 `hooks/gate.py` enforces the stamp as a **phase gate** (the `preflight` block of `gate-config.json`,
 generated from `gate.preflight`): a Task dispatch of a listed `subagent_type` (default
-`review`/`smoke`) with a missing/stale stamp — older than `max_age_minutes`, or HEAD moved — gets an
+`review`) with a missing/stale stamp — older than `max_age_minutes`, or HEAD moved — gets an
 "ask", so a lead can't accidentally skip the gate but a human can consciously override it. The gate
 hook fires for **every** agent in the session, including subagents spawned by the Workflow runtime
 (they run in `acceptEdits` whatever the session mode — Write/Edit auto-approved — but Bash and Task
@@ -409,7 +409,7 @@ card created in the target column if missing.
 | `/spec` opens (draft)                   | `spec`          |
 | `/spec` freezes (`status: frozen`)      | `ready`         |
 | `/build`                                | `building`      |
-| `/review` (owns the move — `/smoke` never moves the card) | `review`        |
+| `/review`                               | `review`        |
 | `/fix`                                  | `fix`           |
 | `/ship` starts                          | `ship`          |
 | PR opened (`status: shipped`)           | `shipped` (+ `PR #<num>` on the card) |
@@ -437,7 +437,7 @@ pre-telemetry installs) ask ONE question, once per machine, default **No**, and 
 `|| true`, so a **missing** script is equally silent: `/doctor` check 1 verifies `pipeline/scripts/`
 is fully populated.
 
-**Which commands ping** — the seven that make up the feature funnel, and only those. The point is to
+**Which commands ping** — the six that make up the feature funnel, and only those. The point is to
 see where features stall, so every stage of `idea → PR` reports and nothing else does:
 
 | phase | fired when | `seconds` | `results` |
@@ -445,7 +445,6 @@ see where features stall, so every stage of `idea → PR` reports and nothing el
 | `brainstorm` | the return is staged | `0` | — |
 | `spec` | a freeze lands (Mode A only) | `0` | `frozen` |
 | `build` | after the batch metrics line | wall-clock | `ok,ok` / `error` |
-| `smoke` | after the verdict | wall-clock | `PASS` / `FAIL:<n>` |
 | `review` | after the merged verdict | wall-clock | `<verdict>:<count>` |
 | `fix` | after the batch metrics line | wall-clock | `<fixed>/<found>` |
 | `ship` | the release agent succeeded | `0` | `pr` / `compare` |

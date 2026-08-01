@@ -5,9 +5,28 @@ user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per 
 
 ## 1.5.0 — 2026-08-01
 
-> **Re-run `npx cohorte@latest update --global` (or `update`)** to pick up the collector; the
-> new dashboard panel comes with `npx cohorte dashboard`.
+> **Re-run `npx cohorte@latest update --global` (or `update`)** to pick up the collector and the
+> `/smoke` removal — the update *deletes* the command and its agent from your install, it does not
+> just stop shipping them. The new dashboard panel comes with `npx cohorte dashboard`.
 
+- **BREAKING — `/smoke` and the `smoke` agent are removed.** The end-to-end run phase is gone:
+  the command, the agent, its preflight wiring, its telemetry phase and its documentation. The
+  loop is now `/brainstorm` → `/spec` → `/build` → `/review` → (`/fix` → `/review`)* → `/ship`,
+  with `/clear` safe between each. Nothing else depended on it; a `/smoke` in an old habit will
+  report an unknown command.
+- **Nothing in the pipeline runs your app any more — that part is yours.** `/build` now closes by
+  telling you to exercise the feature by hand if it's worth it, and `/fix` says the same for
+  runtime failures. `/review` follows suit at the SHIP verdict: it ticks only what a stage
+  actually verified, and **leaves any DoD criterion that needs the app up open** (runtime flows,
+  a visual check against the design) unless you say you exercised it yourself and it held.
+- **The preflight phase gate now gates `review` alone** (`gate.preflight.agents` defaults to
+  `[review]`). Existing profiles that list `smoke` keep working — the hook just never sees that
+  dispatch. `/doctor` compares against the new default, so re-run it after the update if it
+  flags gate drift.
+- **Retired-phase data still renders.** Metrics files and dashboards carrying `phase: "smoke"`
+  keep their column, the transcript collector keeps attributing past `/smoke` runs to `/smoke`
+  instead of silently reclassifying them, and `telemetry-send.sh` still accepts the phase from a
+  stale install. Same treatment `/cycle` got in 1.4.0.
 - **The cockpit now shows what a feature actually cost.** The dashboard's only metrics source
   was `pipeline-metrics.jsonl`, written by the model itself — so it misses any run that ended
   early and can never report tokens. On a real project it had captured 18 phase batches where

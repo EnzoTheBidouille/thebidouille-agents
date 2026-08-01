@@ -43,11 +43,7 @@ fallback.)
    design first, then translates it into the **code design system** — `@/components/ui/*`
    primitives, `cn()` + CVA, tokens — never ad-hoc CSS, always **mobile-first**. It reads a DS
    primitive via `get_file` only if it's missing or stale in code.
-4. **`/smoke`** drives the spec §8 flows at a 375px viewport first, then desktop, and — when a
-   browser/screenshot tool is available — captures each screen and compares layout, states
-   (empty/loading/error), and copy language against the design pages. No browser tooling ⇒ it
-   says so and skips, never claims a visual check it didn't perform.
-5. **`/review`** audits mobile-first/responsive from the code (base styles small-screen, additive
+4. **`/review`** audits mobile-first/responsive from the code (base styles small-screen, additive
    `sm:/md:/lg:`, no fixed widths) whenever a touched surface `uses_design`.
 
 ## `/align-ds` — keeping the kit honest

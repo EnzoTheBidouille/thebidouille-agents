@@ -1,6 +1,6 @@
 ---
 model: sonnet
-description: Apply a REVIEW REPORT (or SMOKE failures) — append it to the spec's Remediation, then re-dispatch ONLY the surfaces that have findings.
+description: Apply a REVIEW REPORT — append it to the spec's Remediation, then re-dispatch ONLY the surfaces that have findings.
 argument-hint: <feature_id> [paste REVIEW REPORT]
 ---
 
@@ -16,9 +16,9 @@ that change the *contract*; `/fix` is for everything else.
 
 ## 1. Ingest the report
 
-- The report is either pasted after the feature id, the REVIEW REPORT / SMOKE failures from this
-  session's last `/review` / `/smoke`, or — if the context was cleared — read from
-  `specs/reports/<id>.md`, where `/review` and `/smoke` stage their last report for exactly this reason.
+- The report is either pasted after the feature id (a REVIEW REPORT, or failures the human hit by
+  hand), this session's last `/review` REVIEW REPORT, or — if the context was cleared — read from
+  `specs/reports/<id>.md`, where `/review` stages its last report for exactly this reason.
   If you have none of these, ask for it and wait.
 - Append each finding to `specs/<id>.md` **`## Remediation`** (same format as `/spec` Mode B, under a
   dated/numbered subheading): `- [ ] <severity> · <file:line> · <type> · <concrete fix>`. Set
@@ -65,7 +65,7 @@ When the agents return:
   handoff content — and append ONE metrics line for the batch to `pipeline-metrics.jsonl`
   (see `/build` §4, `phase: "fix"`), chaining the opt-in usage ping in the same Bash call
   (results = items fixed over items found across surfaces, e.g. `"5/6"`).
-- Tell the human: re-run `/smoke` if the failures were runtime ones, and `/review $ARGUMENTS` for the
+- Tell the human: re-test by hand if the failures were runtime ones, and `/review $ARGUMENTS` for the
   re-verdict — the re-review is what *verifies* the ticked items actually hold (a regression simply
   reappears as a new finding in the next round). **Recommend a `/clear`** — all state (spec,
   checkboxes, staged report) is on disk, and the lead's history is re-sent at input price every turn.

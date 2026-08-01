@@ -43,7 +43,6 @@ features:
 /brainstorm   →  a persona panel pressure-tests the idea
 /spec         →  the frozen spec + contract — the single source of truth
 /build <id>   →  one implementer per surface, in parallel
-/smoke <id>   →  the app actually run, end to end
 /review <id>  →  one reviewer per touched surface, adversarially cross-checked
 /fix <id>     →  the findings applied, surface by surface
 /ship <id>    →  commit, push, PR, CI watch — the one human-confirmed gate

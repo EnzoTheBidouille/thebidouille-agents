@@ -30,7 +30,7 @@ Into the destination `.claude/`:
 
 ```
 commands/     the slash commands
-agents/       review · release · smoke · profile-reader (fixed agents)
+agents/       review · release · profile-reader (fixed agents)
 hooks/        gate.py
 templates/    handoff, review-feedback, spec, design-brief, pr-body, brainstorm-return,
               + steps/init-pipeline/ (the router's step files)

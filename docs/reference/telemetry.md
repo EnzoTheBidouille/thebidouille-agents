@@ -22,7 +22,6 @@ One event per pipeline phase, for the **feature funnel only** — the seven stag
 | `brainstorm` | return staged | 0 | — |
 | `spec` | a freeze lands | 0 | `frozen` |
 | `build` | after the batch | wall-clock | `ok,ok` / `error` |
-| `smoke` | after the verdict | wall-clock | `PASS` / `FAIL:<n>` |
 | `review` | after the merge | wall-clock | `<verdict>:<count>` |
 | `fix` | after the batch | wall-clock | `<fixed>/<found>` |
 | `ship` | release succeeded | 0 | `pr` / `compare` |

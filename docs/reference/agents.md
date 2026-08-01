@@ -9,7 +9,6 @@ re-supplies everything they need as exact file paths.
 | Agent | Model | Tools | Job |
 | --- | --- | --- | --- |
 | `review` | sonnet | Read, Grep, Glob, retrieval MCP | Read-only reviewer / auditor. |
-| `smoke` | sonnet | Read, Write, Grep, Glob, Bash, DesignSync | Runs the built feature end-to-end. |
 | `release` | haiku | Read, Grep, Glob, Bash | Commit / push / PR ritual at `/ship`. |
 | `profile-reader` | haiku | Read, Grep, Glob | `PIPELINE.md` machine block → JSON (workflow phase 0). |
 
@@ -31,18 +30,6 @@ excerpts**, every finding self-sufficient (`file:line · severity · type · con
 gets appended verbatim to the spec's Remediation. In **audit mode** (dispatched by `/audit`
 with a path instead of a spec) it emits a prioritized refactor backlog grouped by domain
 instead of a verdict.
-
-### `smoke`
-
-Actually runs the feature — `/review` audits code; nobody has executed it yet. Brings infra up
-in the checkout named by its dispatch (compose stack, migrations, dev servers in background,
-polls for ready), exercises a representative set of spec §5 endpoints with `curl` against the
-real server (every route domain, every auth level, one error case per class; RBAC denials per
-role boundary), drives spec §8 UI flows mobile-first (375px) and compares against the design
-pages when browser tooling exists — saying so honestly when it doesn't. Keeps its own context
-lean (bulky output to files, grep/jq to assert). Stages the full report to
-`specs/reports/<id>.md`, tears down, returns **only** `PASS`/`FAIL:<n>` + max 10 ❌ one-liners.
-Observes honestly, never fixes.
 
 ### `release`
 

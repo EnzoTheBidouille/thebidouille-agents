@@ -53,7 +53,7 @@ design_files: [] # design page links — full URLs of the form https://claude.ai
 
 > One `###` subsection per surface in `PIPELINE.md` §surfaces (e.g. backend, frontend), each TDD.
 > Surfaces are subsections of §6, never top-level sections — §8 and §9 are referenced by number
-> across the whole pipeline (`/smoke` drives "§8 flows", `/review` checks "§9 acceptance"), so a
+> across the whole pipeline (`/build` implements "§8 flows", `/review` checks "§9 acceptance"), so a
 > third surface must not become a §8 of its own.
 
 ### <surface.key>

@@ -5,8 +5,8 @@ does, what lands on disk, and where the human decisions sit. (The autonomous alt
 middle of this loop is run command by command.)
 
 ```
-/brainstorm → /spec → /build → /smoke → /review → (/fix → /review)* → /ship
-     ↑ human      ↑ human                                    ↑ human
+/brainstorm → /spec → /build → /review → (/fix → /review)* → /ship
+     ↑ human      ↑ human                          ↑ human
 ```
 
 Between every two commands: **`/clear`**. Every handoff is on disk; clearing sheds the lead's
@@ -87,27 +87,11 @@ The lead integrates: flags contract mismatches and failing tests, appends one me
 `.claude/pipeline-metrics.jsonl` (the evidence used later to decide surface splits). Kanban →
 **Building**.
 
-## 4. `/smoke` — run it for real
+## 4. `/review` — audit the diff against the spec
 
-Code review can't tell you the app boots. The preflight gate runs first —
-**typecheck + lint + tests via `preflight.sh`; red aborts with the raw failure, zero agents
-spawned** — then one `smoke` agent:
-
-- brings the stack up in the feature's checkout (worktree ports/DB from its slot when isolation
-  is on), runs migrations, starts dev servers in the background, polls for ready;
-- exercises spec §5 **against the real server** — every route domain, every auth level, at least
-  one error case per class (`422`, `401`, `403`, `409`), and one denial per role boundary when
-  RBAC is on;
-- drives the spec §8 UI flows **mobile viewport first** (375px), compares against the design
-  pages when a browser tool is available (and says so honestly when it isn't);
-- stages the full report to `specs/reports/<id>.md`, tears down, and returns only
-  `PASS`/`FAIL:<n>` + at most 10 one-line ❌ entries.
-
-`FAIL` ⇒ the failures are findings: feed them to `/fix`, re-run `/smoke` after.
-
-## 5. `/review` — audit the diff against the spec
-
-Same preflight gate first. Then:
+Nothing in the pipeline *runs* the app: the preflight gate (**typecheck + lint + tests via
+`preflight.sh`; red aborts with the raw failure, zero agents spawned**) is the mechanical proof,
+and anything that needs the app up is yours to exercise by hand before or after this step. Then:
 
 1. The lead computes the diff **once**: one `git diff --stat`, grouped by surface path, then a
    full patch staged per touched surface to `specs/reports/<id>.<surface>.diff`. Reviewers are
@@ -129,7 +113,7 @@ front-matter. Leftover LOW/MEDIUM nits can be parked to `specs/refactor-backlog.
 Small re-reviews (≤ 2 files, ~40 lines, no contract/security) take a fast path: the lead verifies
 the hunks itself against the open remediation items instead of dispatching.
 
-## 6. `/fix` — the scoped loop
+## 5. `/fix` — the scoped loop
 
 Reads the staged report (pasted, from this session, or from `specs/reports/<id>.md` after a
 `/clear`), appends findings to the spec's `## Remediation` as `- [ ]` items, then re-dispatches
@@ -141,7 +125,7 @@ When agents return, the lead ticks `- [x]` what each handoff reports fixed, coll
 rounds to one summary line (the spec stays bounded), and sends you back to `/review` for the
 re-verdict. Kanban → **Fix**, then back to **Review**.
 
-## 7. `/ship` — the human gate
+## 6. `/ship` — the human gate
 
 - Confirms the last verdict was **SHIP**; recomputes the freshness digest — **if the source
   changed since the review verdict, it refuses** and sends you back to `/review`.
@@ -161,8 +145,8 @@ re-verdict. Kanban → **Fix**, then back to **Review**.
 | `specs/<id>.md` | `/spec` (+ `/fix` remediation, `/review` DoD + freshness stamp) | everyone |
 | `specs/design/<id>.md` | `/spec` | design surfaces, design tools |
 | `<contract.path>/<id>.<ext>` | the lead (`/build`, `/fix`) | implementers (read-only), reviewers |
-| `specs/reports/<id>.md` | `/review`, `/smoke` (gitignored buffer) | `/fix` after a `/clear` |
+| `specs/reports/<id>.md` | `/review` (gitignored buffer) | `/fix` after a `/clear` |
 | `specs/reports/<id>.<surface>.diff` | `/review` §1 | the per-surface reviewers |
 | `specs/reports/<id>.preflight.txt` | `preflight.sh` | you, on abort |
-| `.claude/pipeline-metrics.jsonl` | `/build` `/smoke` `/review` `/fix` (gitignored) | surface-split decisions, dashboard |
+| `.claude/pipeline-metrics.jsonl` | `/build` `/review` `/fix` (gitignored) | surface-split decisions, dashboard |
 | `specs/refactor-backlog.md` | `/audit` (+ deferred review nits) | `/refactor` |

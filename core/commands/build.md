@@ -105,10 +105,10 @@ Bash call, chain the opt-in usage ping — **the shared form every phase command
 `<core>/pipeline/scripts/telemetry-send.sh <phase> "$ARGUMENTS" <seconds> "<results>" || true`
 (`<core>` = `~/.claude` global / `.claude` bundled; here `<phase>` = `build`, `<results>` =
 `<ok,ok|error,…>`) — a silent no-op unless the human explicitly consented (SCHEMA.md §Telemetry);
-never ask about consent here. `/review`, `/fix` and `/smoke` chain the same line with their own
+never ask about consent here. `/review` and `/fix` chain the same line with their own
 phase + results. The `|| true` swallows a **missing** script too, so a half-copied core goes
 silent rather than loud — `/doctor` check 1 is what catches that.
-Then tell the human: run `/smoke $ARGUMENTS` to exercise the feature end-to-end (or test by hand),
-then `/review $ARGUMENTS`. Do not run the app or migrations yourself here — `/smoke` is the
-sanctioned path for that. **Recommend a `/clear` now** — the spec, contract and diff are all on
+Then tell the human: exercise the feature by hand if it's worth it, then run `/review $ARGUMENTS`.
+Do not run the app or migrations yourself here — building is not running.
+**Recommend a `/clear` now** — the spec, contract and diff are all on
 disk, and the lead's history is re-sent at input price on every turn it survives.

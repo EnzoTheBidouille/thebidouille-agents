@@ -20,7 +20,7 @@ Ask ONLY what you couldn't confidently detect. Batch related questions. Cover:
   Recommended option: dot/failures-only reporter (`--reporter=dot` vitest/playwright, `--silent`
   jest, `-q` pytest, `--quiet` eslint/ruff — whatever the detected runner supports). These land in
   `test_quiet_cmd`/`lint_quiet_cmd` + `commands.test_quiet`/`lint_quiet` and are what agents and the
-  `/review`·`/smoke` pre-flight actually run (SCHEMA.md §Output discipline). If the human declines or
+  `/review` pre-flight actually run (SCHEMA.md §Output discipline). If the human declines or
   the runner has no such flag, leave `""` — consumers then fall back to `<cmd> 2>&1 | tail -40`.
 - **Contract** — mechanism (`shared-types-zod` / `openapi` / `protobuf` / `json-schema` / `none`) and
   where feature contracts are authored. If `none`, surfaces sync by the spec prose alone.

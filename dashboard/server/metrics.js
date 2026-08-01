@@ -1,6 +1,6 @@
 'use strict';
 // Read a project's `.claude/pipeline-metrics.jsonl` (one line per phase batch, appended by
-// /build, /review, /fix and /smoke) and aggregate it per feature: wall-clock per phase, fix
+// /build, /review and /fix) and aggregate it per feature: wall-clock per phase, fix
 // rounds, and per-surface results. Dependency-free; a missing file is simply "no data yet".
 //
 // Two line formats coexist in the file:
@@ -11,9 +11,9 @@
 const fs = require('fs');
 const path = require('path');
 
-// `cycle` is a RETIRED phase, kept so metrics files written before its removal still render.
-// Without it in this list its per-surface results parse fine but land in no column — the
-// surface table showed rows with every cell empty.
+// `smoke` and `cycle` are RETIRED phases, kept so metrics files written before their removal
+// still render. Without them in this list their per-surface results parse fine but land in no
+// column — the surface table showed rows with every cell empty.
 const PHASES = ['build', 'review', 'fix', 'smoke', 'cycle'];
 
 // Parse the raw JSONL into normalized batches ({ts, feature, phase, seconds, surfaces}),

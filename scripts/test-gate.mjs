@@ -181,7 +181,7 @@ console.log("gate.py — config robustness");
 // ── the preflight phase gate (Task dispatches) ───────────────────────────────
 console.log("gate.py — preflight phase gate");
 {
-  const pf = { enabled: true, agents: ["review", "smoke"], max_age_minutes: 30 };
+  const pf = { enabled: true, agents: ["review"], max_age_minutes: 30 };
   const d = scratch(); writeConfig(d, { ...GATE_CFG, preflight: pf });
   const head = gitRepo(d, "main");
   const stamp = (epoch, sha) =>
@@ -195,7 +195,6 @@ console.log("gate.py — preflight phase gate");
 
   stamp(now(), head);
   check("fresh stamp at the current HEAD ⇒ passes", run(task("review"), at).decision === null);
-  check("smoke is gated too", run(task("smoke"), at).decision === null);
 
   stamp(now() - 60 * 60, head);
   check("stamp older than max_age_minutes ⇒ ask", run(task("review"), at).decision === "ask");

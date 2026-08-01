@@ -36,7 +36,7 @@ Design decisions worth knowing:
 
 The `preflight` block of `gate-config.json` (from `gate.preflight` in the profile) makes the
 gate enforce **pipeline ordering**, not just command safety: a `Task` dispatch of a listed
-`subagent_type` (default `review`, `smoke`) requires a fresh `.claude/preflight.ok` stamp —
+`subagent_type` (default `review`) requires a fresh `.claude/preflight.ok` stamp —
 written by `pipeline/scripts/preflight.sh` only when typecheck + lint + tests are green.
 Missing stamp, stamp older than `max_age_minutes` (default 30), or HEAD moved since ⇒ the
 dispatch gets an "ask": a lead can't accidentally review red code, a human can consciously

@@ -2,7 +2,7 @@
 # telemetry-send.sh — fire-and-forget anonymous usage ping (SCHEMA.md §Telemetry).
 #
 #   telemetry-send.sh <phase> <feature_id> <seconds> [results]
-#     phase    brainstorm|spec|build|smoke|review|fix|ship — the feature funnel, and only it.
+#     phase    brainstorm|spec|build|review|fix|ship — the feature funnel, and only it.
 #              Setup/maintenance commands never ping (SCHEMA.md §Telemetry).
 #     feature  the feature id — NEVER sent raw; SHA-256-hashed to 12 hex chars
 #     seconds  batch wall-clock
@@ -39,7 +39,10 @@ phase="${1:-}"; feature="${2:-}"; seconds="${3:-0}"; results="${4:-}"
 # Allowlist the phase here — the collector accepts any string, so a typo in a command
 # file would silently pollute the dataset with a phantom phase nobody notices.
 case "$phase" in
-  brainstorm|spec|build|smoke|review|fix|ship) ;;
+  brainstorm|spec|build|review|fix|ship) ;;
+  # `smoke` is a RETIRED phase (removed in 1.5.0) — still accepted so a stale install
+  # pinging it lands in its own bucket instead of being silently dropped.
+  smoke) ;;
   *) exit 0 ;;
 esac
 

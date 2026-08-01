@@ -39,7 +39,7 @@ explicitly rather than reporting success on registration alone.
 Double hook registration (usually a bundled repo whose global settings also register the gate).
 `/doctor` check 3 flags it; remove the duplicate PreToolUse entry.
 
-**A review/smoke dispatch asks for confirmation about a "preflight stamp".**
+**A review dispatch asks for confirmation about a "preflight stamp".**
 The phase gate: preflight hasn't run green recently (or HEAD moved since). Run the command's §0
 preflight (or let it run — the prompt is the sign something skipped it). You can consciously
 confirm through it; the point is that it can't happen *accidentally*.

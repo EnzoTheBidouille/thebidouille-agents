@@ -106,7 +106,7 @@ commands:
   format: pnpm format
   typecheck: pnpm check-types
   test: pnpm test
-  test_quiet: pnpm test --reporter=dot       # bridled variant — what /review·/smoke preflight runs
+  test_quiet: pnpm test --reporter=dot       # bridled variant — what the /review preflight runs
   # migration commands — omit / leave "" if the project has no DB migrations
   migrate: "cd apps/api && node ace migration:run"
   make_migration: "cd apps/api && node ace make:migration"
@@ -164,12 +164,12 @@ gate:
     - "git rebase"
     - "git reset"
     - "docker compose"
-  # Phase gate: review/smoke dispatches require a fresh `.claude/preflight.ok` stamp,
+  # Phase gate: review dispatches require a fresh `.claude/preflight.ok` stamp,
   # written by pipeline/scripts/preflight.sh when typecheck+lint+tests are green —
   # gate.py "ask"s the dispatch when the stamp is missing, stale, or HEAD moved.
   preflight:
     enabled: true
-    agents: [review, smoke]                   # subagent_types the stamp gates
+    agents: [review]                          # subagent_types the stamp gates
     max_age_minutes: 30
 
 ```

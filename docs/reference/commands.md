@@ -11,7 +11,6 @@ model — their value is the conversation.
 | `/brainstorm` | inherit | Persona panel pressure-tests a feature idea. |
 | `/spec` | inherit | Freeze the spec + contract; also applies review returns (Mode B). |
 | `/build <id>` | sonnet | Author the contract, dispatch one implementer per surface, parallel. |
-| `/smoke <id>` | sonnet | Preflight, then run the feature for real (infra, contract, UI flows). |
 | `/review <id>` | sonnet | Preflight, staged diff, one reviewer per touched surface, merged verdict. |
 | `/fix <id>` | sonnet | Apply a report; re-dispatch only the surfaces with findings. |
 | `/ship <id>` | sonnet | Freshness + DoD gates, human confirm, release agent, CI watch, teardown. |
@@ -61,14 +60,7 @@ routes to `/fix` when only open non-contract items remain; design gate for UI fe
 rendered immediately per the shared procedure). §2 authors the contract (postcondition:
 file exists). §3 dispatches all implementers in one message, byte-stable prompts, variable slots
 last. §4 integrates handoffs, appends the batch metrics line + telemetry ping, recommends
-`/smoke` then `/review`, and a `/clear`.
-
-## `/smoke <id>`
-
-§0 preflight (abort on red, zero agents — see [Token economy](/guide/token-economy)). §1
-resolves the checkout (worktree slot or main). §2 dispatches ONE `smoke` agent with a
-byte-stable prompt. §3 relays the capped verdict, appends metrics + telemetry, routes: PASS ⇒
-`/review`; FAIL ⇒ `/fix`.
+`/review`, and a `/clear`.
 
 ## `/review <id>`
 
@@ -85,8 +77,7 @@ SHIP ticks the DoD and stamps `reviewed_base`/`reviewed_digest`; on REVISE/BLOCK
 `## Remediation`, re-authors the contract itself if a finding demands it (full `/build` only
 when the change ripples into clean surfaces). §2 maps open items to surfaces by path and
 re-dispatches **only those**, items verbatim in the dispatch. §3 ticks `- [x]` per handoff,
-collapses fully-fixed rounds to one line, metrics + telemetry, routes to `/smoke` (runtime
-failures) and `/review`.
+collapses fully-fixed rounds to one line, metrics + telemetry, routes to `/review`.
 
 ## `/ship <id>`
 

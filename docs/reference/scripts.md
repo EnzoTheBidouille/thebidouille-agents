@@ -13,9 +13,9 @@ preflight.sh <report-file> "<cmd>" ["<cmd>"...]
 
 Runs each command through `sh -c`, all output appended to `<report-file>` (the bulk never enters
 any agent's context). First failure ⇒ prints the last 40 lines of the report raw to stderr, exit
-1 — the caller (**`/review` §0, `/smoke` §0, the workflow preflight phases**) must stop there
+1 — the caller (**`/review` §0, the workflow preflight phases**) must stop there
 and spawn no agents. All green ⇒ writes `.claude/preflight.ok` (`<epoch> <HEAD sha>`), the stamp
-`gate.py` checks before letting review/smoke dispatches through.
+`gate.py` checks before letting review dispatches through.
 
 ## `kanban-move.sh` — board updates outside agent context
 
@@ -37,7 +37,7 @@ telemetry-send.sh <phase> <feature_id> <seconds> [results]
 Fire-and-forget, GDPR-first: exits silently unless `~/.claude/cohorte.config.yaml` has
 `telemetry.enabled: true` **and** an `install_id` **and** an `endpoint` (all three written only
 by the explicit consent flow). The phase is allowlisted client-side to the seven funnel stages
-(`brainstorm spec build smoke review fix ship`); the feature id is SHA-256-hashed to 12 hex
+(`brainstorm spec build review fix ship`); the feature id is SHA-256-hashed to 12 hex
 chars before sending; 2s timeout; never fails the pipeline. See
 [Telemetry & privacy](/reference/telemetry).
 
