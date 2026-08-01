@@ -219,6 +219,7 @@ it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.
 | `/build <id>`        | Lead authors the contract, then dispatches one implementer per surface in parallel.   |
 | `/review <id>`       | Read-only review agents (one per touched surface, parallel) audit the diff vs the spec. |
 | `/fix <id>`          | Apply a review report: remediation into the spec, re-dispatch only the surfaces with findings. |
+| `/loop <id>`         | Autonomous `/build → /review → /fix → /review …` until no blocking finding is left (see below). |
 | `/ship <id>`         | Release agent commits, pushes, opens the PR; watches CI; proposes worktree teardown.  |
 | `/audit [path]`      | Prioritized refactor backlog for existing code.                                       |
 | `/refactor <domain>` | Apply the backlog for one surface, TDD-first.                                         |
@@ -241,6 +242,29 @@ every boundary**:
 lever: long sessions (>150k) are expensive even when cached. Each command tells you when its handoff is
 safe to clear. If you'd rather stay in one session, `/compact` mid-task does the lighter version. (Claude
 can't fire `/clear` itself — it's a client-side command; the pipeline just makes it always safe to type.)
+
+### Let it run itself — `/loop`
+
+```
+/loop feat-x              # /build, then /review ⇄ /fix until clean (max 5 passes)
+/loop feat-x --no-build   # already built — just re-run the /review ⇄ /fix loop
+/loop feat-x --max=8
+```
+
+It stops when `/review` reports **zero blocking findings** (a CRITICAL or a security issue — a LOW
+nit never costs a pass), at the pass ceiling, or as soon as two consecutive reviews return the same
+blocking findings, which means the fix is treading water and more passes won't help. **Each fix pass
+is committed** (`loop(<id>): fix pass <i>`) — that's your way back after N autonomous passes — and
+**no fix runs on the last pass**, since fixing without a review behind it leaves unaudited code.
+
+**The loop does not run in your session.** Each phase is a separate `claude -p` child with its own
+fresh context, driven by `pipeline/scripts/loop.sh`; all of their output goes to
+`specs/reports/<id>.loop.log`, which the command is forbidden to read back. Your session sees one
+line per phase and a three-line summary. That's the whole design: a slash command can't `/clear`
+itself, so a conversational loop would pile the diff plus N review reports plus N contracts into a
+history that is re-sent at input price every turn — it would cost more than the loop saves. The
+machine contract is `specs/reports/<id>.verdict.json`, which `/review` now writes on every run; no
+prose is ever parsed.
 
 ### Run features in parallel — one session per feature
 

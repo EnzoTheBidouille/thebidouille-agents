@@ -9,6 +9,31 @@ user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per 
 > `/smoke` removal — the update *deletes* the command and its agent from your install, it does not
 > just stop shipping them. The new dashboard panel comes with `npx cohorte dashboard`.
 
+- **New — `/loop <id>`: the review ⇄ fix cycle, run for you.** `/build` → `/review` → `/fix` →
+  `/review` … until a review reports **zero blocking findings** (a CRITICAL or a security issue —
+  a LOW nit never costs a pass), or the pass ceiling (`--max=N`, default 5), or two consecutive
+  reviews returning the *same* blocking findings, which means the fix is treading water and more
+  passes won't help. `--no-build` re-runs the loop on an already-built feature; `--rebuild` forces
+  a build. Every fix pass is committed (`loop(<id>): fix pass <i>`) — your way back after N
+  autonomous passes — and **no fix runs on the last pass**, since fixing without a review behind
+  it leaves unaudited code. Exit codes distinguish clean · ceiling · no verdict · non-convergent ·
+  usage, so a wrapper can tell "needs more passes" from "needs a human".
+- **The loop does not run in your session — that's the whole design.** Each phase is a separate
+  `claude -p` child with its own fresh context, driven by the new shipped `loop.sh`; all child
+  output goes to `specs/reports/<id>.loop.log`, which the command is forbidden to read back. Your
+  session sees one line per phase and a three-line summary. A slash command cannot `/clear` itself,
+  so a conversational loop would pile the diff plus N review reports plus N contracts into a
+  history re-sent at input price every turn — it would cost more than the loop saves.
+  `disable-model-invocation: true`: an autonomous loop only ever starts because you asked.
+- **`/review` now writes a machine-readable verdict** to `specs/reports/<id>.verdict.json` on every
+  run — verdict, finding counts by severity, per-surface breakdown, the normalized blocking items
+  and a stable `fingerprint` over them. It is the only contract between the pipeline and any
+  driver; no prose is parsed. `blocking` restates the reviewer's existing rule as a number
+  (CRITICAL + security, deduplicated), so `blocking == 0` ⟺ `SHIP`. The fingerprint hashes
+  *surface + file + problem* with the line number deliberately dropped — a fix that inserts lines
+  would otherwise change it every pass and the drift detection would never fire. A red preflight
+  writes a degraded `{"aborted":"preflight"}` verdict rather than nothing, so an abort is a
+  diagnosis instead of a silence.
 - **BREAKING — `/smoke` and the `smoke` agent are removed.** The end-to-end run phase is gone:
   the command, the agent, its preflight wiring, its telemetry phase and its documentation. The
   loop is now `/brainstorm` → `/spec` → `/build` → `/review` → (`/fix` → `/review`)* → `/ship`,

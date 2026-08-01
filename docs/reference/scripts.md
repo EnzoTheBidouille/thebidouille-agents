@@ -17,6 +17,29 @@ any agent's context). First failure ⇒ prints the last 40 lines of the report r
 and spawn no agents. All green ⇒ writes `.claude/preflight.ok` (`<epoch> <HEAD sha>`), the stamp
 `gate.py` checks before letting review dispatches through.
 
+## `loop.sh` — the autonomous review ⇄ fix driver
+
+```sh
+loop.sh <feature-id> [--max=N] [--no-build] [--rebuild]
+```
+
+Backs [`/loop`](/reference/commands). Runs each phase as a **separate `claude -p` child session**
+(flags from `CLAUDE_FLAGS`, default `--permission-mode acceptEdits`) so the calling session never
+accumulates the diff, the N review reports or the N contracts — all child output goes to
+`specs/reports/<id>.loop.log`, and `/loop` is forbidden to read it back. stdout is one line per
+phase plus a closing verdict line, nothing else.
+
+Reads exactly two scalars from `specs/reports/<id>.verdict.json` — `blocking` and `fingerprint` —
+with `sed`, so it needs no `jq` and no runtime dependency. Stops on `blocking == 0` (exit 0), the
+`--max` ceiling (1), a missing or preflight-aborted verdict (2), or a fingerprint identical to the
+previous pass (3); usage errors exit 64. Skips `/fix` on the last pass, and commits each fix pass
+as `loop(<id>): fix pass <i>`. The `specs/reports/<id>.built` stamp is the driver's own
+bookkeeping — `/build` knows nothing about it, which is why `--no-build` ignores the stamp
+entirely (a feature built before the stamp existed still skips correctly).
+
+Unlike the other shipped executables, its call site does **not** chain `|| true` — its exit code
+*is* the result, and `/doctor` check 1 verifies it is present and executable.
+
 ## `kanban-move.sh` — board updates outside agent context
 
 ```sh

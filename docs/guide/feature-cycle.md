@@ -125,6 +125,21 @@ When agents return, the lead ticks `- [x]` what each handoff reports fixed, coll
 rounds to one summary line (the spec stays bounded), and sends you back to `/review` for the
 re-verdict. Kanban → **Fix**, then back to **Review**.
 
+### Or let it run itself — `/loop <id>`
+
+`/loop feat-x` runs steps 3–5 for you (`--no-build` starts at the review, on an already-built
+feature) until a review returns **zero blocking findings** — CRITICAL or security only, so a LOW
+nit never costs a pass. It also stops at the `--max` ceiling (default 5) and, crucially, as soon
+as two consecutive reviews return the *same* blocking findings: the fix is treading water and
+more passes won't help. Each fix pass is committed, and no fix runs on the last pass — fixing
+without a review behind it leaves unaudited code.
+
+Each phase is a **separate `claude -p` child session**, so your session never accumulates the
+diff, the N reports or the N contracts; it sees one line per phase and a three-line summary. The
+child transcripts go to `specs/reports/<id>.loop.log`, which the command is forbidden to read
+back — that log is for you, in an editor, for free. See
+[`/loop`](/reference/commands) for the exit codes.
+
 ## 6. `/ship` — the human gate
 
 - Confirms the last verdict was **SHIP**; recomputes the freshness digest — **if the source
@@ -148,5 +163,7 @@ re-verdict. Kanban → **Fix**, then back to **Review**.
 | `specs/reports/<id>.md` | `/review` (gitignored buffer) | `/fix` after a `/clear` |
 | `specs/reports/<id>.<surface>.diff` | `/review` §1 | the per-surface reviewers |
 | `specs/reports/<id>.preflight.txt` | `preflight.sh` | you, on abort |
+| `specs/reports/<id>.verdict.json` | `/review` §3, every run | `/loop` — the only machine contract |
+| `specs/reports/<id>.loop.log` · `.built` | `loop.sh` | you, in an editor — **never** an agent |
 | `.claude/pipeline-metrics.jsonl` | `/build` `/review` `/fix` (gitignored) | surface-split decisions, dashboard |
 | `specs/refactor-backlog.md` | `/audit` (+ deferred review nits) | `/refactor` |

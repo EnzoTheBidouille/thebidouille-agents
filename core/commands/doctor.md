@@ -21,7 +21,7 @@ fix only with the human's go-ahead (or hand them the command).
    commands' step files are present — `templates/steps/init-pipeline/` non-empty (a router whose
    `templates/steps/<cmd>/` dir is missing is a partial/stale install ⇒
    re-run install/update). **Shipped scripts present and executable** in `<core>/pipeline/scripts/`:
-   `kanban-move.sh`, `telemetry-send.sh`, `preflight.sh`, `new-feature.sh.template`,
+   `kanban-move.sh`, `telemetry-send.sh`, `preflight.sh`, `loop.sh`, `new-feature.sh.template`,
    `remove-feature.sh.template` — ❌ any missing one. Every caller chains these with `|| true`, so an absent script is a **silent**
    no-op (no kanban card moves, no telemetry ping, no error anywhere) — this check is the only thing
    that sees it. Also flag ❌ a `VERSION` **newer than** the other `pipeline/` files (compare mtimes):
@@ -36,7 +36,7 @@ fix only with the human's go-ahead (or hand them the command).
    dispatch); ⚠️ any `inherit` with the note that it bills at the lead's tier. The generic agents
    (`review.md`, `release.md`, `profile-reader.md` — repo or `~/.claude/agents/`) must
    each carry their `model:` line too (sonnet/haiku/haiku). **Command pins:** every mechanical command file
-   (`build`, `review`, `fix`, `ship`, `audit`, `refactor`, `doctor`, `align-ds`,
+   (`build`, `review`, `fix`, `loop`, `ship`, `audit`, `refactor`, `doctor`, `align-ds`,
    `update-pipeline` — in `.claude/commands/` or `~/.claude/commands/`) carries `model: sonnet` in
    its frontmatter — ⚠️ if missing (the lead's orchestration turn then bills at the session model,
    e.g. Opus/Fable). `brainstorm`, `spec`, and `init-pipeline` are intentionally unpinned

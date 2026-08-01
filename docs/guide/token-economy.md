@@ -81,6 +81,15 @@ always safe** — each command's closing line tells you when. Corollaries the co
 themselves: never paste a diff into a dispatch (agents compute their own, scoped), never echo a
 staged report into chat, redirect bulky output to a file and grep it.
 
+**`/loop` is the same rule taken to its conclusion.** A slash command cannot `/clear` itself, so an
+autonomous `/review ⇄ /fix` loop running *inside* your session would pile the diff plus N review
+reports plus N contracts into a history re-sent at input price on every turn — it would cost more
+than the automation saves. Instead each phase runs as a separate `claude -p` child with its own
+fresh context, and the parent reads back only two things: one line per phase, and
+`specs/reports/<id>.verdict.json` — a handful of numbers. The child transcripts sit in
+`specs/reports/<id>.loop.log`, which the command is explicitly forbidden to read; re-importing it
+would undo the entire design.
+
 ## Model routing — pay for judgment, not mechanics
 
 - Mechanical **commands** pin `model: sonnet` in their frontmatter, so the lead's orchestration

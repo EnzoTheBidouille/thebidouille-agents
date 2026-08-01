@@ -13,6 +13,7 @@ model — their value is the conversation.
 | `/build <id>` | sonnet | Author the contract, dispatch one implementer per surface, parallel. |
 | `/review <id>` | sonnet | Preflight, staged diff, one reviewer per touched surface, merged verdict. |
 | `/fix <id>` | sonnet | Apply a report; re-dispatch only the surfaces with findings. |
+| `/loop <id>` | sonnet | Autonomous `/build → /review → /fix → /review …` in child sessions, until no blocking finding. |
 | `/ship <id>` | sonnet | Freshness + DoD gates, human confirm, release agent, CI watch, teardown. |
 | `/audit [target]` | sonnet | Mechanical gates + convention/TDD audit → prioritized backlog. |
 | `/refactor <domain…>` | sonnet | Apply the backlog per domain via the surface implementers, TDD-first. |
@@ -70,6 +71,10 @@ surface in parallel (small re-reviews: lead verifies hunks itself). §3 merges i
 verdict `SHIP`/`REVISE`/`BLOCK`, capped findings — stages it, appends metrics + telemetry; on
 SHIP ticks the DoD and stamps `reviewed_base`/`reviewed_digest`; on REVISE/BLOCK routes to
 `/fix`. LOW/MEDIUM leftovers can be parked to the refactor backlog (`deferred:<id>`).
+§3 also writes **`specs/reports/<id>.verdict.json`** on every run — counts by severity, per-surface
+breakdown, normalized `blocking_items` and a stable `fingerprint` over them. That file is the only
+machine contract with `/loop`; no prose is ever parsed. A red preflight writes the degraded
+`{"aborted":"preflight"}` form instead of nothing, so an abort reads as a diagnosis.
 
 ## `/fix <id> [paste]`
 
@@ -78,6 +83,28 @@ SHIP ticks the DoD and stamps `reviewed_base`/`reviewed_digest`; on REVISE/BLOCK
 when the change ripples into clean surfaces). §2 maps open items to surfaces by path and
 re-dispatches **only those**, items verbatim in the dispatch. §3 ticks `- [x]` per handoff,
 collapses fully-fixed rounds to one line, metrics + telemetry, routes to `/review`.
+
+## `/loop <id> [--max=N] [--no-build] [--rebuild]`
+
+Runs the cycle for you: `/build` (skipped when the `specs/reports/<id>.built` stamp is there —
+`--no-build` never builds, `--rebuild` always does), then `/review` ⇄ `/fix` until one of four
+stops. **The loop does not run in your session** — each phase is a separate `claude -p` child with
+its own context, driven by [`loop.sh`](/reference/scripts); all their output lands in
+`specs/reports/<id>.loop.log`, which the command is **forbidden** to read back. You get one line
+per phase and a three-line summary. Child flags come from `CLAUDE_FLAGS` (default
+`--permission-mode acceptEdits`). `disable-model-invocation: true` — it only starts when you ask.
+
+| exit | stop condition |
+| --- | --- |
+| `0` | clean — a review returned `blocking == 0` |
+| `1` | ceiling — `--max` passes used, still blocking (the fix was progressing ⇒ raise `--max`) |
+| `2` | no usable verdict — `/review` produced none, or aborted on a red preflight |
+| `3` | non-convergent — the same blocking fingerprint twice; a higher `--max` will not help |
+| `64` | usage — bad flag, missing spec, no `claude` on PATH |
+
+`blocking` counts CRITICAL + security findings only, so a LOW nit never costs a pass. Every fix
+pass is committed (`loop(<id>): fix pass <i>`) — the way back after N autonomous passes — and **no
+fix runs on the last pass**: fixing without a review behind it leaves unaudited code.
 
 ## `/ship <id>`
 

@@ -77,6 +77,7 @@ jobs:
           test -x "$scratch/.claude/pipeline/scripts/telemetry-send.sh"
           test -x "$scratch/.claude/pipeline/scripts/kanban-move.sh"
           test -x "$scratch/.claude/pipeline/scripts/preflight.sh"
+          test -x "$scratch/.claude/pipeline/scripts/loop.sh"
           test -f "$scratch/.claude/pipeline/CHANGELOG.md"
           # Workflow variants + their phase-0 agent must ship together.
           test -f "$scratch/.claude/workflows/review.js"
@@ -117,6 +118,7 @@ jobs:
           test -x "$scratch/.claude/pipeline/scripts/telemetry-send.sh"
           test -x "$scratch/.claude/pipeline/scripts/kanban-move.sh"
           test -x "$scratch/.claude/pipeline/scripts/preflight.sh"
+          test -x "$scratch/.claude/pipeline/scripts/loop.sh"
           test -f "$scratch/.claude/pipeline/CHANGELOG.md"
           test -f "$scratch/.claude/workflows/review.js"
           test -f "$scratch/.claude/workflows/audit.js"

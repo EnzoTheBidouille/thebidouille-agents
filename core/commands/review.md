@@ -28,7 +28,11 @@ with `test -x`); note the epoch (`date +%s`) in the same call — §3's metrics 
 
 - **Non-zero exit** ⇒ the script already printed the raw last-40 lines. **STOP: relay them verbatim
   and spawn NO agent** — a compiler/test failure needs `/fix` (or the human), not a review that
-  rediscovers it at agent prices. This abort is the whole point of the step.
+  rediscovers it at agent prices. This abort is the whole point of the step. Before stopping, write
+  the **aborted verdict** (§3's contract, degraded form) so an automated driver gets a diagnosis
+  rather than silence:
+  `{"id":"$ARGUMENTS","phase":"review","ts":"<ISO>","aborted":"preflight","verdict":"BLOCK","blocking":null}`
+  → `specs/reports/$ARGUMENTS.verdict.json`. One `printf`, in the same Bash call.
 - **Zero exit** ⇒ it stamped `.claude/preflight.ok`, which the gate hook checks before letting
   `review` dispatches through (SCHEMA.md §Preflight). Continue.
 - Script absent (older core) ⇒ run the three commands yourself, each redirected into
@@ -91,6 +95,33 @@ merged verdict + total finding count, e.g. `"REVISE:3"`).
 **Stage the full report to `specs/reports/$ARGUMENTS.md`** (overwrite) — a gitignored buffer so a
 `/fix` after a `/clear` can still read the findings; the `specs/reports/` subfolder is skipped by the
 non-recursive `specs/*.md` glob, so it's never mistaken for a spec (no phantom card, no bogus stage).
+**Write the machine-readable verdict** to `specs/reports/$ARGUMENTS.verdict.json` (overwrite) — on
+**every** run, including the small-diff fast path of §2 and a `SHIP`. This file is the ONLY contract
+between the pipeline and an automated driver (`/loop`), which parses no prose:
+
+```json
+{ "id": "$ARGUMENTS", "phase": "review", "ts": "<ISO>", "verdict": "REVISE",
+  "findings": 7, "blocking": 2, "security": 1,
+  "severity": {"CRITICAL": 1, "HIGH": 2, "MEDIUM": 3, "LOW": 1},
+  "surfaces": {"backend": {"verdict":"BLOCK","findings":4,"blocking":2}},
+  "blocking_items": ["backend|apps/api/src/routes/order.ts|missing authz on post"],
+  "fingerprint": "b3f1c2a90d4e5f67" }
+```
+
+- **`blocking` = CRITICAL findings + `security` findings, deduplicated** (a finding that is both
+  counts once). That is exactly the agent's existing verdict rule restated as a number, so
+  `blocking == 0` ⟺ `verdict == SHIP`. HIGH/MEDIUM/LOW quality findings are **not** blocking —
+  they follow the `deferred:<id>` backlog route below, and must never cost a driver an iteration.
+- **`blocking_items`** — one normalized string per blocking finding, `<surface>|<file>|<problem>`:
+  the file path **without the `:line`** (a fix that inserts lines shifts every line below it — a
+  line-bearing identity would change every pass and the drift detection would never fire), and the
+  **problem**, not the fix, cut to its first 8 words, lowercased, every run of non-alphanumerics
+  collapsed to one space. Identity of a finding, not its wording.
+- **`fingerprint`** — computed in the same Bash call, never by hand:
+  `printf '%s\n' "<item>" … | LC_ALL=C sort | sha256sum | cut -c1-16` (`shasum -a 256` where there
+  is no `sha256sum`). Empty list ⇒ `""`. A driver comparing two consecutive fingerprints detects a
+  fix loop that is treading water.
+
 In chat print ONLY: the verdict, the severity-count table, a one-line digest of each CRITICAL/security
 finding, and `Full report: specs/reports/$ARGUMENTS.md` — never echo the findings body into chat (it
 would sit in this session's history, re-sent every turn). Then:
