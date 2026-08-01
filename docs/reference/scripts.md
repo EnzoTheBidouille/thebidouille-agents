@@ -20,22 +20,34 @@ and spawn no agents. All green ⇒ writes `.claude/preflight.ok` (`<epoch> <HEAD
 ## `loop.sh` — the autonomous review ⇄ fix driver
 
 ```sh
-loop.sh <feature-id> [--max=N] [--no-build] [--rebuild]
+loop.sh <feature-id> [--max=N] [--no-build] [--rebuild] [--resume]
 ```
 
-Backs [`/loop`](/reference/commands). Runs each phase as a **separate `claude -p` child session**
+Backs [`/drive`](/reference/commands). Runs each phase as a **separate `claude -p` child session**
 (flags from `CLAUDE_FLAGS`, default `--permission-mode acceptEdits`) so the calling session never
 accumulates the diff, the N review reports or the N contracts — all child output goes to
-`specs/reports/<id>.loop.log`, and `/loop` is forbidden to read it back. stdout is one line per
+`specs/reports/<id>.loop.log`, and `/drive` is forbidden to read it back. stdout is one line per
 phase plus a closing verdict line, nothing else.
 
-Reads exactly two scalars from `specs/reports/<id>.verdict.json` — `blocking` and `fingerprint` —
-with `sed`, so it needs no `jq` and no runtime dependency. Stops on `blocking == 0` (exit 0), the
-`--max` ceiling (1), a missing or preflight-aborted verdict (2), or a fingerprint identical to the
-previous pass (3); usage errors exit 64. Skips `/fix` on the last pass, and commits each fix pass
+Reads four fields from `specs/reports/<id>.verdict.json` — `blocking`, `fingerprint`, `deferred` and
+`unreviewed` — plus `verdict` from `<id>.readiness.json` and `dead` from `<id>.build.json`, all with
+`sed`/`grep`, so it needs no `jq` and no runtime dependency. A non-empty `dead[]` (an implementer never
+built its surface) or `unreviewed[]` (a reviewer never audited one) aborts as **exit 2**, checked
+*before* `blocking` — a dead reviewer makes `blocking == 0` a claim about code nobody read. Otherwise it
+stops on `blocking == 0` (exit 0), the
+`--max` ceiling (1), a missing or preflight-aborted verdict (2), a fingerprint identical to the
+previous pass (3), or a `NOT-READY` readiness verdict from `/build` (4 — the spec cannot be built, so
+no pass count will help); usage errors exit 64. Skips `/fix` on the last pass, and commits each fix pass
 as `loop(<id>): fix pass <i>`. The `specs/reports/<id>.built` stamp is the driver's own
 bookkeeping — `/build` knows nothing about it, which is why `--no-build` ignores the stamp
 entirely (a feature built before the stamp existed still skips correctly).
+
+**State in the spec, not in the driver.** Before each phase it stamps `status: in-progress`,
+`loop_pass` and `loop_phase` into `specs/<id>.md`'s front-matter with `awk` (a temp file + `mv`, so no
+GNU/BSD `sed -i` divergence), and on exit a terminal `in-review` or `blocked`. `--resume` reads
+`loop_pass` back and continues from that pass. A spec with no front-matter makes every stamp a silent
+no-op: this is bookkeeping for resume and the dashboard, never a precondition — the loop must not die
+over a status line.
 
 Unlike the other shipped executables, its call site does **not** chain `|| true` — its exit code
 *is* the result, and `/doctor` check 1 verifies it is present and executable.
@@ -88,6 +100,13 @@ prefix, install/dev/migrate commands, per-surface env stanzas).
   logic, and one failure mode needs exactly this — `agent()` returns `null` when a subagent dies,
   so a crashed reviewer yields zero findings, indistinguishable from a clean surface. Both
   `review.js` scored that as `SHIP` until this test existed.
+- `scripts/test-loop.mjs` — **behavioural** tests for `loop.sh`, run end-to-end with a fake
+  `claude` on `PATH` that produces each phase's JSON. Pins what nothing structural can see: exit 4
+  on a `NOT-READY` readiness verdict (no review spawned, no build stamp), the terminal statuses that
+  make a run resumable (`in-review` clean · `blocked` otherwise, with the pass recorded), `--resume`
+  continuing at that pass instead of re-paying the earlier ones, and a spec with **no** front-matter
+  still running to completion. The stamps are `awk` + `mv` precisely so they behave identically on
+  GNU and BSD — a `sed -i` there would pass CI on Linux and corrupt every spec on macOS.
 - `scripts/test-gate.mjs` — **behavioural** tests for `hooks/gate.py`, driving its real
   stdin→stdout contract with PreToolUse payloads: the deny/ask tiers, chained-command splitting
   (`&&`, `;`, `|`, `||`, newlines), branch-conditional gating resolved at the *payload's* cwd,

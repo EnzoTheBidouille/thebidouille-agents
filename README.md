@@ -131,7 +131,8 @@ design system), **interviews** you for the gaps, and **generates**:
   symbols instead of grep-and-reading whole files; `graphify` or `none` also available via the
   profile's `retrieval.provider`)
 - `scripts/new-feature.sh` + `remove-feature.sh` — parallel worktree isolation (if you enable it)
-- `specs/_template.md`
+- `specs/_template.md` (and, on first decision, `specs/_decisions.md` — the project's one-line-per-decision
+  journal, read by `/brainstorm`, `/spec` and `/audit` so features stop re-litigating settled ground)
 
 Sanity-check `PIPELINE.md`, commit it, and run `/brainstorm`.
 
@@ -216,10 +217,10 @@ it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.
 | `/init-pipeline`     | Detect stack → interview → generate the profile + agents. Run once per project.       |
 | `/brainstorm`        | Interactive persona panel that pressure-tests a feature idea.                         |
 | `/spec`              | Freeze the feature spec + contract into `specs/<id>.md` (UI features also get a standalone design brief at `specs/design/<id>.md`). Also applies review returns. |
-| `/build <id>`        | Lead authors the contract, then dispatches one implementer per surface in parallel.   |
-| `/review <id>`       | Read-only review agents (one per touched surface, parallel) audit the diff vs the spec. |
+| `/build <id>`        | Readiness gate on the frozen spec, then the lead authors the contract and dispatches one implementer per surface in parallel. |
+| `/review <id>`       | Read-only review agents (one per touched surface, parallel) audit the diff vs the spec; out-of-scope findings go to the refactor backlog. |
 | `/fix <id>`          | Apply a review report: remediation into the spec, re-dispatch only the surfaces with findings. |
-| `/loop <id>`         | Autonomous `/build → /review → /fix → /review …` until no blocking finding is left (see below). |
+| `/drive <id>`         | Autonomous `/build → /review → /fix → /review …` until no blocking finding is left (see below). |
 | `/ship <id>`         | Release agent commits, pushes, opens the PR; watches CI; proposes worktree teardown.  |
 | `/audit [path]`      | Prioritized refactor backlog for existing code.                                       |
 | `/refactor <domain>` | Apply the backlog for one surface, TDD-first.                                         |
@@ -243,19 +244,26 @@ lever: long sessions (>150k) are expensive even when cached. Each command tells 
 safe to clear. If you'd rather stay in one session, `/compact` mid-task does the lighter version. (Claude
 can't fire `/clear` itself — it's a client-side command; the pipeline just makes it always safe to type.)
 
-### Let it run itself — `/loop`
+### Let it run itself — `/drive`
 
 ```
-/loop feat-x              # /build, then /review ⇄ /fix until clean (max 5 passes)
-/loop feat-x --no-build   # already built — just re-run the /review ⇄ /fix loop
-/loop feat-x --max=8
+/drive feat-x              # /build, then /review ⇄ /fix until clean (max 5 passes)
+/drive feat-x --no-build   # already built — just re-run the /review ⇄ /fix loop
+/drive feat-x --max=8
+/drive feat-x --resume     # continue a run that died / hit the ceiling, at the pass it reached
 ```
 
 It stops when `/review` reports **zero blocking findings** (a CRITICAL or a security issue — a LOW
-nit never costs a pass), at the pass ceiling, or as soon as two consecutive reviews return the same
-blocking findings, which means the fix is treading water and more passes won't help. **Each fix pass
-is committed** (`loop(<id>): fix pass <i>`) — that's your way back after N autonomous passes — and
-**no fix runs on the last pass**, since fixing without a review behind it leaves unaudited code.
+nit never costs a pass), at the pass ceiling, as soon as two consecutive reviews return the same
+blocking findings (the fix is treading water and more passes won't help), or immediately if `/build`'s
+readiness gate says the frozen spec **cannot be built** — that one needs `/spec`, not passes. **Each
+fix pass is committed** (`loop(<id>): fix pass <i>`) — that's your way back after N autonomous passes —
+and **no fix runs on the last pass**, since fixing without a review behind it leaves unaudited code.
+
+**It's resumable.** Before each phase the driver stamps `status: in-progress` + `loop_pass` +
+`loop_phase` into the spec's front-matter (plain `awk`, zero tokens), and a terminal `in-review` or
+`blocked` on exit. So `--resume` continues at pass 3 instead of re-paying passes 1 and 2 — and the spec
+itself tells you, `/doctor` and the dashboard where the loop got to.
 
 **The loop does not run in your session.** Each phase is a separate `claude -p` child with its own
 fresh context, driven by `pipeline/scripts/loop.sh`; all of their output goes to

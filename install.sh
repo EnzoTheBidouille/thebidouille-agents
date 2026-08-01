@@ -154,6 +154,13 @@ copy_fixed_agents() {
      "$dest/agents/"
   # 1.5.0 removed the /smoke phase; copy-over never deletes, so scrub the orphan agent.
   rm -f "$dest/agents/smoke.md" "$dest/commands/smoke.md"
+  # 1.4.0 removed /cycle and its workflow — and no installer ever scrubbed them, so every
+  # install since has kept offering a command that dispatches a workflow whose phases were
+  # later deleted. A dead command is worse than a missing one: the model can still fire it.
+  rm -f "$dest/commands/cycle.md" "$dest/workflows/cycle.js"
+  # 1.6.0 renamed /loop → /drive: Claude Code's own built-in /loop shadowed ours, so a leftover
+  # commands/loop.md is a command the user can never reach — scrub it rather than leave a decoy.
+  rm -f "$dest/commands/loop.md"
   # 0.1.19 split the bi-mode questionnaire-researcher into research-agent + questionnaire-architect;
   # copy-over never deletes, so scrub the retired agent lest a dead subagent_type linger.
   rm -f "$dest/agents/questionnaire-researcher.md"

@@ -41,6 +41,13 @@ Discipline built in:
 - **Size budget** — target ≤ ~300 lines. Every implementer re-reads the spec on every first
   build, so each extra line is paid `surfaces × dispatches` times. A spec that genuinely needs
   more is two features — `/spec` proposes the split.
+- **Decision journal** — before the interview `/spec` reads `specs/_decisions.md` (one line per
+  standing decision) so the new spec doesn't silently contradict settled ground; at freeze it
+  appends the decisions that **outlive this feature** — typically 0–3 lines, and zero is normal.
+  That file is the project's transverse memory: `PIPELINE.md` says how the repo is built, the
+  journal says what was decided and why. Read by `/brainstorm`, `/spec` and `/audit` only —
+  implementers and reviewers never load it (they have the contract; the rationale would cost
+  `surfaces × dispatches` tokens for a fact they can't act on).
 - **Design brief** (UI features only) — authored to `specs/design/<id>.md`; spec §8 keeps only a
   summary + pointer so non-design surfaces never pay for it. You paste the resulting design page
   links (full `https://claude.ai/design/p/<projectId>?file=<file>` URLs) into the spec's
@@ -70,10 +77,18 @@ later.
 2. **Reconciles surfaces** — if the spec touches an unowned tree, or one surface carries a
    cleanly-separable bottleneck, `/build` proposes a new/split surface, renders its agent on
    your go-ahead, and continues. You never go back to `/init-pipeline` for this.
-3. **Authors the contract** — the lead writes `<contract.path>/<id>.<ext>` from spec §5 (e.g.
+3. **Scores readiness** — before authoring anything, `/build` judges the frozen spec on
+   *implementability* (contract shapes complete · every area owned · named dependencies actually
+   exist · no ambiguity a surface would have to guess at · design links present) and writes
+   `specs/reports/<id>.readiness.json`. **`NOT-READY` aborts with zero agents spawned** and sends you
+   to `/spec`; `RESERVATIONS` never blocks — each gap is inlined into the affected surface's dispatch
+   as an assumption the implementer must apply *and* flag. This costs no extra agent (the lead already
+   holds the spec), which is the point: a bancal spec costs one verdict instead of N implementers
+   discovering it in parallel.
+4. **Authors the contract** — the lead writes `<contract.path>/<id>.<ext>` from spec §5 (e.g.
    Zod v4 schemas + inferred types), exports it from the barrel. This is the *only* file surfaces
    share; implementers import it read-only.
-4. **Dispatches one implementer per surface, in a single message** — parallel, never serial:
+5. **Dispatches one implementer per surface, in a single message** — parallel, never serial:
    build wall-clock is the slowest surface, not the sum. Each dispatch is byte-stable (variable
    slots at the end, for the prompt cache) and self-sufficient: spec path, contract path, its
    tree, its design links or `none`, its remediation items or `none`.
@@ -86,6 +101,17 @@ mismatches, TODOs — no file lists, no code excerpts).
 The lead integrates: flags contract mismatches and failing tests, appends one metrics line to
 `.claude/pipeline-metrics.jsonl` (the evidence used later to decide surface splits). Kanban →
 **Building**.
+
+**Roll call — silence is not a green light.** A subagent can die mid-run (rate limit, transport error,
+its own context exhausted) and it then returns *nothing* — indistinguishable from "finished, nothing to
+report". So before integrating, the lead accounts for **every** dispatch: a silent surface is retried
+**once**, alone, with the byte-identical prompt (the other surfaces' work is already on disk, so
+recovery costs one agent, not a rebuild). Silent twice ⇒ the surface is `dead`: the lead stops speaking
+for it and checks the tree instead (that surface's own quiet commands, output redirected), reports it
+`DEAD — unverified`, records `"<key>":"dead"` in the metrics line and in
+`specs/reports/<id>.build.json`. The batch is never reported as ok. Same rule in `/review` (a dead
+reviewer lands in the verdict's `unreviewed[]` and forbids `SHIP`) and in `/fix` (a dead agent ticks no
+checkbox). See [§Dead agents](/reference/profile).
 
 ## 4. `/review` — audit the diff against the spec
 
@@ -105,10 +131,19 @@ and anything that needs the app up is yours to exercise by hand before or after 
    security vulnerability). Full report staged to `specs/reports/<id>.md`; chat gets only the
    verdict, the severity table, and one-liners for the criticals.
 
+**Deferred findings** are the second half of the report: things the reviewer judges real but **out of
+this feature's scope** — pre-existing code the diff never touched, adjacent debt the spec never claims
+to fix. They sit in their own `## Deferred` section with an out-of-scope reason each, count in no
+severity row, move no verdict, and are never cross-checked. On **every** verdict the lead routes them
+into `specs/refactor-backlog.md` under the owning surface's `## <domain>` heading, tagged
+`deferred:<id>` — so `/refactor <domain>` picks them up, and `/review` feeds `/audit`'s backlog for
+free instead of dropping everything non-blocking. Never into `## Remediation`, which is what `/fix`
+re-dispatches. What is *not* deferrable: anything the diff touched, any spec violation, any security
+issue on a path this feature adds or calls.
+
 On **SHIP**, the lead ticks the verified DoD boxes in the spec and **stamps the freshness gate**:
 `reviewed_base` (merge-base SHA) + `reviewed_digest` (hash of exactly the reviewed source) in the
-front-matter. Leftover LOW/MEDIUM nits can be parked to `specs/refactor-backlog.md` tagged
-`deferred:<id>` instead of forcing a fix cycle.
+front-matter. Leftover LOW/MEDIUM nits take the same backlog route instead of forcing a fix cycle.
 
 Small re-reviews (≤ 2 files, ~40 lines, no contract/security) take a fast path: the lead verifies
 the hunks itself against the open remediation items instead of dispatching.
@@ -125,9 +160,9 @@ When agents return, the lead ticks `- [x]` what each handoff reports fixed, coll
 rounds to one summary line (the spec stays bounded), and sends you back to `/review` for the
 re-verdict. Kanban → **Fix**, then back to **Review**.
 
-### Or let it run itself — `/loop <id>`
+### Or let it run itself — `/drive <id>`
 
-`/loop feat-x` runs steps 3–5 for you (`--no-build` starts at the review, on an already-built
+`/drive feat-x` runs steps 3–5 for you (`--no-build` starts at the review, on an already-built
 feature) until a review returns **zero blocking findings** — CRITICAL or security only, so a LOW
 nit never costs a pass. It also stops at the `--max` ceiling (default 5) and, crucially, as soon
 as two consecutive reviews return the *same* blocking findings: the fix is treading water and
@@ -138,7 +173,14 @@ Each phase is a **separate `claude -p` child session**, so your session never ac
 diff, the N reports or the N contracts; it sees one line per phase and a three-line summary. The
 child transcripts go to `specs/reports/<id>.loop.log`, which the command is forbidden to read
 back — that log is for you, in an editor, for free. See
-[`/loop`](/reference/commands) for the exit codes.
+[`/drive`](/reference/commands) for the exit codes.
+
+**It survives being interrupted.** Before every phase the driver stamps `status: in-progress` plus
+`loop_pass` and `loop_phase` into the spec's front-matter (deterministic `awk`, zero tokens), and on
+exit a terminal status — `in-review` when clean, `blocked` otherwise. So `/drive feat-x --resume`
+continues at the pass it reached instead of re-paying the ones it already made, whether the session
+died, the ceiling hit, or the fix stopped converging. The spec *is* the state: the dashboard's specs
+board shows `↻ pass 3 · /review` on the card, and `/doctor` names any spec left mid-loop.
 
 ## 6. `/ship` — the human gate
 
@@ -163,7 +205,10 @@ back — that log is for you, in an editor, for free. See
 | `specs/reports/<id>.md` | `/review` (gitignored buffer) | `/fix` after a `/clear` |
 | `specs/reports/<id>.<surface>.diff` | `/review` §1 | the per-surface reviewers |
 | `specs/reports/<id>.preflight.txt` | `preflight.sh` | you, on abort |
-| `specs/reports/<id>.verdict.json` | `/review` §3, every run | `/loop` — the only machine contract |
+| `specs/reports/<id>.verdict.json` | `/review` §3, every run | `/drive` — the only machine contract |
+| `specs/reports/<id>.readiness.json` | `/build` §1.6, every build | `/drive` (exit 4), you on a `NOT-READY` |
+| `specs/reports/<id>.build.json` | `/build` §4, every batch | `/drive` (exit 2 on a dead implementer) |
 | `specs/reports/<id>.loop.log` · `.built` | `loop.sh` | you, in an editor — **never** an agent |
 | `.claude/pipeline-metrics.jsonl` | `/build` `/review` `/fix` (gitignored) | surface-split decisions, dashboard |
-| `specs/refactor-backlog.md` | `/audit` (+ deferred review nits) | `/refactor` |
+| `specs/refactor-backlog.md` | `/audit` + `/review`'s deferred findings | `/refactor` |
+| `specs/_decisions.md` | `/spec` at freeze, `/build` on a surface split | `/brainstorm` `/spec` `/audit` only |

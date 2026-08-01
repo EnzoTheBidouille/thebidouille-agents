@@ -51,6 +51,8 @@ as a clickable link with live open/merged/closed status.
 | `/build` | `building` |
 | `/review` | `review` |
 | `/fix` | `fix` |
+| a `/drive` is driving it (`in-progress`) | the current phase's column |
+| a `/drive` gave up (`blocked`) | `fix` |
 | `/ship` starts | `ship` |
 | PR opened | `shipped` (+ `PR #<num>`) |
 

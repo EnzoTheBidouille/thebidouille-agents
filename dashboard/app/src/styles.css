@@ -226,16 +226,20 @@ button.danger:hover { border-color: var(--bad); }
 /* One scroll area for a whole board (both boards). The inner grid/flex is left unconstrained so
    its columns stretch to equal (tallest) height; this wrapper caps the height and scrolls. */
 .board-scroll { max-height: 500px; overflow: auto; }
-.board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+/* Auto-flow by column, not a fixed count: the spec lifecycle has six stages (plus the
+   "other" bucket for an invalid status), and a hard `repeat(4, …)` wrapped them onto a
+   second row — a board is one row that scrolls, never two. */
+.board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(140px, 1fr); gap: 10px; }
 .col { background: var(--bg); border: 1px solid var(--border); border-radius: 9px; padding: 8px; min-width: 140px; }
 .col-head { display: flex; justify-content: space-between; font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); padding: 2px 4px 8px; position: sticky; top: 0; background: var(--bg); z-index: 1; }
 .col-shipped { opacity: 0.85; }
+.col-blocked { border-color: color-mix(in srgb, var(--bad) 40%, var(--border)); }
 .col-other { border-color: color-mix(in srgb, var(--warn) 40%, var(--border)); }
 .spec-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 7px; padding: 8px 9px; margin-bottom: 7px; }
 .spec-card.bad { border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
 .spec-title { font-size: 13px; font-weight: 600; }
-.spec-meta, .spec-branch { margin-top: 3px; }
-@media (max-width: 640px) { .board { grid-template-columns: repeat(2, 1fr); } }
+.spec-meta, .spec-branch, .spec-loop { margin-top: 3px; }
+@media (max-width: 640px) { .board { grid-auto-flow: row; grid-template-columns: repeat(2, 1fr); } }
 
 /* ── kanban board (obsidian) ─────────────────────────────────────────────── */
 .kanban-board { display: flex; gap: 10px; }

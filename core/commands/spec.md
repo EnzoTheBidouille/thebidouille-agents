@@ -13,6 +13,10 @@ You run the **spec** step in the main thread — interactive, with the human. Pa
 > Template paths below (`.claude/templates/…`) resolve to `~/.claude/templates/…` when the core is
 > installed globally — read whichever exists.
 >
+> **Decision journal** (SCHEMA.md §Decisions): read `specs/_decisions.md` §Live if it exists — one
+> line per standing decision, so it is cheap. It is the ONLY place the project's transverse rules
+> live; a spec that contradicts one silently un-decides it. Absent ⇒ nothing to honour yet.
+>
 > **Kanban** (SCHEMA.md §Kanban): when the spec opens, move card `#<feature_id>` → **Spec**; on freeze
 > (`status: frozen`, Mode A) → **Ready to build**. No-op silently if no board is configured.
 
@@ -53,6 +57,22 @@ Detect the mode from the pasted content:
    Ping only on a **landed** freeze, so the funnel counts specs that exist, not attempts. Mode B does
    not ping — it re-enters an already-counted spec, and `/fix` covers that loop. Silent no-op without
    consent; never ask about consent here.
+5b. **Record the transverse decisions — the journal, not a summary.** Walk what the interview settled
+   and keep ONLY the decisions that **outlive this feature**: a rule the next spec would otherwise
+   re-litigate or contradict (auth model, id/naming scheme, where a kind of state lives, an error
+   convention, a deliberate non-goal that binds future features). Typical yield: **0–3 lines**; zero
+   is a normal, healthy outcome for a feature that decided nothing new — never invent lines to fill
+   the section. Append them to `specs/_decisions.md` §Live (create the file from
+   `.claude/templates/decisions.template.md` on first use), each exactly:
+   `- <YYYY-MM-DD> · <area> · <decision> — because <reason> · <feature_id>`
+   - **Never** duplicate what §5, `PIPELINE.md` §Conventions or the code already states — the journal
+     carries the *non-obvious rule*, not the feature's content. A line that restates a spec section is
+     a line every future `/spec` pays for and learns nothing from.
+   - **Contradicting an existing line** is allowed but never silent: tell the human which line this
+     feature overrides, get their go-ahead, then append the new line with
+     `· supersedes <YYYY-MM-DD> <area>` and move the old one to `## Superseded`.
+   - Append with one `>>` Bash call, not a full-file rewrite (the file is append-only, and reading it
+     back to re-write it is the one way to make a bounded file expensive).
 6. Author the **design brief** — `specs/design/<id>.md`, rendered via
    `.claude/templates/design-brief.md` (resolves to `~/.claude/templates/…` on a global install).
    _Only if `design.enabled` / the feature has UI; skip entirely for a backend-only feature._

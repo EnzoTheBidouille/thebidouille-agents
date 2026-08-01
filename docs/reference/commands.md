@@ -13,7 +13,7 @@ model — their value is the conversation.
 | `/build <id>` | sonnet | Author the contract, dispatch one implementer per surface, parallel. |
 | `/review <id>` | sonnet | Preflight, staged diff, one reviewer per touched surface, merged verdict. |
 | `/fix <id>` | sonnet | Apply a report; re-dispatch only the surfaces with findings. |
-| `/loop <id>` | sonnet | Autonomous `/build → /review → /fix → /review …` in child sessions, until no blocking finding. |
+| `/drive <id>` | sonnet | Autonomous `/build → /review → /fix → /review …` in child sessions, until no blocking finding; `--resume` picks a killed run back up. |
 | `/ship <id>` | sonnet | Freshness + DoD gates, human confirm, release agent, CI watch, teardown. |
 | `/audit [target]` | sonnet | Mechanical gates + convention/TDD audit → prioritized backlog. |
 | `/refactor <domain…>` | sonnet | Apply the backlog per domain via the surface implementers, TDD-first. |
@@ -58,22 +58,37 @@ must change, sets `status: in-review`, routes to `/build`.
 §1 loads the spec selectively (status grep first, then only front-matter/§5/tasks/Remediation);
 routes to `/fix` when only open non-contract items remain; design gate for UI features.
 §1.5 **auto-reconciles surfaces** (new tree ⇒ new agent; clean bottleneck ⇒ split proposal —
-rendered immediately per the shared procedure). §2 authors the contract (postcondition:
+rendered immediately per the shared procedure, plus one line in `specs/_decisions.md`).
+§1.6 scores **readiness** — contract completeness · surface coverage · named dependencies exist ·
+residual ambiguity · design links — and writes `specs/reports/<id>.readiness.json`
+(`READY`/`RESERVATIONS`/`NOT-READY` + `gaps[]`). **`NOT-READY` stops the build with zero agents
+spawned** (go patch the spec); `RESERVATIONS` proceeds, each gap inlined into the affected surface's
+dispatch as a flagged assumption. Costs no extra agent — the lead already holds the spec.
+§2 authors the contract (postcondition:
 file exists). §3 dispatches all implementers in one message, byte-stable prompts, variable slots
-last. §4 integrates handoffs, appends the batch metrics line + telemetry ping, recommends
-`/review`, and a `/clear`.
+last. §3.5 does the **roll call**: a surface that returned no handoff is dead, not clean — retried once alone
+(byte-identical prompt), then marked `dead`, its tree verified with its own quiet commands rather than
+spoken for. §4 integrates handoffs, appends the batch metrics line (`ok|error|dead`, written even on an
+incomplete batch) + telemetry ping, writes `specs/reports/<id>.build.json` (`dead[]` — the driver's
+channel), recommends `/review`, and a `/clear`.
 
 ## `/review <id>`
 
 §0 preflight. §1 one `git diff --stat`, paths grouped by surface (shared remainder attached to
 the most relevant surface), full patch staged per touched surface. §2 one reviewer per touched
-surface in parallel (small re-reviews: lead verifies hunks itself). §3 merges into one report —
+surface in parallel (small re-reviews: lead verifies hunks itself). §3 **rolls call first** — a reviewer
+that died returns zero findings, which reads exactly like a clean surface, so a silent one is retried
+once and then listed in the verdict's `unreviewed[]`, which **forbids `SHIP`**. Then it merges into one
+report —
 verdict `SHIP`/`REVISE`/`BLOCK`, capped findings — stages it, appends metrics + telemetry; on
 SHIP ticks the DoD and stamps `reviewed_base`/`reviewed_digest`; on REVISE/BLOCK routes to
-`/fix`. LOW/MEDIUM leftovers can be parked to the refactor backlog (`deferred:<id>`).
+`/fix`. §3.5 routes the reviewers' **deferred findings** — real but out of this feature's scope — into
+`specs/refactor-backlog.md` under the owning surface's domain heading, tagged `deferred:<id>`, on
+**every** verdict; they count in no severity row and can never cost a fix pass. LOW/MEDIUM leftovers on
+a SHIP take the same route.
 §3 also writes **`specs/reports/<id>.verdict.json`** on every run — counts by severity, per-surface
 breakdown, normalized `blocking_items` and a stable `fingerprint` over them. That file is the only
-machine contract with `/loop`; no prose is ever parsed. A red preflight writes the degraded
+machine contract with `/drive`; no prose is ever parsed. A red preflight writes the degraded
 `{"aborted":"preflight"}` form instead of nothing, so an abort reads as a diagnosis.
 
 ## `/fix <id> [paste]`
@@ -84,10 +99,10 @@ when the change ripples into clean surfaces). §2 maps open items to surfaces by
 re-dispatches **only those**, items verbatim in the dispatch. §3 ticks `- [x]` per handoff,
 collapses fully-fixed rounds to one line, metrics + telemetry, routes to `/review`.
 
-## `/loop <id> [--max=N] [--no-build] [--rebuild]`
+## `/drive <id> [--max=N] [--no-build] [--rebuild] [--resume]`
 
 Runs the cycle for you: `/build` (skipped when the `specs/reports/<id>.built` stamp is there —
-`--no-build` never builds, `--rebuild` always does), then `/review` ⇄ `/fix` until one of four
+`--no-build` never builds, `--rebuild` always does), then `/review` ⇄ `/fix` until one of five
 stops. **The loop does not run in your session** — each phase is a separate `claude -p` child with
 its own context, driven by [`loop.sh`](/reference/scripts); all their output lands in
 `specs/reports/<id>.loop.log`, which the command is **forbidden** to read back. You get one line
@@ -98,13 +113,22 @@ per phase and a three-line summary. Child flags come from `CLAUDE_FLAGS` (defaul
 | --- | --- |
 | `0` | clean — a review returned `blocking == 0` |
 | `1` | ceiling — `--max` passes used, still blocking (the fix was progressing ⇒ raise `--max`) |
-| `2` | no usable verdict — `/review` produced none, or aborted on a red preflight |
+| `2` | no usable verdict — `/review` produced none, aborted on a red preflight, or a subagent died (`dead[]` in `build.json` / `unreviewed[]` in the verdict), checked **before** `blocking` |
 | `3` | non-convergent — the same blocking fingerprint twice; a higher `--max` will not help |
+| `4` | not implementable — `/build`'s readiness gate returned `NOT-READY`; no agent ran, go to `/spec` |
 | `64` | usage — bad flag, missing spec, no `claude` on PATH |
 
-`blocking` counts CRITICAL + security findings only, so a LOW nit never costs a pass. Every fix
+`blocking` counts CRITICAL + security findings only, so a LOW nit never costs a pass; the verdict's
+`deferred` count is reported on a fourth line when non-zero. Every fix
 pass is committed (`loop(<id>): fix pass <i>`) — the way back after N autonomous passes — and **no
 fix runs on the last pass**: fixing without a review behind it leaves unaudited code.
+
+**Resume.** Before each phase the driver stamps `status: in-progress` + `loop_pass` + `loop_phase` into
+the spec's front-matter (plain `awk`, no tokens); on exit it stamps `in-review` when clean and `blocked`
+otherwise. `--resume` reads `loop_pass` back and continues from that pass — `--max` stays a ceiling on
+the *total*, so `--max=8 --resume` at pass 5 buys three more. The build is still decided by the build
+stamp alone, so a run killed mid-build rebuilds. The spec is the state: the dashboard's specs board
+shows the pass and phase on the card, and `/doctor` names any spec left mid-loop.
 
 ## `/ship <id>`
 

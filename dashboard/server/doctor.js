@@ -19,7 +19,10 @@ const FIXED_AGENTS = new Set([
   'implementer.template',
 ]);
 
-const VALID_STATUS = ['draft', 'frozen', 'in-review', 'shipped'];
+// The spec lifecycle (SCHEMA.md §Spec status). `in-progress` and `blocked` are written by
+// the /drive driver — they are what makes an interrupted autonomous loop resumable, so a
+// dashboard that flagged them as invalid would report the pipeline's own state as a defect.
+const VALID_STATUS = ['draft', 'frozen', 'in-progress', 'in-review', 'shipped', 'blocked'];
 
 // Artifacts the pipeline itself writes into specs/ that are NOT feature specs and have no
 // front-matter status. `/audit` writes specs/refactor-backlog.md by design, so scanning it
@@ -281,12 +284,16 @@ function scanSpecs(projectRoot) {
     const body = fm ? fm[1] : '';
     const get = k => { const m = body.match(new RegExp(`^${k}:\\s*(.*)$`, 'm')); return m ? m[1].trim() : null; };
     const status = get('status');
+    // The loop driver's resume state, when a /drive is (or was) running on this spec.
+    const pass = parseInt(get('loop_pass'), 10);
+    const phase = get('loop_phase');
     specs.push({
       file: f,
       id: get('feature_id') || f.replace(/\.md$/, ''),
       title: get('title'),
       status: status ? status.split('#')[0].trim() : null,
       branch: get('branch'),
+      loop: pass > 0 ? { pass, phase: phase && phase !== 'done' ? phase : null } : null,
     });
   }
   return specs;

@@ -1,9 +1,11 @@
 ---
 feature_id: <slug>
 title: <Feature title>
-status: draft # draft → frozen → in-review → shipped
+status: draft # draft → frozen → in-progress → in-review → shipped · blocked (see SCHEMA.md §Spec status)
 branch: <feature_branch_prefix><slug>
 created: <YYYY-MM-DD>
+loop_pass: 0 # /drive bookkeeping — the review pass it is on; 0 = no loop running. Written by the driver, not by hand
+loop_phase: # /drive bookkeeping — build | review | fix | done. With loop_pass, this is what `--resume` reads back
 reviewed_base: # merge-base sha at the last SHIP verdict — freshness-gate anchor (written by /review)
 reviewed_digest: # sha256 (16 hex) of the reviewed source diff vs reviewed_base, specs excluded — /ship re-checks
 design_files: [] # design page links — full URLs of the form https://claude.ai/design/p/<projectId>?file=<file> (each carries its own project + page); blank until designed; omit if no UI

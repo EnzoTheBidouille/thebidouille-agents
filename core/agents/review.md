@@ -81,6 +81,24 @@ domain** (same finding-line shape) instead of a SHIP/REVISE/BLOCK verdict.
 - Any **security vulnerability** ⇒ verdict **BLOCK**.
 - No CRITICAL and no security issue ⇒ verdict **SHIP**.
 
+## Deferred — real, but not this feature's problem
+
+A finding is **deferred** when it is genuinely true and genuinely **out of this feature's scope**:
+pre-existing code the staged diff did not touch, adjacent debt the spec never claims to fix, a
+convention violation that predates this work. Deferring is not softening — it is naming the right
+owner. The lead routes deferred findings to `specs/refactor-backlog.md` (they feed `/refactor`), so
+they are **never lost and never cost a fix loop**.
+
+- **Deferred findings are separate from your findings list** and count in **no** severity row: the
+  severity table drives the verdict, and a deferred item must never force one.
+- **Deferrable:** a problem entirely in lines/files the diff did not change, whose fix is not required
+  by any acceptance criterion of this spec.
+- **NOT deferrable, ever:** anything the diff touched or introduced; any spec violation; any
+  **security** issue on a path this feature adds, calls or modifies (a pre-existing hole this feature
+  now exposes to new traffic is this feature's problem). When in doubt, it is a finding, not a deferral.
+- Cap the deferred list at **10 lines**, worst first; each carries its own out-of-scope reason so the
+  lead can route it without re-reading anything.
+
 ## Your return — the REVIEW REPORT, exactly this shape
 
 Every finding must be **self-sufficient for a stateless agent**: `file:line` · severity ·
@@ -109,6 +127,11 @@ Verdict: <SHIP | REVISE | BLOCK>
 
 - **[<SEVERITY>]** `<file>:<line>` · <spec-violation|quality|security> · <problem> → **Fix:** <concrete change>
 (order by severity; "None." if none; max 20 lines, one per finding, no code excerpts)
+
+## Deferred
+
+- **[<SEVERITY>]** `<file>:<line>` · <quality|security> · <problem> → **Fix:** <concrete change> · out of scope: <why this feature does not own it>
+(real but out of this feature's scope — see §Deferred; worst first; "None." if none; max 10 lines)
 
 ## Notes
 (ONLY the RBAC / mobile-first assessment when the profile enables them; omit the section otherwise)

@@ -147,6 +147,34 @@ console.log("review.js");
   check("SHIP + only LOW ⇒ next is /ship", String(result.next).startsWith("/ship"), result.next);
 }
 {
+  // Deferred findings are real but out of the feature's scope: they must be
+  // counted and routed to the backlog, yet move NEITHER the verdict nor `clean`.
+  // Both halves matter — a deferred item that blocks costs a fix loop it was
+  // deferred out of, and one that is dropped is the leak the section exists to close.
+  const deferred = [{
+    severity: "HIGH", file: "apps/api/legacy.ts", line: 9, kind: "quality",
+    problem: "p", fix: "f", outOfScope: "predates this feature; diff never touched it",
+  }];
+  let stagePrompt = "";
+  const { result } = await run("review.js", (prompt, opts) => {
+    const label = opts.label || "";
+    if (label.startsWith("review:")) return { verdict: "SHIP", findings: [], deferred };
+    if (label === "stage-report") { stagePrompt = prompt; return "done"; }
+    return replier(BASE_REVIEW)(prompt, opts);
+  });
+  check("deferred-only ⇒ verdict still SHIP", result.verdict === "SHIP", `got ${result.verdict}`);
+  check("deferred-only ⇒ next is /ship (not a fix loop)",
+    String(result.next).startsWith("/ship"), result.next);
+  check("deferred are counted (both surfaces)", result.deferred === 2, `got ${result.deferred}`);
+  check("deferred stay out of the severity counts",
+    Object.values(result.counts).every(n => n === 0), JSON.stringify(result.counts));
+  check("deferred are routed to the refactor backlog",
+    /refactor-backlog\.md/.test(stagePrompt) && /deferred:feat-x/.test(stagePrompt),
+    stagePrompt.slice(0, 200));
+  check("deferred are never cross-checked (no verify agent spawned)",
+    !/verify:/.test(String(result.criticals)) && result.refutedByCrossCheck === 0);
+}
+{
   const { result } = await run("review.js", replier([
     ["preflight", { pass: false, tail: "boom" }], ...BASE_REVIEW,
   ]));

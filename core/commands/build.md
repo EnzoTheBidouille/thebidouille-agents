@@ -16,8 +16,11 @@ You are the **lead**. Build feature **$ARGUMENTS** from its frozen spec.
 ## 1. Load & check
 
 - Check the spec front-matter FIRST — `grep '^status:' specs/$ARGUMENTS.md` (or Read with a ~15-line
-  limit) — before any full read. If missing or `status` not `frozen`/`in-review`, stop — tell the human
-  to run `/spec` first. Only then read the body, selectively: front-matter, §5 contract, the surface
+  limit) — before any full read. Buildable statuses are `frozen`, `in-review` and `in-progress` (the
+  last one means a `/drive` is or was driving this spec — SCHEMA.md §Spec status). `blocked` means a
+  loop gave up here: say so, and route by the spec's `## Remediation` — open items ⇒ `/fix`, none ⇒
+  continue this build. Anything else (`draft`, missing, `shipped`) ⇒ stop and tell the human to run
+  `/spec` first. Only then read the body, selectively: front-matter, §5 contract, the surface
   task sections, and `## Remediation` (fall back to a full read if the spec doesn't follow the
   template's headings).
 - **Route check** — if `## Remediation` has open `- [ ]` items and none requires a contract change,
@@ -56,6 +59,59 @@ shared-code rule (shared trees get a single-owner surface; cross-slice shapes go
 This is the automatic path: you don't send the human back to `/init-pipeline`. If nothing new is needed,
 say so and continue. Dispatch (§3) then covers the reconciled surface list.
 
+**Adding or splitting a surface is an architectural decision** — append ONE line for it to
+`specs/_decisions.md` §Live (SCHEMA.md §Decisions; create from `.claude/templates/decisions.template.md`
+if absent), area `surfaces`, e.g.
+`- <date> · surfaces · <key> owns <path>, single owner of <what> — because <the boundary reason> · $ARGUMENTS`.
+One `>>` in the Bash call you're already making. Nothing added ⇒ nothing to append.
+
+## 1.6 Readiness verdict — the gate before N dispatches
+
+**Zero extra agents: you already hold the spec, the profile and the reconciled surface list.** The
+whole point is that a bancal spec costs one verdict here instead of N implementers discovering it in
+parallel. Judge the frozen contract on **implementability only** — never on whether the feature is a
+good idea (that was `/brainstorm`), never by re-reading files you don't already need:
+
+1. **Contract completeness** (§5) — every endpoint/interface has method+path (or signature), auth,
+   request fields with types + validation, the success shape, and its error cases. A missing
+   **request or success shape** ⇒ `NOT-READY` (an implementer would invent it, and the other surface
+   would invent a different one). A missing **error case** ⇒ `RESERVATIONS`.
+2. **Surface coverage** — every §6 task maps to a surface in the reconciled list, and every contract
+   entry has an owner **on each side it names** (producer and consumer). A contract entry no surface
+   owns ⇒ `NOT-READY`.
+3. **Dependencies exist** — for the modules, packages, tables, env vars and shared helpers the spec
+   names as *pre-existing*: verify them in ONE Bash call (`test -f` / `grep -l` / a package-manifest
+   grep, output redirected — never a file read per name). Named as pre-existing but absent, and not
+   listed as created by this feature ⇒ `NOT-READY`.
+4. **Residual ambiguity** (§10) — an open question a surface would have to *guess* at: blocks a
+   contract decision ⇒ `NOT-READY`; merely narrows an implementation choice ⇒ `RESERVATIONS`.
+5. **Design gate** — a `uses_design` surface in scope with `design_files` still empty ⇒ `NOT-READY`
+   (this is §1's gate restated as a verdict, so an automated driver sees the same fact).
+
+Write the machine-readable verdict to `specs/reports/$ARGUMENTS.readiness.json` (overwrite,
+`mkdir -p specs/reports` first — the same gitignored buffer dir `/review` stages into, which may not
+exist yet on a first build) — on **every** build, including `READY`. It is the only channel between this gate and a driver (`/drive`),
+which parses no prose:
+
+```json
+{ "id": "$ARGUMENTS", "phase": "readiness", "ts": "<ISO>", "verdict": "RESERVATIONS",
+  "gaps": ["contract|POST /orders|no 409 case for a duplicate id"],
+  "surfaces": ["backend", "frontend"] }
+```
+
+- **`gaps`** — one normalized string per gap, `<check>|<where>|<what is missing>`: `<check>` is
+  `contract` · `coverage` · `dependency` · `ambiguity` · `design`; `<where>` is the contract entry,
+  surface key or dependency name (no `:line` — it shifts on every edit); `<what>` is the gap, not the
+  fix. `READY` ⇒ `[]`.
+- **`NOT-READY` ⇒ STOP: author no contract and spawn NO agent.** Print the gaps and send the human to
+  `/spec $ARGUMENTS` to patch the contract, then re-run `/build`. This abort is the whole point of the
+  step — a spec that cannot be built does not get cheaper by being built N times in parallel.
+- **`RESERVATIONS` ⇒ continue.** It never blocks (a gate that stalls a sound build on a missing error
+  case would cost more human round-trips than it saves): inline each gap verbatim into the dispatch of
+  the surface it affects, as an explicit assumption the agent must implement *and* flag in its handoff,
+  and relay the list to the human in one line each.
+- **`READY` ⇒ continue silently** — one line, no restatement.
+
 ## 2. Author the contract (lead-only — the single sync channel)
 
 _Only if `contract.enabled`._ From §5 of the spec, write/update the feature's contract file at
@@ -87,19 +143,46 @@ tree. For each surface in `surfaces`:
 > via `DesignSync get_file`, build mobile-first · or `none` (non-design surface, or a fix loop whose
 > open items are all non-visual)>. Open Remediation items for YOUR surface (self-contained — fix
 > exactly these, reading only the files they name; `none` ⇒ first build, implement the spec's tasks
-> for your surface): <the surface's open `- [ ]` lines verbatim, or `none`>."
+> for your surface): <the surface's open `- [ ]` lines verbatim, or `none`>. Readiness gaps for YOUR
+> surface (§1.6 `RESERVATIONS` — the spec is silent here: implement the stated assumption and flag what
+> you assumed in your handoff): <that surface's `gaps` entries verbatim, or `none`>."
+
+## 3.5 Roll call — account for EVERY dispatch before integrating
+
+A subagent can die: a rate limit mid-run, a transport error after retries, its own context exhausted.
+When it does, it returns **nothing** — and nothing is byte-identical to "a clean surface with nothing
+to report". Silence is not a green light; treat it as the failure it is (SCHEMA.md §Dead agents).
+
+- **Roll call.** Every surface you dispatched in §3 must come back with a handoff in the format its
+  agent instructions define. Missing, empty, or truncated mid-sentence ⇒ that surface is **dead**.
+- **Never infer success from silence,** and never speak for a dead agent — you did not see its work.
+- **Retry that surface ONCE, alone.** Re-dispatch it with the byte-identical §3 prompt. The other
+  surfaces' work is already on disk and untouched, so this costs one agent, not a rebuild — and most
+  deaths are transient. Never retry a surface that *did* answer.
+- **Died twice ⇒ stop guessing and look.** Run that surface's own quiet commands
+  (`<surface>.typecheck_cmd`, `lint_quiet_cmd`, `test_quiet_cmd`) with output redirected to
+  `specs/reports/$ARGUMENTS.<key>.deadcheck.txt`, then grep it — never into your context. Report the
+  three results plus which of the spec's tasks for that surface actually landed, checked against the
+  tree, not against a handoff you never got. Say plainly that the surface is **unverified**.
 
 ## 4. Integrate
 
 When all return, flag any contract mismatch or failing test from the handoffs; otherwise print one
 status line per surface (`<key> · tests pass/fail · <n> TODOs`) — do not restate handoff content.
+A dead surface (§3.5) prints `<key> · DEAD — unverified` and **the batch is never reported as ok**.
 Append **ONE line for the batch** to the **main checkout's** `.claude/pipeline-metrics.jsonl` —
 NOT the worktree's, which dies at teardown while metrics must accumulate across features. Resolve
 it from anywhere: `$(dirname "$(git rev-parse --git-common-dir)")/.claude/pipeline-metrics.jsonl`
 (in the main checkout this resolves to itself). Create it if absent; it must be gitignored.
 Compute the elapsed time in the same Bash call
 (`echo "{...\"seconds\":$(($(date +%s)-<start epoch from §2>)),...}" >> …`):
-`{"ts":"<ISO date>","feature":"$ARGUMENTS","phase":"build","seconds":<wall-clock>,"surfaces":{"<key>":"ok|error",…}}`
+`{"ts":"<ISO date>","feature":"$ARGUMENTS","phase":"build","seconds":<wall-clock>,"surfaces":{"<key>":"ok|error|dead",…}}`
+— **write this line even when a surface died.** An incomplete batch is exactly the batch worth having
+in the record; skipping the append to "wait until it's complete" silently deletes the evidence that
+anything went wrong. In the same call write the machine-readable batch result to
+`specs/reports/$ARGUMENTS.build.json` (overwrite) — the channel an automated driver reads, since it
+never sees your chat:
+`{"id":"$ARGUMENTS","phase":"build","ts":"<ISO>","surfaces":{"<key>":"ok|error|dead",…},"dead":["<key>",…]}`
 — this is the evidence SCHEMA.md §Specialization asks for before splitting a surface. In the same
 Bash call, chain the opt-in usage ping — **the shared form every phase command reuses**:
 `<core>/pipeline/scripts/telemetry-send.sh <phase> "$ARGUMENTS" <seconds> "<results>" || true`
@@ -108,7 +191,9 @@ Bash call, chain the opt-in usage ping — **the shared form every phase command
 never ask about consent here. `/review` and `/fix` chain the same line with their own
 phase + results. The `|| true` swallows a **missing** script too, so a half-copied core goes
 silent rather than loud — `/doctor` check 1 is what catches that.
-Then tell the human: exercise the feature by hand if it's worth it, then run `/review $ARGUMENTS`.
+Then tell the human: exercise the feature by hand if it's worth it, then run `/review $ARGUMENTS` —
+unless a surface is dead, in which case say so first and let them decide whether to re-run `/build`
+(a dead surface has no findings, so `/fix` has nothing to re-dispatch).
 Do not run the app or migrations yourself here — building is not running.
 **Recommend a `/clear` now** — the spec, contract and diff are all on
 disk, and the lead's history is re-sent at input price on every turn it survives.

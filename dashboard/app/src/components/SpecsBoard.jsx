@@ -1,10 +1,15 @@
 import React from 'react';
 
+// Mirrors SCHEMA.md §Spec status — `in-progress` (a /drive is driving this spec) and
+// `blocked` (a /drive gave up on it) are terminal-ish states the driver writes, and the
+// board is where a human notices a loop that died mid-flight.
 const STAGES = [
   { key: 'draft', label: 'Draft' },
   { key: 'frozen', label: 'Frozen' },
+  { key: 'in-progress', label: 'In progress' },
   { key: 'in-review', label: 'In review' },
   { key: 'shipped', label: 'Shipped' },
+  { key: 'blocked', label: 'Blocked' },
 ];
 
 // Kanban of specs by lifecycle stage (front-matter `status`).
@@ -67,6 +72,11 @@ function SpecCard({ s, bad }) {
       <div className="spec-meta muted small mono">
         {s.id}{bad && s.status ? ` · status: ${s.status}` : ''}
       </div>
+      {s.loop && (
+        <div className="spec-loop muted small mono">
+          ↻ pass {s.loop.pass}{s.loop.phase ? ` · /${s.loop.phase}` : ''} — resume with <code>--resume</code>
+        </div>
+      )}
       {s.branch && <div className="spec-branch muted small mono">⑂ {s.branch}</div>}
     </div>
   );

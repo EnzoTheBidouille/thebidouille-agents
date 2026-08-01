@@ -217,6 +217,129 @@ Rules for every consumer (implementers, preflight, `/audit` gates, workflow agen
 `/init-pipeline` **asks** for these variants (detected defaults offered first) instead of silently
 storing a bare `pnpm test` as the thing agents execute; `/update-pipeline` tops up older profiles.
 
+## Spec status — the lifecycle state machine (and the loop's resume state)
+
+A spec's front-matter `status` is not a label, it is the pipeline's **state**: every command routes on
+it, the dashboard boards on it, the kanban backfill maps it to a column, and `/drive --resume` reads it
+back to continue an interrupted autonomous run. Six states, and exactly one writer each:
+
+| status | meaning | written by | who may build it |
+| --- | --- | --- | --- |
+| `draft` | the interview is open, nothing is frozen | `/spec` Mode A | no |
+| `frozen` | the contract is frozen — the handoff to `/build` | `/spec` Mode A freeze | yes |
+| `in-progress` | a `/drive` is driving this spec right now (or died doing it) | `scripts/loop.sh`, before each phase | yes |
+| `in-review` | reviewed / awaiting the next round or `/ship` | `/spec` Mode B, `/fix`, `loop.sh` on a clean exit | yes |
+| `blocked` | a loop gave up here (ceiling, non-convergent, no verdict, not implementable) | `loop.sh` on any non-zero exit | yes, with the reason named |
+| `shipped` | the PR is open; the status flip is part of the release commit | `/ship` | no |
+
+**The resume contract.** Before every phase, `loop.sh` stamps `status: in-progress` plus `loop_pass`
+(the review pass it is on) and `loop_phase` (`build`/`review`/`fix`) into the spec — deterministically,
+with `awk`, spending **no tokens** on state it will need later. On exit it stamps a terminal status:
+`in-review` + `loop_phase: done` when clean, `blocked` otherwise. `/drive <id> --resume` then continues
+at the recorded pass instead of pass 1, so a session killed at pass 3 of 5 does not re-pay passes 1–2.
+The build is still skipped or redone by the build stamp alone (`specs/reports/<id>.built`, written only
+after a build that finished), so an interrupted *build* correctly rebuilds.
+
+Corollaries worth knowing:
+
+- A spec with no front-matter makes every stamp a **silent no-op** — the state is bookkeeping, and the
+  loop must never die over a status line.
+- Child commands write `status` too (`/fix` sets `in-review`); re-stamping before each phase is what
+  keeps `in-progress` true for the duration of the run rather than for its first phase.
+- `blocked` is not a failure to hide: it is the resumable state. `/build` accepts it, names it, and
+  routes by the spec's `## Remediation` (open items ⇒ `/fix`).
+
+## Dead agents — silence is not a green light
+
+A subagent can die mid-run: a rate limit, a transport error that outlived its retries, its own context
+exhausted on a big surface. When it does it returns **nothing** — and nothing is byte-identical to
+"finished, nothing to report". Every phase that fans out therefore does a **roll call** before it
+integrates anything, because the default reading of silence is the most dangerous one available:
+
+| phase | what a dead agent looks like | what the phase must do |
+| --- | --- | --- |
+| `/build` | a surface with no handoff | retry it **once** alone (byte-identical prompt), then mark it `dead`, verify the tree with that surface's own quiet commands, never call the batch ok |
+| `/review` | a reviewer with no report ⇒ **zero findings** | retry once, then list the surface in `unreviewed` and refuse to score `SHIP` |
+| `/fix` | a re-dispatched agent with no handoff | retry once, then leave **every** one of its items `- [ ]` — a dead agent never ticks a box |
+| workflows | `agent()` resolves to `null` | already enforced (`review.js` `unreviewedSurfaces`) — the doctrine started here |
+
+Non-negotiables, in every phase:
+
+- **Retry once, alone, byte-identical.** Most deaths are transient, and the other surfaces' work is
+  already on disk — so recovery costs one agent, never a rebuild. Never retry an agent that answered.
+- **Never speak for a dead agent.** You did not see its work: report what the *tree* says (quiet
+  commands, redirected to a file, grepped), not what a handoff would have said.
+- **Never let it reach a driver as clean.** `/build` writes `dead[]` into
+  `specs/reports/<id>.build.json`, `/review` writes `unreviewed[]` into the verdict; `scripts/loop.sh`
+  aborts on either with **exit 2** *before* it reads `blocking`, since a dead reviewer makes
+  `blocking == 0` a statement about code nobody read.
+- **`unreviewed` is separate from `blocking` on purpose.** Faking a count in `blocking` to force a
+  driver's hand would corrupt the one field the whole contract rests on; a driver reads them as two
+  different facts — "what was found" and "what was covered".
+- **Write the metrics line anyway** (`"<key>":"dead"`). An incomplete batch is exactly the batch worth
+  recording; holding the append back "until it's complete" deletes the evidence that anything failed.
+
+## Readiness — the gate between a frozen spec and N implementers
+
+`/build` §1.6 scores the frozen spec on **implementability** before authoring the contract and before
+dispatching anything, and writes `specs/reports/<id>.readiness.json`
+(`verdict`: `READY` · `RESERVATIONS` · `NOT-READY`, plus `gaps[]`). It costs **zero extra agents** — the
+lead already holds the spec, the profile and the reconciled surface list — which is the whole economics
+of the step: a spec that cannot be built does not get cheaper by being built on N surfaces in parallel.
+
+- Five checks: contract completeness · surface coverage · dependencies exist · residual ambiguity ·
+  the design gate. Each maps to `NOT-READY` (a surface would have to invent the answer) or
+  `RESERVATIONS` (a surface can proceed on a stated assumption).
+- **`NOT-READY` aborts the build with no agent spawned** and sends the human to `/spec`.
+  `scripts/loop.sh` reads the same file and exits **4** (`not implementable`) — the one loop outcome
+  that more passes cannot fix.
+- **`RESERVATIONS` never blocks.** Each gap is inlined verbatim into the dispatch of the surface it
+  affects, as an assumption the implementer must apply *and* flag in its handoff. A gate that stalled a
+  sound build on a missing error case would cost more human round-trips than it saves.
+
+## Deferred findings — real, but not this feature's problem
+
+`/review` ends on "zero blocking findings", so everything non-blocking used to be discarded with the
+report. A **deferred** finding is one the reviewer judges true and **out of this feature's scope**
+(pre-existing code the staged diff never touched, adjacent debt the spec never claims to fix). The
+review agent returns them in their own `## Deferred` section — never in `findings` — each carrying its
+own out-of-scope reason.
+
+- They count in **no** severity row, enter **no** verdict, and are **never** cross-checked: a deferred
+  item cannot cost a fix loop an iteration, and refuting one would spend an agent arguing about
+  something that cannot change the outcome.
+- **Not deferrable, ever:** anything the diff touched or introduced, any spec violation, any security
+  issue on a path this feature adds, calls or modifies.
+- `/review` §3.5 routes them, **on every verdict**, into `specs/refactor-backlog.md` under the
+  `## <domain>` heading of the owning surface, tagged `deferred:<feature_id>` — the same grouping
+  `/audit` writes, so `/refactor <domain>` picks them up with no extra plumbing. Never into the spec's
+  `## Remediation`, which is what `/fix` re-dispatches.
+- `/audit` **carries open `deferred:` items over** when it rewrites the backlog; overwriting them away
+  is the one way they silently vanish.
+- The verdict JSON carries `deferred: <n>` (informational, outside `blocking`), so `/drive` can name
+  them in its closing line without reading a report.
+
+## Decisions — the transverse decision journal
+
+`PIPELINE.md` is a **stack profile** (surfaces, commands, conventions); it says nothing about what this
+project has *decided*. Without somewhere for those, every `/spec` re-discovers or contradicts them.
+`specs/_decisions.md` (from `core/templates/decisions.template.md`) is that place, deliberately small:
+
+- **Append-only, one line per decision, ≤ ~160 chars:**
+  `- <YYYY-MM-DD> · <area> · <decision> — because <reason> · <feature_id>`. Reversal never edits a line:
+  append a superseding one (`· supersedes <date> <area>`) and move the old one to `## Superseded`. When
+  `## Live` passes ~100 lines, sweep the superseded ones down.
+- **Written by** `/spec` at freeze (the decisions that outlive the feature — typically 0–3 lines, and
+  zero is a normal outcome) and `/build` §1.5 when it adds or splits a surface.
+- **Read by the deciding stages only** — `/brainstorm` (so the panel argues about the idea, not about
+  settled ground), `/spec` (so a new spec does not silently un-decide something), `/audit` (standing
+  decisions are part of the rulebook it audits against).
+- **Never read by implementers or reviewers.** They work from the frozen contract, which already tells
+  them what to do; shipping them the rationale would cost `surfaces × dispatches` tokens per feature
+  for a fact they cannot act on. This is what keeps the journal cheap enough to be worth having.
+- The `_` prefix is load-bearing: `/doctor`, the dashboard spec scanner and the kanban backfill all skip
+  `specs/_*.md`, so the journal is never mistaken for a spec (no phantom card, no bogus stage).
+
 ## Preflight — the deterministic phase gate
 
 `/review` starts by running `pipeline/scripts/preflight.sh` — a plain shell script (no
@@ -313,6 +436,15 @@ files automatically. It works because every generated artifact is a **determinis
    clobber an existing filled file; report what was seeded.
 6. **Kanban sync.** Run the §Kanban reconcile: link/create the project's board if configured, verify
    its columns, and backfill/sync cards from `specs/*.md`. See §Kanban.
+7. **Spec-template top-up.** `specs/_template.md` is seeded once at install and then **never**
+   refreshed, so a repo keeps whatever front-matter the core shipped the day it was installed (a
+   pre-1.6 copy has no `loop_pass`/`loop_phase`, and its `status` comment still lists four states).
+   Top it up the same way as the profile: add the **front-matter fields** the current
+   `templates/spec.template.md` has and the repo's copy lacks, with their documented defaults, and
+   refresh the `status:` comment. Never rewrite its body — the section list is the human's to shape,
+   and some repos have deliberately trimmed it. Nothing breaks without this (the fields are written on
+   demand when a driver needs them); it just keeps a new spec's front-matter honest about the states
+   the pipeline can put it in.
 
 Re-running `/init-pipeline` remains possible (it reconciles too) but is only *needed* when the stack
 itself changes in ways `/build` §1.5 can't auto-grow (e.g. package manager or contract mechanism swap).
@@ -347,6 +479,9 @@ Shared design, all four scripts:
   that never answered: `review.js` names them in `unreviewedSurfaces` and refuses to score
   `SHIP`. `scripts/test-workflows.mjs`
   pins this — it is the one invariant the structural checks in `validate-core.mjs` cannot see.
+  The conversational commands enforce the same rule by roll call (§Dead agents); it was the workflows
+  that had it first, and for three releases they had it **alone** — the same crash on the
+  conversational path went unreported.
 - **`review.js`** — preflight gate (aborts red, zero agents), one `git diff --stat` staged per
   touched surface, one reviewer per surface in parallel, then an **adversarial cross-check** phase
   that tries to refute each CRITICAL/security finding before it can trigger a fix loop.
@@ -411,12 +546,16 @@ card created in the target column if missing.
 | `/build`                                | `building`      |
 | `/review`                               | `review`        |
 | `/fix`                                  | `fix`           |
+| a `/drive` is driving it (`in-progress`) | the current phase's column |
+| a `/drive` gave up (`blocked`)            | `fix`           |
 | `/ship` starts                          | `ship`          |
 | PR opened (`status: shipped`)           | `shipped` (+ `PR #<num>` on the card) |
 
 **Backfill / sync from specs (reconcile).** `specs/*.md` is the source of truth. For each spec, read its
 `feature_id` (front-matter or filename) and `status`, map `status`→column — `frozen`→`ready`,
-`in-review`→`review`, `shipped`→`shipped`, anything else / a spec with no status→`spec` — then **full
+`in-progress`→the `loop_phase`'s column (`build`→`building`, `review`→`review`, `fix`→`fix`; unset ⇒
+`building`), `in-review`→`review`, `blocked`→`fix`, `shipped`→`shipped`, anything else / a spec with no
+status→`spec` — then **full
 sync**: card absent ⇒ add it in that column; card present ⇒ **move it** to that column so the board
 always reflects the specs (this repositions cards the human may have moved by hand). Report cards
 added vs. moved vs. already-correct.

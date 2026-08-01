@@ -48,7 +48,7 @@ features:
 /ship <id>    →  commit, push, PR, CI watch — the one human-confirmed gate
 ```
 
-`/loop <id>` runs `/build → /review → /fix → /review …` for you until no blocking finding is left
+`/drive <id>` runs `/build → /review → /fix → /review …` for you until no blocking finding is left
 — in child sessions, so your own context never sees the diff or the reports.
 
 Three moments of human attention per feature: the brainstorm, the spec freeze, and the ship

@@ -27,7 +27,12 @@ Go: discarded errors, un-`ctx`'d goroutines, `defer` in loops; SQL: `UPDATE`/`DE
 Emits the **REVIEW REPORT**: severity table, verdict (`SHIP` = no CRITICAL/security;
 `REVISE` = ≥1 CRITICAL; `BLOCK` = security), findings **capped at 20, one line each, zero code
 excerpts**, every finding self-sufficient (`file:line · severity · type · concrete fix`) — it
-gets appended verbatim to the spec's Remediation. In **audit mode** (dispatched by `/audit`
+gets appended verbatim to the spec's Remediation. A separate **`## Deferred`** section (max 10) holds
+what is real but **out of this feature's scope** — pre-existing code the diff never touched, each line
+carrying its own out-of-scope reason. Deferred items count in no severity row, move no verdict, and get
+routed to `specs/refactor-backlog.md` by the lead; anything the diff touched, any spec violation and any
+security issue on a path this feature adds or calls is **never** deferrable. In **audit mode**
+(dispatched by `/audit`
 with a path instead of a spec) it emits a prioritized refactor backlog grouped by domain
 instead of a verdict.
 

@@ -43,7 +43,10 @@ Every script follows the same skeleton:
 Ask: *"run the review workflow for `<id>`"*. Preflight gate (aborts while red — **zero reviewers
 spawned**) → diff staged once → one reviewer per touched surface in parallel → adversarial
 cross-check of CRITICAL/security findings → merged report staged to `specs/reports/<id>.md`,
-metrics + telemetry chained — and only the verdict, counts, and critical one-liners return.
+metrics + telemetry chained — and only the verdict, counts, and critical one-liners return. Deferred
+findings (real, but out of the feature's scope) skip the cross-check — they cannot move the verdict —
+and are appended to `specs/refactor-backlog.md` under their surface's domain heading, tagged
+`deferred:<id>`, exactly as the conversational `/review` §3.5 does.
 `/fix <id>` consumes the staged report exactly as after a conversational `/review`.
 
 ## `audit.js` — codebase audit
