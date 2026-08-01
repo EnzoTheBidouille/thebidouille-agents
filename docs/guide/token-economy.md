@@ -7,7 +7,7 @@ habits that make them pay.
 
 ## The deterministic preflight — zero agents on red code
 
-`/review` and `/smoke` (and the workflow variants) start with
+`/review` (and the workflow variants) starts with
 `pipeline/scripts/preflight.sh` — a plain shell script, **not an agent** — that runs the
 profile's mechanical checks in order (typecheck → lint → tests, quiet variants), all output
 redirected to `specs/reports/<id>.preflight.txt`:
@@ -16,7 +16,7 @@ redirected to `specs/reports/<id>.preflight.txt`:
   zero agents are spawned.** A reviewer dispatched onto code that doesn't compile burns its whole
   run rediscovering what `tsc` printed for free.
 - **All green** ⇒ it stamps `.claude/preflight.ok` (`<epoch> <HEAD sha>`), which the gate hook
-  enforces as a **phase gate**: a `review`/`smoke` dispatch with a missing or stale stamp (older
+  enforces as a **phase gate**: a `review` dispatch with a missing or stale stamp (older
   than `gate.preflight.max_age_minutes`, or HEAD moved) gets a confirmation prompt. A lead can't
   accidentally skip the gate; a human can consciously override it.
 
@@ -61,7 +61,6 @@ Everything agents return is schema-capped:
   (`severity · file:line · type · concrete fix`), **zero code excerpts** (the diff and source are
   on disk; `file:line` is enough for a stateless fixer). Overflow keeps every CRITICAL/HIGH/
   security finding and closes with one `+<n> more` line.
-- **Smoke returns** — `PASS`/`FAIL:<n>` + max **10** ❌ one-liners; the full report is staged.
 - **Implementer handoffs** — summary, migrations, test results, mismatches, TODOs. Never file
   lists (the lead has `git diff --stat`), never code excerpts.
 
@@ -76,11 +75,20 @@ live at the end of prompts, not the beginning.
 ## Lead context discipline — `/clear` at every boundary
 
 The lead session's history is re-sent as input on **every turn**. A session spanning
-spec → build → smoke → review → fix re-pays the accumulated walkthroughs each turn. The pipeline
+spec → build → review → fix re-pays the accumulated walkthroughs each turn. The pipeline
 makes this unnecessary: every phase handoff lives on disk, so **`/clear` at each boundary is
 always safe** — each command's closing line tells you when. Corollaries the commands enforce on
 themselves: never paste a diff into a dispatch (agents compute their own, scoped), never echo a
 staged report into chat, redirect bulky output to a file and grep it.
+
+**`/loop` is the same rule taken to its conclusion.** A slash command cannot `/clear` itself, so an
+autonomous `/review ⇄ /fix` loop running *inside* your session would pile the diff plus N review
+reports plus N contracts into a history re-sent at input price on every turn — it would cost more
+than the automation saves. Instead each phase runs as a separate `claude -p` child with its own
+fresh context, and the parent reads back only two things: one line per phase, and
+`specs/reports/<id>.verdict.json` — a handful of numbers. The child transcripts sit in
+`specs/reports/<id>.loop.log`, which the command is explicitly forbidden to read; re-importing it
+would undo the entire design.
 
 ## Model routing — pay for judgment, not mechanics
 
@@ -90,7 +98,7 @@ staged report into chat, redirect bulky output to a file and grep it.
 - **Surface agents** pin their profile tier: `sonnet` by default (implementers mostly apply a
   frozen contract), `haiku` for purely mechanical surfaces, `inherit` only when a surface makes
   real design decisions worth the lead's model.
-- **Fixed agents**: `review` sonnet · `smoke` sonnet · `release` haiku · `profile-reader` haiku.
+- **Fixed agents**: `review` sonnet · `release` haiku · `profile-reader` haiku.
 - **Workflows** route every mechanical phase (profile read, preflight, staging, verify, report
   writing) to haiku explicitly.
 

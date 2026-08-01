@@ -6,6 +6,7 @@ import Surfaces from './Surfaces.jsx';
 import SpecsBoard from './SpecsBoard.jsx';
 import KanbanBoard from './KanbanBoard.jsx';
 import MetricsPanel from './MetricsPanel.jsx';
+import UsagePanel from './UsagePanel.jsx';
 import ResetModal from './ResetModal.jsx';
 import ActionRunner from './ActionRunner.jsx';
 
@@ -50,23 +51,27 @@ export default function ProjectDetail({ project }) {
   const [error, setError] = useState(null);
   const [resetting, setResetting] = useState(false);
   const [runner, setRunner] = useState(null); // { title, command, confirmText }
+  const [usage, setUsage] = useState(null);
 
   async function refresh() {
     const q = encodeURIComponent(project);
-    const [st, kb, mt] = await Promise.allSettled([
+    const [st, kb, mt, us] = await Promise.allSettled([
       getJson(`/api/state?project=${q}`),
       getJson(`/api/kanban?project=${q}`),
       getJson(`/api/metrics?project=${q}`),
+      getJson(`/api/usage?project=${q}`),
     ]);
     if (st.status === 'fulfilled') { setState(st.value); setError(null); } else setError(st.reason.message);
     setKanban(kb.status === 'fulfilled' ? kb.value : { enabled: false });
     setMetrics(mt.status === 'fulfilled' ? mt.value : { present: false, features: [], batches: 0 });
+    setUsage(us.status === 'fulfilled' ? us.value : { present: false, error: 'collector unreachable' });
   }
 
   useEffect(() => {
     setState(null);
     setKanban(null);
     setMetrics(null);
+    setUsage(null);
     refresh();
     const id = setInterval(refresh, 15000);
     return () => clearInterval(id);
@@ -112,6 +117,7 @@ export default function ProjectDetail({ project }) {
       <KanbanBoard data={kanban} />
       {/* Kanban supersedes the specs board — only show specs when there's no linked board. */}
       {kanban && !kanban.enabled && <SpecsBoard specs={state && state.specs} />}
+      <UsagePanel data={usage} />
       <MetricsPanel data={metrics} />
 
       {resetting && (

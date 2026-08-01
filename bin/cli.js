@@ -213,8 +213,8 @@ function copyFixedAgents() {
   fs.mkdirSync(path.join(dest, 'agents'), { recursive: true });
   // Every agent in core/agents/ EXCEPT the *.template.md ones, which /init-pipeline renders
   // per-surface. Until 1.2.6 this was a hardcoded ['review.md', 'release.md'] that never grew
-  // the `smoke.md` the shell installers copy, so `npx cohorte install` shipped the /smoke
-  // command with no `smoke` agent to dispatch — the run reported /smoke as not installed.
+  // the agents the shell installers copy, so `npx cohorte install` shipped a command with no
+  // agent to dispatch — the run reported the command as not installed.
   // Reading the directory needs no list to keep in sync with the shell installers.
   const agentDir = path.join(src, 'core', 'agents');
   for (const f of fs.readdirSync(agentDir)) {
@@ -224,6 +224,9 @@ function copyFixedAgents() {
   // 0.1.19 split the bi-mode questionnaire-researcher into research-agent + questionnaire-architect;
   // copy-over never deletes, so scrub the retired agent lest a dead subagent_type linger.
   fs.rmSync(path.join(dest, 'agents', 'questionnaire-researcher.md'), { force: true });
+  // 1.5.0 removed the /smoke phase; copy-over never deletes, so scrub the orphan agent+command.
+  fs.rmSync(path.join(dest, 'agents', 'smoke.md'), { force: true });
+  fs.rmSync(path.join(dest, 'commands', 'smoke.md'), { force: true });
   scrubResearchQuestionnaire();
 }
 

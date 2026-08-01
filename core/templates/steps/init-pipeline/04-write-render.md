@@ -15,7 +15,7 @@
    (`<SURFACE_EXTRA_NEVER>`, `<SURFACE_DESIGN_INPUT>`, `<SURFACE_TDD_STEP1>` — fill design-related ones
    only when `uses_design`).
    Leave the fixed agents as-is (generic, shipped by the installer): `review.md`, `release.md`,
-   `smoke.md`, `profile-reader.md`.
+   `profile-reader.md`.
 4. **Generate `.claude/gate-config.json`** from the `gate` block — copy all five keys verbatim:
    `{"deny": [...], "ask": [...], "ask_on_default_branch": [...], "default_branch": "<vcs.default_branch>",
    "preflight": {"enabled": <gate.preflight.enabled>, "agents": [...], "max_age_minutes": <n>}}`
@@ -27,7 +27,11 @@
    variants** and repo-wide `commands.*` equivalents as `Bash(<cmd>:*)` rules, plus read-only git —
    `Bash(git status:*)`, `Bash(git diff:*)`, `Bash(git log:*)`, `Bash(git rev-parse:*)` — plus the
    shipped pipeline scripts for BOTH cores (`Bash(.claude/pipeline/scripts/:*)` and
-   `Bash(~/.claude/pipeline/scripts/:*)` — preflight, kanban-move, telemetry-send), and the
+   `Bash(~/.claude/pipeline/scripts/:*)` — preflight, kanban-move, telemetry-send) **plus the
+   `bash`-prefixed form the `/loop` driver uses** (`Bash(bash .claude/pipeline/scripts/loop.sh:*)`
+   and `Bash(bash ~/.claude/pipeline/scripts/loop.sh:*)`) — those prefix rules match a command
+   *starting* with the path, so `bash <path>` needs its own entry or `/loop` stalls on a permission
+   prompt at every launch, and the
    retrieval provider's MCP tools when wired (e.g. `mcp__serena`). Never allowlist anything matching
    a `gate.ask`/`gate.deny` pattern. Mention the human can widen it later with
    `/fewer-permission-prompts`) + the hooks, **conditioned on the install mode:**
@@ -86,8 +90,8 @@
     `build_cmd`s that are non-empty). Derive the setup steps from the detected stack — mirror what a
     sibling workflow does if one exists. `/ship` watches these checks before the merge.
 11. **Metrics sink & report buffer:** add `.claude/pipeline-metrics.jsonl` to `.gitignore` — `/build`,
-    `/review`, `/fix` and `/smoke` append per-dispatch evidence there (SCHEMA §Specialization reads it).
-    Also add `specs/reports/` — `/review` and `/smoke` stage their last report there so a `/fix` (or
+    `/review` and `/fix` append per-dispatch evidence there (SCHEMA §Specialization reads it).
+    Also add `specs/reports/` — `/review` stages its last report there so a `/fix` (or
     `/spec` Mode B) survives a `/clear`; it's a derived buffer, not a versioned artifact.
 12. **Design system:** if `design.enabled` with a snapshot dir, note that `/align-ds` is active; else the
     `/align-ds` command will no-op with a clear message.

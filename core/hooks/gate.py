@@ -28,7 +28,7 @@ prompt that can never be answered.
 Two extra duties beyond Bash patterns:
 
 - Phase gate (`preflight` block in gate-config.json): a Task dispatch of a
-  listed subagent_type (default review/smoke) requires a fresh
+  listed subagent_type (default review) requires a fresh
   `.claude/preflight.ok` stamp, written by pipeline/scripts/preflight.sh when
   typecheck+lint+tests are green. Stale/missing stamp => "ask" — dispatching
   reviewers onto code that doesn't compile burns their whole run.
@@ -70,7 +70,7 @@ def load_config() -> dict:
         # Patterns gated ONLY on the default branch — allowed freely on feature branches.
         "ask_on_default_branch": list(cfg.get("ask_on_default_branch", [])),
         "default_branch": cfg.get("default_branch", "main") or "main",
-        # Phase gate: {"enabled": true, "agents": ["review","smoke"], "max_age_minutes": 30}
+        # Phase gate: {"enabled": true, "agents": ["review"], "max_age_minutes": 30}
         "preflight": preflight,
     }
 
@@ -130,11 +130,11 @@ def known_heads(cwd: str):
 
 
 def check_preflight(payload: dict, cfg: dict) -> int:
-    """Phase gate on Task dispatches: review/smoke agents need a green preflight stamp."""
+    """Phase gate on Task dispatches: review agents need a green preflight stamp."""
     pf = cfg.get("preflight") or {}
     if not pf.get("enabled"):
         return 0
-    agents = pf.get("agents") or ["review", "smoke"]
+    agents = pf.get("agents") or ["review"]
     subagent = (payload.get("tool_input") or {}).get("subagent_type", "") or ""
     if subagent not in agents:
         return 0

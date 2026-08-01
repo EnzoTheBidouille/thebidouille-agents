@@ -3,6 +3,73 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 1.5.0 — 2026-08-01
+
+> **Re-run `npx cohorte@latest update --global` (or `update`)** to pick up the collector and the
+> `/smoke` removal — the update *deletes* the command and its agent from your install, it does not
+> just stop shipping them. The new dashboard panel comes with `npx cohorte dashboard`.
+
+- **New — `/loop <id>`: the review ⇄ fix cycle, run for you.** `/build` → `/review` → `/fix` →
+  `/review` … until a review reports **zero blocking findings** (a CRITICAL or a security issue —
+  a LOW nit never costs a pass), or the pass ceiling (`--max=N`, default 5), or two consecutive
+  reviews returning the *same* blocking findings, which means the fix is treading water and more
+  passes won't help. `--no-build` re-runs the loop on an already-built feature; `--rebuild` forces
+  a build. Every fix pass is committed (`loop(<id>): fix pass <i>`) — your way back after N
+  autonomous passes — and **no fix runs on the last pass**, since fixing without a review behind
+  it leaves unaudited code. Exit codes distinguish clean · ceiling · no verdict · non-convergent ·
+  usage, so a wrapper can tell "needs more passes" from "needs a human".
+- **The loop does not run in your session — that's the whole design.** Each phase is a separate
+  `claude -p` child with its own fresh context, driven by the new shipped `loop.sh`; all child
+  output goes to `specs/reports/<id>.loop.log`, which the command is forbidden to read back. Your
+  session sees one line per phase and a three-line summary. A slash command cannot `/clear` itself,
+  so a conversational loop would pile the diff plus N review reports plus N contracts into a
+  history re-sent at input price every turn — it would cost more than the loop saves.
+  `disable-model-invocation: true`: an autonomous loop only ever starts because you asked.
+- **`/review` now writes a machine-readable verdict** to `specs/reports/<id>.verdict.json` on every
+  run — verdict, finding counts by severity, per-surface breakdown, the normalized blocking items
+  and a stable `fingerprint` over them. It is the only contract between the pipeline and any
+  driver; no prose is parsed. `blocking` restates the reviewer's existing rule as a number
+  (CRITICAL + security, deduplicated), so `blocking == 0` ⟺ `SHIP`. The fingerprint hashes
+  *surface + file + problem* with the line number deliberately dropped — a fix that inserts lines
+  would otherwise change it every pass and the drift detection would never fire. A red preflight
+  writes a degraded `{"aborted":"preflight"}` verdict rather than nothing, so an abort is a
+  diagnosis instead of a silence.
+- **BREAKING — `/smoke` and the `smoke` agent are removed.** The end-to-end run phase is gone:
+  the command, the agent, its preflight wiring, its telemetry phase and its documentation. The
+  loop is now `/brainstorm` → `/spec` → `/build` → `/review` → (`/fix` → `/review`)* → `/ship`,
+  with `/clear` safe between each. Nothing else depended on it; a `/smoke` in an old habit will
+  report an unknown command.
+- **Nothing in the pipeline runs your app any more — that part is yours.** `/build` now closes by
+  telling you to exercise the feature by hand if it's worth it, and `/fix` says the same for
+  runtime failures. `/review` follows suit at the SHIP verdict: it ticks only what a stage
+  actually verified, and **leaves any DoD criterion that needs the app up open** (runtime flows,
+  a visual check against the design) unless you say you exercised it yourself and it held.
+- **The preflight phase gate now gates `review` alone** (`gate.preflight.agents` defaults to
+  `[review]`). Existing profiles that list `smoke` keep working — the hook just never sees that
+  dispatch. `/doctor` compares against the new default, so re-run it after the update if it
+  flags gate drift.
+- **Retired-phase data still renders.** Metrics files and dashboards carrying `phase: "smoke"`
+  keep their column, the transcript collector keeps attributing past `/smoke` runs to `/smoke`
+  instead of silently reclassifying them, and `telemetry-send.sh` still accepts the phase from a
+  stale install. Same treatment `/cycle` got in 1.4.0.
+- **The cockpit now shows what a feature actually cost.** The dashboard's only metrics source
+  was `pipeline-metrics.jsonl`, written by the model itself — so it misses any run that ended
+  early and can never report tokens. On a real project it had captured 18 phase batches where
+  the transcripts hold 53 runs. The new **Cost & runtime** panel reads
+  `cohorte metrics` instead: per command, the number of runs, $ per run, $ total, tokens, wall
+  and active time, and the median number of subagents dispatched. That last column is the one
+  that makes a broken run obvious — a `/build` reporting 0 agents did no fan-out at all.
+- **Both metrics sources are kept, because they answer different questions.** `pipeline-metrics.jsonl`
+  carries per-surface verdicts (`ok`, `REVISE:2`, `error`) that only the model knows and the
+  transcripts never contain; the collector carries money and time, which the model cannot report
+  and the transcripts record exactly. The two panels sit side by side and each says what it is
+  for. Neither replaces the other.
+- **Fixed: discussing a command counted as running it.** An inline command mention was treated
+  as an invocation regardless of context, so a long message *about* `/review` billed that whole
+  conversation to `/review` — in cohorte's own repo it invented five `/cycle` runs out of a
+  design discussion. Inline mentions are now length-gated (an instruction is short; a discussion
+  is not); an explicit slash-command invocation is always counted.
+
 ## 1.4.0 — 2026-08-01
 
 > **Re-run `npx cohorte@latest update --global` (or `update`)** — the workflow fixes only apply

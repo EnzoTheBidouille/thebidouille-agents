@@ -60,21 +60,30 @@ function knownCommands() {
   }
   // Fallback for a collector run outside the package (e.g. copied into a repo on its own).
   if (!names.size) {
-    for (const n of ['brainstorm', 'spec', 'build', 'smoke', 'review', 'fix', 'ship',
+    for (const n of ['brainstorm', 'spec', 'build', 'review', 'fix', 'ship',
                      'audit', 'refactor', 'align-ds', 'doctor', 'init-pipeline', 'update-pipeline']) names.add(n);
   }
   // Retired commands. The list above is read from the shipped core, so a command that is
   // removed stops being recognised — and every run of it already in the transcripts silently
   // reclassifies as (chat), rewriting history and inflating the catch-all bucket. Keep the
   // names here so past runs stay attributed to what actually ran.
-  for (const n of ['cycle']) names.add(n);
+  for (const n of ['cycle', 'smoke']) names.add(n);
   return names;
 }
 const COMMANDS = knownCommands();
 
+// An invocation is a short instruction that is mostly the command ("move on branding-ramp
+// and /review"). A long prompt that happens to name one is someone TALKING ABOUT the
+// command — a bug report, a design discussion, a pasted transcript. Counting those as runs
+// inflates a command's run count and cost with conversation that never invoked it, which is
+// exactly what happened in cohorte's own repo while this pipeline was being discussed.
+// Only inline mentions are length-gated; an explicit <command-name> is always an invocation.
+const MENTION_MAX_CHARS = 120;
+
 function commandIn(text) {
   const explicit = /<command-name>\s*(\/?[\w:-]+)\s*<\/command-name>/.exec(text);
   if (explicit) return explicit[1].replace(/^\//, '');
+  if (text.trim().length > MENTION_MAX_CHARS) return null;
   // Last mention wins: "finish /build then /review" ends on the one being asked for.
   let found = null;
   for (const m of text.matchAll(/(?:^|\s)\/([a-z][a-z0-9-]{2,})\b/g)) {

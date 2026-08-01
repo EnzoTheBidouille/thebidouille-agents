@@ -38,7 +38,7 @@ is the main checkout), and derives from the slot:
 
 - its own **database** (`<name>_<id>` pattern) — the shared infra stack stays single; only the
   logical DB differs;
-- its own **ports** (`port_base.api + slot`, `port_base.web + slot`) — so two features' `/smoke`
+- its own **ports** (`port_base.api + slot`, `port_base.web + slot`) — so two features' dev servers
   runs never collide.
 
 Teardown after the merge:
@@ -60,8 +60,8 @@ waiting), a second Claude Code session can `/spec` or `/review` feature B:
 ```
 session 1:   /spec feat-a → /build feat-a   (agents run…)
 session 2:   /spec feat-b → /build feat-b   (agents run…)
-session 1:   /smoke feat-a → /review feat-a → /ship feat-a
-session 2:   /smoke feat-b → …
+session 1:   /review feat-a → /ship feat-a
+session 2:   /review feat-b → …
 ```
 
 Rules that keep it safe:

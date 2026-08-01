@@ -54,7 +54,7 @@ Both mirror the npm CLI exactly (same files, same scrub of retired artifacts, sa
 
 ::: tip What lands where
 Either mode installs: `commands/` (the slash commands), `agents/` (the four fixed agents —
-review, release, smoke, profile-reader), `hooks/gate.py`, `templates/`, `workflows/` (the four
+review, release, profile-reader), `hooks/gate.py`, `templates/`, `workflows/` (the four
 workflow scripts), and `pipeline/` (the profile templates, `SCHEMA.md`,
 `implementer.template.md` — the surface-agent template lives here, *not* in `agents/`, so it is
 never mistaken for a dispatchable agent — the shipped scripts `preflight.sh`, `kanban-move.sh`,
@@ -127,7 +127,7 @@ comes with its exact fix command.
 ```
 
 Prefer manual control? The conversational path is the same pipeline, one phase at a time:
-`/build <id>` → `/smoke <id>` → `/review <id>` → `/fix <id>` → `/ship <id>`. See
+`/build <id>` → `/review <id>` → `/fix <id>` → `/ship <id>`. See
 [The feature cycle](/guide/feature-cycle).
 
 ## Keeping it current

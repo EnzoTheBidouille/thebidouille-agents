@@ -82,6 +82,13 @@ const lines = [
   // Case 8: a slash token that is not a command must not invent one.
   user(1800, 'look at the /usr/local/share directory and report what you find there'),
   assistant('m7', 1805, 'claude-opus-5', { input_tokens: 0, output_tokens: 10 }),
+  // Case 9: a long prompt that merely DISCUSSES a command is not an invocation of it.
+  // Without the length gate, writing about /review bills the conversation to /review —
+  // which is what happened in cohorte's own repo while the pipeline was being designed.
+  user(2400, 'I want to talk through how /review behaves when a surface has no findings at '
+    + 'all, because the verdict logic there is what produced the false green we saw last week '
+    + 'and I am not convinced the fix covers the case where every reviewer dies at once.'),
+  assistant('m8', 2405, 'claude-opus-5', { input_tokens: 0, output_tokens: 20 }),
 ];
 fs.writeFileSync(path.join(projectDir, `${SESSION}.jsonl`),
   lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
@@ -107,18 +114,20 @@ const chat = out.commands.find((c) => c.command === '(chat)');
 const review = out.commands.find((c) => c.command === '/review');
 
 console.log('test-metrics');
-check('the mid-command task-notification did not split the run', out.totals.runs, 4);
+check('the mid-command task-notification did not split the run', out.totals.runs, 5);
 check('/build is one run, not three', build.runs, 1);
 check('duplicate lines of one response are billed once', build.tokens.output, 1000 + 500 + 2000);
 check('the <synthetic> message contributed no tokens', build.tokens.output < 999999, true);
 check('cache-write tokens are kept on their own tier', build.tokens.cacheWrite5m, 1000);
 check('cache-read tokens are kept on their own tier', build.tokens.cacheRead, 10000);
 check('the subagent was attributed to the command that spawned it', build.agents.total, 1);
-check('the second prompt is a separate (chat) run', chat.runs, 2);
+check('the second prompt is a separate (chat) run', chat.runs, 3);
 check('a command named inside prose is attributed to that command', review && review.runs, 1);
 check('a short steer continues the run instead of opening a new one', review.continuations, 1);
 check('the continued turn counts toward the command it continued', review.tokens.output, 60 + 70);
-check('a non-command slash token does not invent a command', chat.tokens.output, 40 + 10);
+check('a non-command slash token does not invent a command', chat.tokens.output, 40 + 10 + 20);
+check('a long prompt that discusses a command is not counted as running it',
+  review.runs, 1);
 
 // opus-5 $5 in / $25 out per MTok; 5m cache write 1.25x input, cache read 0.1x input.
 //   m1  100*5 + 1000*25 + 1000*6.25 + 10000*0.5 = 36750

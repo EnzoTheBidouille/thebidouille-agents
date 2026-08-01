@@ -20,7 +20,7 @@ then one command per project (`/init-pipeline`) adapts it to that project's stac
   **stateless agents** that only communicate through a frozen contract:
 
   ```
-  /brainstorm → /spec → (design) → /build <id> → /smoke → /review → (/fix) → /ship
+  /brainstorm → /spec → (design) → /build <id> → /review → (/fix) → /ship
   ```
 
 ## How it works — three layers
@@ -217,9 +217,9 @@ it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.
 | `/brainstorm`        | Interactive persona panel that pressure-tests a feature idea.                         |
 | `/spec`              | Freeze the feature spec + contract into `specs/<id>.md` (UI features also get a standalone design brief at `specs/design/<id>.md`). Also applies review returns. |
 | `/build <id>`        | Lead authors the contract, then dispatches one implementer per surface in parallel.   |
-| `/smoke <id>`        | Run the feature for real: infra up, contract endpoints, UI flows, design conformance. |
 | `/review <id>`       | Read-only review agents (one per touched surface, parallel) audit the diff vs the spec. |
-| `/fix <id>`          | Apply a review/smoke report: remediation into the spec, re-dispatch only the surfaces with findings. |
+| `/fix <id>`          | Apply a review report: remediation into the spec, re-dispatch only the surfaces with findings. |
+| `/loop <id>`         | Autonomous `/build → /review → /fix → /review …` until no blocking finding is left (see below). |
 | `/ship <id>`         | Release agent commits, pushes, opens the PR; watches CI; proposes worktree teardown.  |
 | `/audit [path]`      | Prioritized refactor backlog for existing code.                                       |
 | `/refactor <domain>` | Apply the backlog for one surface, TDD-first.                                         |
@@ -230,18 +230,41 @@ it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.
 ### Run the loop cheaply — `/clear` between stages
 
 Every command reloads all the state it needs **from disk** — the frozen spec, the contract, the diff, the
-Remediation checkboxes, the freshness stamp, and the last `/review`·`/smoke` report (staged to a gitignored
+Remediation checkboxes, the freshness stamp, and the last `/review` report (staged to a gitignored
 `specs/reports/<id>.md`). Nothing essential lives in the conversation. So the loop is **`/clear`-safe at
 every boundary**:
 
 ```
-/spec → /clear → /build → /clear → /smoke → /clear → /review → /clear → /fix → /clear → /review → /ship
+/spec → /clear → /build → /clear → /review → /clear → /fix → /clear → /review → /ship
 ```
 
 `/clear`-ing between stages sheds the accumulated main-thread context, which is the single biggest token
 lever: long sessions (>150k) are expensive even when cached. Each command tells you when its handoff is
 safe to clear. If you'd rather stay in one session, `/compact` mid-task does the lighter version. (Claude
 can't fire `/clear` itself — it's a client-side command; the pipeline just makes it always safe to type.)
+
+### Let it run itself — `/loop`
+
+```
+/loop feat-x              # /build, then /review ⇄ /fix until clean (max 5 passes)
+/loop feat-x --no-build   # already built — just re-run the /review ⇄ /fix loop
+/loop feat-x --max=8
+```
+
+It stops when `/review` reports **zero blocking findings** (a CRITICAL or a security issue — a LOW
+nit never costs a pass), at the pass ceiling, or as soon as two consecutive reviews return the same
+blocking findings, which means the fix is treading water and more passes won't help. **Each fix pass
+is committed** (`loop(<id>): fix pass <i>`) — that's your way back after N autonomous passes — and
+**no fix runs on the last pass**, since fixing without a review behind it leaves unaudited code.
+
+**The loop does not run in your session.** Each phase is a separate `claude -p` child with its own
+fresh context, driven by `pipeline/scripts/loop.sh`; all of their output goes to
+`specs/reports/<id>.loop.log`, which the command is forbidden to read back. Your session sees one
+line per phase and a three-line summary. That's the whole design: a slash command can't `/clear`
+itself, so a conversational loop would pile the diff plus N review reports plus N contracts into a
+history that is re-sent at input price every turn — it would cost more than the loop saves. The
+machine contract is `specs/reports/<id>.verdict.json`, which `/review` now writes on every run; no
+prose is ever parsed.
 
 ### Run features in parallel — one session per feature
 
@@ -256,8 +279,8 @@ The pattern:
 ```
 session 1 (main checkout):   /spec feat-a → /build feat-a  (agents run…)
 session 2 (main checkout):   /spec feat-b → /build feat-b  (agents run…)
-session 1:                   /smoke feat-a → /review feat-a → /ship feat-a
-session 2:                   /smoke feat-b → …
+session 1:                   /review feat-a → /ship feat-a
+session 2:                   /review feat-b → …
 ```
 
 Rules that make it safe:
@@ -266,7 +289,7 @@ Rules that make it safe:
   (`specs/<id>.md`, `<contract.path>/<id>.*`, `specs/reports/<id>*`), so sessions never share state —
   but a single session interleaving two features accumulates both in its context, paying for both.
 - **Disjoint surfaces per feature are guaranteed** (each worktree is a full checkout), and each
-  feature's DB/ports come from its slot — `/smoke` runs collide on neither.
+  feature's DB/ports come from its slot — two features' dev servers collide on neither.
 - **The contract package is the one shared tree.** Two features editing
   `<contract.path>/<their-own-id>.<ext>` never conflict (one file per feature); merge order only
   matters if a later feature *imports* an earlier one's contract — ship the dependency first.
@@ -331,7 +354,7 @@ bin/cli.js              # the npm CLI: install / update / dashboard / version (c
 install.sh              # script installer (fresh + --update) for no-Node environments
 install.ps1             # same installer for Windows PowerShell (fresh + -Update)
 core/                   # copied verbatim into ~/.claude (global) or <project>/.claude (bundled)
-  agents/               # implementer.template.md (rendered per surface) + review / release / smoke / profile-reader
+  agents/               # implementer.template.md (rendered per surface) + review / release / profile-reader
   commands/             # init-pipeline + the pipeline commands + /update-pipeline
   hooks/                # gate.py (destructive-command gate; branch-aware; preflight phase gate)
   templates/            # handoff / brainstorm-return / design-brief / review-feedback / pr-body / spec

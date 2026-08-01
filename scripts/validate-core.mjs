@@ -22,7 +22,7 @@ const frontmatter = (text) => {
 // Mechanical commands must pin model: sonnet (otherwise the lead's
 // orchestration turn silently bills at the session model — Opus/Fable).
 // Interactive commands must stay unpinned (they inherit on purpose).
-const PINNED = ["build", "review", "fix", "smoke", "ship", "audit",
+const PINNED = ["build", "review", "fix", "ship", "audit",
   "refactor", "doctor", "align-ds", "update-pipeline"];
 const UNPINNED = ["brainstorm", "spec", "init-pipeline"];
 
@@ -43,7 +43,7 @@ for (const f of readdirSync(join(root, "core/commands"))) {
 // Every non-template agent needs name/tools/model, and must be shipped by
 // both installers (a new agent that install.sh doesn't copy never reaches
 // a global install — the exact bug that motivated this check).
-const AGENT_MODEL = { review: "sonnet", release: "haiku", smoke: "sonnet",
+const AGENT_MODEL = { review: "sonnet", release: "haiku",
   "profile-reader": "haiku" };
 const installSh = read("install.sh");
 const installPs1 = read("install.ps1");
@@ -90,7 +90,7 @@ for (const path of allDocs) {
   }
   for (const m of text.matchAll(/subagent_type:\s*(?:`|)([a-z-]+)(?:`|)/g)) {
     const t = m[1];
-    if (["review", "release", "smoke", "profile-reader"].includes(t)) continue;
+    if (["review", "release", "profile-reader"].includes(t)) continue;
     if (t.startsWith("<")) continue; // <surface.agent> placeholder
     if (!existsSync(join(root, "core/agents", `${t}.md`)))
       fail(path, `dispatches subagent_type ${t} with no core/agents/${t}.md`);
@@ -115,9 +115,9 @@ if (!existsSync(steps) || readdirSync(steps).length === 0)
 
 // ── telemetry coverage ──────────────────────────────────────────────────────
 // The funnel is only readable if every one of its stages pings — a single missing
-// one silently truncates it (that is how /smoke, /review and /fix went unreported
+// one silently truncates it (that is how /review and /fix went unreported
 // until 1.2.3). The phase list here must match SCHEMA.md §Telemetry's table.
-const FUNNEL = ["brainstorm", "spec", "build", "smoke", "review", "fix", "ship"];
+const FUNNEL = ["brainstorm", "spec", "build", "review", "fix", "ship"];
 for (const c of FUNNEL)
   if (!/usage ping/i.test(read(`core/commands/${c}.md`)))
     fail(`core/commands/${c}.md`, "funnel command with no usage ping — breaks the telemetry funnel");

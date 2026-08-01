@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# preflight.sh — deterministic phase gate for /review and /smoke.
+# preflight.sh — deterministic phase gate for /review.
 #
 # Runs the profile's mechanical checks (typecheck, lint, tests — whatever the caller
 # passes) BEFORE any agent is spawned. A red gate means the caller aborts and relays
@@ -15,7 +15,7 @@
 #   The caller must stop there — no agents.
 # - All green: writes `<project>/.claude/preflight.ok` ("<epoch> <HEAD sha>") — the
 #   stamp `hooks/gate.py` checks (gate-config.json `preflight` block) before letting
-#   review/smoke agents dispatch.
+#   review agents dispatch.
 
 set -u
 

@@ -107,8 +107,9 @@ copy_core() {
   cp "$src/scripts/kanban-move.sh"       "$dest/pipeline/scripts/"
   cp "$src/scripts/telemetry-send.sh"    "$dest/pipeline/scripts/"
   cp "$src/scripts/preflight.sh"         "$dest/pipeline/scripts/"
+  cp "$src/scripts/loop.sh"              "$dest/pipeline/scripts/"
   chmod +x "$dest/pipeline/scripts/kanban-move.sh" "$dest/pipeline/scripts/telemetry-send.sh" \
-           "$dest/pipeline/scripts/preflight.sh" 2>/dev/null || true
+           "$dest/pipeline/scripts/preflight.sh" "$dest/pipeline/scripts/loop.sh" 2>/dev/null || true
   cp "$src/core/agents/implementer.template.md" "$dest/pipeline/"
   [ -f "$src/CHANGELOG.md" ] && cp "$src/CHANGELOG.md" "$dest/pipeline/"
   printf '%s\n' "$ver" > "$dest/pipeline/VERSION"
@@ -149,8 +150,10 @@ PY
 copy_fixed_agents() {
   mkdir -p "$dest/agents"
   cp "$src/core/agents/review.md" "$src/core/agents/release.md" \
-     "$src/core/agents/smoke.md" "$src/core/agents/profile-reader.md" \
+     "$src/core/agents/profile-reader.md" \
      "$dest/agents/"
+  # 1.5.0 removed the /smoke phase; copy-over never deletes, so scrub the orphan agent.
+  rm -f "$dest/agents/smoke.md" "$dest/commands/smoke.md"
   # 0.1.19 split the bi-mode questionnaire-researcher into research-agent + questionnaire-architect;
   # copy-over never deletes, so scrub the retired agent lest a dead subagent_type linger.
   rm -f "$dest/agents/questionnaire-researcher.md"

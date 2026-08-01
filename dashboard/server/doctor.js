@@ -12,7 +12,10 @@ const { versions } = require('./versions');
 // Rendered surface agents live alongside these fixed (non-surface) agents; exclude them
 // from the orphan check so they're never mistaken for a stray surface agent.
 const FIXED_AGENTS = new Set([
-  'review', 'release', 'smoke', 'profile-reader',
+  'review', 'release', 'profile-reader',
+  // retired (1.5.0) — still excluded so a stale install's leftover file isn't
+  // reported as a stray surface agent.
+  'smoke',
   'implementer.template',
 ]);
 
@@ -126,7 +129,7 @@ function checkGate(profile, projectRoot) {
   const wantPf = gate.preflight || {};
   const havePf = (cfg.preflight && typeof cfg.preflight === 'object') ? cfg.preflight : {};
   if (!!wantPf.enabled !== !!havePf.enabled
-      || !sameSet(wantPf.agents || ['review', 'smoke'], havePf.agents || ['review', 'smoke'])
+      || !sameSet(wantPf.agents || ['review'], havePf.agents || ['review'])
       || Number(wantPf.max_age_minutes || 30) !== Number(havePf.max_age_minutes || 30)) {
     drifted.push('preflight');
   }
