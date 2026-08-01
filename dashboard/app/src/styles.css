@@ -309,3 +309,25 @@ a.kc-pr:hover { filter: brightness(1.25); }
 .picker-row .badge.small { font-size: 10px; padding: 0 6px; margin-left: auto; }
 .picker-empty { padding: 12px; }
 .add-form .ghost[type="button"] { white-space: nowrap; }
+
+/* Cost & runtime (UsagePanel) — same row idiom as .phase-row, one column per metric.
+   The $ total column doubles as a bar so the dominant command is visible without reading. */
+.usage-list { display: flex; flex-direction: column; gap: 2px; }
+.usage-row {
+  display: grid;
+  grid-template-columns: minmax(96px, 1.4fr) 44px 62px minmax(90px, 1.6fr) 66px 52px 52px 52px;
+  align-items: center; gap: 8px; padding: 3px 0; font-size: 12px;
+}
+.usage-head { color: var(--muted); font-size: 11px; border-bottom: 1px solid var(--border); padding-bottom: 5px; margin-bottom: 3px; }
+.usage-cmd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.usage-num, .usage-bar-head { text-align: right; font-variant-numeric: tabular-nums; }
+.usage-bar { position: relative; height: 16px; border-radius: 4px; background: var(--panel-2); overflow: hidden; }
+.usage-fill { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: color-mix(in srgb, var(--accent) 55%, var(--panel-2)); }
+.usage-bar-label { position: relative; display: block; padding-right: 6px; text-align: right; line-height: 16px; font-variant-numeric: tabular-nums; }
+/* The catch-all bucket is real spend, but it is not a command — de-emphasise it. */
+.usage-chat { color: var(--muted); }
+.usage-chat .usage-fill { background: var(--panel-2); border: 1px solid var(--border); }
+@media (max-width: 720px) {
+  .usage-row { grid-template-columns: 1fr 40px 58px minmax(70px, 1fr); }
+  .usage-row > :nth-child(n+5) { display: none; }
+}

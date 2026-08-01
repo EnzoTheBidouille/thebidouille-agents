@@ -11,6 +11,7 @@ const { versions } = require('./versions');
 const { state } = require('./doctor');
 const { kanban } = require('./kanban');
 const { metrics } = require('./metrics');
+const { usage } = require('./usage');
 const fleet = require('./fleet');
 
 const MIME = {
@@ -320,6 +321,12 @@ function start({ projectRoot, globalDir, port, host, openBrowser, pkgRoot, versi
         const q = new URL(req.url, 'http://localhost').searchParams.get('project');
         const root = q ? path.resolve(q) : projectRoot;
         return sendJson(res, 200, metrics({ projectRoot: root }));
+      }
+      if (url === '/api/usage') {
+        const q = new URL(req.url, 'http://localhost');
+        const root = q.searchParams.get('project') ? path.resolve(q.searchParams.get('project')) : projectRoot;
+        const days = Number(q.searchParams.get('days')) || null;
+        return sendJson(res, 200, usage({ projectRoot: root, days }));
       }
       if (url === '/api/projects') {
         const body = await readBody(req);

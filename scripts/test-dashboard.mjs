@@ -20,6 +20,7 @@ const require = createRequire(import.meta.url);
 const root = fileURLToPath(new URL("..", import.meta.url));
 const { parse, parseProfileBlock } = require(join(root, "dashboard/server/yaml.js"));
 const { metrics } = require(join(root, "dashboard/server/metrics.js"));
+const { usage } = require(join(root, "dashboard/server/usage.js"));
 const { state, scanSpecs } = require(join(root, "dashboard/server/doctor.js"));
 const { kanban } = require(join(root, "dashboard/server/kanban.js"));
 const fleet = require(join(root, "dashboard/server/fleet.js"));
@@ -104,6 +105,25 @@ console.log("metrics.js — the funnel aggregate");
   eq("a REVISE verdict counts as a failure", f1.surfaces.backend.failures, 1);
   check("newest feature first", m.features[0].feature === "f2", m.features[0].feature);
   check("no metrics file ⇒ present:false", metrics({ projectRoot: scratch() }).present === false);
+}
+
+// ── usage.js ─────────────────────────────────────────────────────────────────
+// Wraps the ESM metrics collector for the CJS server. The failure that matters is
+// not a crash: a project with no transcripts must say so, because rendering zeros
+// reads as "this pipeline costs nothing" rather than "nothing was measured".
+console.log("usage.js — the collector bridge");
+{
+  const empty = usage({ projectRoot: scratch() });
+  check("a project with no transcripts reports present:false", empty.present === false);
+  check("…and says why rather than returning silent zeros",
+    typeof empty.error === "string" && empty.error.length > 0, JSON.stringify(empty));
+
+  // Same project twice: the second call must come from cache, or the panel's polling
+  // would re-parse tens of MB of transcripts on every refresh.
+  const d = scratch();
+  const t0 = Date.now(); usage({ projectRoot: d });
+  const t1 = Date.now(); usage({ projectRoot: d }); const cached = Date.now() - t1;
+  check("a repeated read is served from cache", cached <= Math.max(50, (t1 - t0)), `${cached}ms`);
 }
 
 // ── doctor.js ────────────────────────────────────────────────────────────────
