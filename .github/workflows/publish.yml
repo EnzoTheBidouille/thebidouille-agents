@@ -41,6 +41,7 @@ jobs:
           node scripts/test-gate.mjs
           node scripts/test-dashboard.mjs
           node scripts/test-metrics.mjs
+          node scripts/test-loop.mjs
           python3 -m py_compile core/hooks/gate.py
           rm -rf core/hooks/__pycache__   # never let it reach the tarball
 
