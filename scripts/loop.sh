@@ -2,20 +2,26 @@
 #
 # loop.sh — autonomous /build → /review → /fix → /review … loop for ONE feature.
 #
-#   loop.sh <feature-id> [--max=N] [--no-build] [--rebuild]
+#   loop.sh <feature-id> [--max=N] [--no-build] [--rebuild] [--resume]
 #
 # THE POINT: every phase runs as a SEPARATE `claude -p` child with its own fresh
-# context. The session that typed /loop never sees the diff, the N review reports
+# context. The session that typed /drive never sees the diff, the N review reports
 # or the N contracts — it reads only this script's one-line-per-phase stdout and,
 # at the end, the verdict JSON. Running the loop inside the calling session would
 # accumulate all of it in a history that is re-sent at input price on every turn,
 # which is the exact cost the pipeline's /clear discipline exists to avoid.
 #
 # Contract with the pipeline: /review writes specs/reports/<id>.verdict.json on
-# every run. That file — `blocking` and `fingerprint` — is the ONLY channel
-# between cohorte and this driver. No prose is parsed.
+# every run, and /build writes <id>.readiness.json + <id>.build.json. Those three
+# files — `blocking`, `fingerprint`, `unreviewed`, `verdict`, `dead` — are the ONLY
+# channel between cohorte and this driver. No prose is parsed.
 #
-# Exit codes (three distinct diagnostics, do not collapse them):
+# Two of those fields exist for the same reason: a subagent that DIES returns
+# nothing, and nothing is byte-identical to "clean". A dead implementer means a
+# surface was never built; a dead reviewer means a surface was never audited, and
+# `blocking == 0` would then certify code no one read. Both abort as exit 2.
+#
+# Exit codes (distinct diagnostics, do not collapse them):
 #   0   clean — a review returned blocking == 0
 #   1   ceiling — --max passes used, still blocking (the fix was progressing;
 #       re-run with a higher --max)
@@ -23,22 +29,37 @@
 #       preflight (typecheck/lint/tests broken; the message says which)
 #   3   non-convergent — two consecutive reviews returned the SAME blocking
 #       fingerprint: the fix is treading water, a higher --max will not help
+#   4   not implementable — /build's readiness gate returned NOT-READY and spawned
+#       no agent: the frozen spec cannot be built (missing contract shape, unowned
+#       area, absent dependency). Needs /spec, not more passes.
 #   64  usage — bad flag, bad id, missing spec, no `claude` on PATH
 #
 # No /fix runs on the last pass: fixing without a review behind it ships
 # unaudited code. Each fix pass is committed — that commit is the only way back
 # after N autonomous passes.
+#
+# RESUME: the spec's front-matter IS the loop's state (SCHEMA.md §Spec status).
+# Before every phase this script stamps `status: in-progress` + `loop_phase` +
+# `loop_pass` into specs/<id>.md — deterministically, with awk, costing no tokens
+# — and on exit stamps a terminal status (`in-review` clean, `blocked` otherwise).
+# `--resume` reads `loop_pass` back and continues from that pass instead of 1, so
+# a session that died at pass 3 of 5 does not re-pay passes 1 and 2. The build is
+# skipped or redone by the same stamp logic as always (the stamp is only written
+# on a build that finished), so an interrupted build still rebuilds.
 
 set -uo pipefail
 
 usage() {
   cat >&2 <<'EOF'
-usage: loop.sh <feature-id> [--max=N] [--no-build] [--rebuild]
+usage: loop.sh <feature-id> [--max=N] [--no-build] [--rebuild] [--resume]
 
-  --max=N      stop after N review passes (default 5)
+  --max=N      stop after N review passes (default 5) — a ceiling on the TOTAL
+               pass count, so it still means "5 passes" when resuming at pass 3
   --no-build   never build — re-run the /review ⇄ /fix loop on a feature that
                is already built (the common case; the build stamp is ignored)
   --rebuild    force a /build even if the stamp says it was already built
+  --resume     continue from the pass recorded in the spec's front-matter
+               (loop_pass), instead of starting over at pass 1
 
   env CLAUDE_FLAGS   flags for every child session
                      (default: --permission-mode acceptEdits)
@@ -49,6 +70,7 @@ EOF
 id=""
 max=5
 build_mode="auto"          # auto | never | force
+resume=0
 
 for arg in "$@"; do
   case "$arg" in
@@ -61,6 +83,7 @@ for arg in "$@"; do
       ;;
     --no-build) build_mode="never" ;;
     --rebuild)  build_mode="force" ;;
+    --resume)   resume=1 ;;
     -h|--help)  usage ;;
     -*)         echo "loop: unknown flag: $arg" >&2; usage ;;
     *)
@@ -93,8 +116,46 @@ spec="specs/$id.md"
 reports="specs/reports"
 mkdir -p "$reports"
 verdict="$reports/$id.verdict.json"
+readiness="$reports/$id.readiness.json"
+buildjson="$reports/$id.build.json"
 stamp="$reports/$id.built"
 log="$reports/$id.loop.log"
+
+# --- the spec front-matter as loop state -------------------------------------
+# Best-effort by design: a spec with no front-matter (or an unwritable one) makes
+# every fm_* call a silent no-op. This is bookkeeping for resume + the dashboard,
+# never a precondition — the loop must not die over a status line.
+fm_get() {                        # fm_get <key>  → value, or empty
+  [ -f "$spec" ] || return 0
+  awk -v k="$1" '
+    NR==1 && $0=="---" { fm=1; next }
+    fm==1 && $0=="---" { exit }
+    fm==1 && $0 ~ "^"k":" {
+      sub("^"k":[[:space:]]*", ""); sub("#.*", "")
+      gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print; exit
+    }
+  ' "$spec"
+}
+
+fm_set() {                        # fm_set <key> <value>  (replace, else append)
+  [ -f "$spec" ] || return 0
+  awk -v k="$1" -v v="$2" '
+    NR==1 && $0!="---" { nofm=1 }
+    nofm { print; next }
+    NR==1 { fm=1; print; next }
+    fm==1 && $0=="---" {
+      if (!done) print k ": " v          # key absent: add it before the closing ---
+      fm=2; print; next
+    }
+    fm==1 && $0 ~ "^"k":" {
+      if (done) next                     # a duplicate key: drop it
+      c=""; i=index($0, "#"); if (i>0) c=" " substr($0, i)   # keep a trailing comment
+      print k ": " v c; done=1; next
+    }
+    { print }
+  ' "$spec" >"$spec.loop.tmp" 2>/dev/null &&
+    mv "$spec.loop.tmp" "$spec" 2>/dev/null || rm -f "$spec.loop.tmp"
+}
 
 : "${CLAUDE_FLAGS:=--permission-mode acceptEdits}"
 
@@ -110,6 +171,13 @@ log="$reports/$id.loop.log"
 # $CLAUDE_FLAGS is intentionally unquoted — it is a flag list, not one word.
 run_phase() {
   cmd="$1"
+  # Stamp the state BEFORE the phase runs: if this child dies (or the whole
+  # session does), the spec already says where the loop was — that is what
+  # --resume reads back. Child commands write `status` themselves (/fix sets
+  # in-review); re-stamping here each phase is what keeps `in-progress` true.
+  fm_set status in-progress
+  fm_set loop_pass "$pass"
+  fm_set loop_phase "$cmd"
   printf '▶ /%-6s %-24s ' "$cmd" "$id"
   printf '\n\n===== /%s %s =====\n' "$cmd" "$id" >>"$log"
   # shellcheck disable=SC2086
@@ -127,7 +195,31 @@ run_phase() {
 json_num() { sed -n 's/.*"'"$2"'"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$1" | head -n1; }
 json_str() { sed -n 's/.*"'"$2"'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$1" | head -n1; }
 
-finish() { echo "$2"; exit "$1"; }
+# Terminal status goes into the spec, not just into this stdout: a clean run
+# leaves the feature ready to /ship, any failure leaves it visibly `blocked` for
+# the human and for the dashboard. Exit 64 never reaches here (usage dies earlier),
+# so every code handled below is a real run outcome.
+finish() {
+  if [ "$1" -eq 0 ]; then
+    fm_set status in-review
+    fm_set loop_pass 0
+    fm_set loop_phase done
+  else
+    fm_set status blocked
+  fi
+  echo "$2"
+  exit "$1"
+}
+
+# One short clause naming the deferred findings, appended to a closing line.
+# They are NOT blocking (they live in the backlog, not in ## Remediation), so
+# they never change an exit code — but a loop that silently drops them is the
+# leak /review §3.5 exists to close, so the driver names them.
+def_note() {
+  d="$(json_num "$verdict" deferred 2>/dev/null)"
+  case "$d" in ''|0) return 0 ;; esac
+  printf ' · %s deferred finding(s) parked in specs/refactor-backlog.md' "$d"
+}
 
 # --- build -------------------------------------------------------------------
 # The stamp is the driver's own bookkeeping — /build knows nothing about it.
@@ -137,14 +229,44 @@ case "$build_mode" in
   auto)  [ -f "$stamp" ] && do_build=0 || do_build=1 ;;
 esac
 
+# --resume: continue from the pass the spec records, not from 1. A missing or
+# junk value falls back to 1 — resuming must never be less safe than starting.
+pass=1
+if [ "$resume" -eq 1 ]; then
+  rp="$(fm_get loop_pass)"
+  case "$rp" in ''|*[!0-9]*|0) rp=1 ;; esac
+  [ "$rp" -le "$max" ] || {
+    echo "loop: --resume says pass $rp but --max=$max — raise --max to continue" >&2; exit 64; }
+  pass="$rp"
+  [ "$pass" -eq 1 ] || printf '↻ resuming at review pass %s (from %s)\n' "$pass" "$spec"
+fi
+
 if [ "$do_build" -eq 1 ]; then
-  run_phase build || finish 2 "✗ /build failed — see $log"
+  # Delete first: a NOT-READY left by a previous build would abort this one on
+  # someone else's verdict (and a stale READY would hide a gate that never ran).
+  rm -f "$readiness" "$buildjson"
+  build_ok=0
+  run_phase build && build_ok=1
+  # The readiness gate is checked BEFORE the child's exit status: /build aborting
+  # on NOT-READY is a cleaner diagnosis than "/build failed", and it is the one
+  # outcome that more passes cannot fix.
+  if [ -f "$readiness" ] &&
+     grep -q '"verdict"[[:space:]]*:[[:space:]]*"NOT-READY"' "$readiness"; then
+    finish 4 "✗ spec not implementable — /build's readiness gate returned NOT-READY and spawned no agent; see $readiness, then /spec $id"
+  fi
+  # A dead implementer returns nothing, so /build can finish "successfully" having
+  # built one surface of two. Reviewing that would spend N reviewers auditing a
+  # half-built feature and report its gaps as findings to fix — the wrong diagnosis
+  # at the wrong price. `dead` is a non-empty array only when a surface died twice.
+  if [ -f "$buildjson" ] && grep -q '"dead"[[:space:]]*:[[:space:]]*\[[^]]' "$buildjson"; then
+    finish 2 "✗ an implementer died — the surface(s) in \"dead\" were never built; see $buildjson and $log"
+  fi
+  [ "$build_ok" -eq 1 ] || finish 2 "✗ /build failed — see $log"
   date -u +%Y-%m-%dT%H:%M:%SZ >"$stamp"
 fi
 
 # --- review ⇄ fix ------------------------------------------------------------
 prev_fp=""
-pass=1
 while [ "$pass" -le "$max" ]; do
   # Delete first: a stale verdict from the previous pass read as this pass's
   # answer would end the loop on someone else's numbers.
@@ -158,12 +280,19 @@ while [ "$pass" -le "$max" ]; do
     finish 2 "✗ /review aborted on a red preflight — typecheck/lint/tests are broken, see $reports/$id.preflight.txt"
   fi
 
+  # A reviewer that died twice leaves its surface unaudited, and `blocking` counts only
+  # what the SURVIVING reviewers found — so blocking == 0 here would mean "clean" about
+  # code nobody read. Checked BEFORE blocking, because it invalidates it.
+  if grep -q '"unreviewed"[[:space:]]*:[[:space:]]*\[[^]]' "$verdict"; then
+    finish 2 "✗ a reviewer died — the surface(s) in \"unreviewed\" carry no verdict (pass $pass); see $verdict"
+  fi
+
   blocking="$(json_num "$verdict" blocking)"
   [ -n "$blocking" ] || finish 2 \
     "✗ verdict has no usable 'blocking' count (pass $pass) — see $verdict"
 
   [ "$blocking" -eq 0 ] && finish 0 \
-    "✓ clean after $pass review pass(es) — no blocking findings"
+    "✓ clean after $pass review pass(es) — no blocking findings$(def_note)"
 
   fp="$(json_str "$verdict" fingerprint)"
   if [ -n "$fp" ] && [ "$fp" = "$prev_fp" ]; then
@@ -173,7 +302,7 @@ while [ "$pass" -le "$max" ]; do
 
   # Last pass: report and stop. A /fix here would leave unreviewed code behind.
   [ "$pass" -eq "$max" ] && finish 1 \
-    "✗ ceiling — $blocking blocking finding(s) after $max pass(es); re-run with a higher --max"
+    "✗ ceiling — $blocking blocking finding(s) after $max pass(es); re-run with a higher --max --resume$(def_note)"
 
   run_phase fix || true
 

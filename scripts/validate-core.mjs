@@ -23,11 +23,26 @@ const frontmatter = (text) => {
 // orchestration turn silently bills at the session model — Opus/Fable).
 // Interactive commands must stay unpinned (they inherit on purpose).
 const PINNED = ["build", "review", "fix", "ship", "audit",
-  "refactor", "doctor", "align-ds", "update-pipeline"];
+  "refactor", "doctor", "align-ds", "update-pipeline", "drive"];
 const UNPINNED = ["brainstorm", "spec", "init-pipeline"];
+
+// Names Claude Code itself claims. A core command that collides is not overridden —
+// it is SHADOWED: the built-in answers the slash, our command file is never read, and
+// the session confidently reports on a run that never happened. That is what `/loop`
+// did (Claude Code's own `/loop` runs a prompt on an interval), invisible until a user
+// noticed the driver had never started. `/loop` is here so the 1.6.0 rename to
+// `/drive` can never be quietly reverted.
+// Watchlist, not yet enforced because the collision is unproven: `doctor` (Claude Code
+// has its own `/doctor`) — if a typed `/doctor` ever stops reaching the pipeline's, add
+// it here and rename.
+const RESERVED = ["loop", "clear", "compact", "cost", "help", "config",
+  "init", "run", "schedule", "simplify", "review-pr"];
 
 for (const f of readdirSync(join(root, "core/commands"))) {
   const path = `core/commands/${f}`;
+  if (RESERVED.includes(f.replace(/\.md$/, "")))
+    fail(path, `command name collides with a Claude Code built-in — it would be SHADOWED ` +
+      `(the built-in answers the slash and this file is never read); rename it`);
   const fm = frontmatter(read(path));
   if (!fm) { fail(path, "missing or malformed YAML frontmatter"); continue; }
   if (!/^description:\s*\S/m.test(fm)) fail(path, "frontmatter lacks a description");

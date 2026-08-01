@@ -50,6 +50,11 @@ that change the *contract*; `/fix` is for everything else.
 
 When the agents return:
 
+- **Roll call first (SCHEMA.md §Dead agents).** A re-dispatched agent that returns nothing has fixed
+  nothing you can verify. Retry that surface ONCE with the byte-identical dispatch; still silent ⇒ leave
+  **every one of its items `- [ ]`** (a dead agent never ticks a box — that would hide an open finding
+  from the next round and from the driver), print `<key> · DEAD — items untouched`, and say the surface
+  is unverified.
 - **Tick the resolved items.** Each handoff's `## Remediation addressed` lists what that agent fixed
   (by `file:line`). For every Remediation item an agent reports fixed, flip its `- [ ]` → `- [x]` in
   `specs/<id>.md` and append a terse ` — fixed: <what/where>` note (the convention prior rounds already

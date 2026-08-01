@@ -193,6 +193,14 @@ try {
         # 1.5.0 removed the /smoke phase; copy-over never deletes, so scrub the orphan agent.
         Remove-Item -LiteralPath (Join-Path $dest 'agents\smoke.md') -Force -ErrorAction SilentlyContinue
         Remove-Item -LiteralPath (Join-Path $dest 'commands\smoke.md') -Force -ErrorAction SilentlyContinue
+        # 1.4.0 removed /cycle and its workflow — and no installer ever scrubbed them, so every
+        # install since has kept offering a command that dispatches a workflow whose phases were
+        # later deleted. A dead command is worse than a missing one: the model can still fire it.
+        Remove-Item -LiteralPath (Join-Path $dest 'commands\cycle.md') -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath (Join-Path $dest 'workflows\cycle.js') -Force -ErrorAction SilentlyContinue
+        # 1.6.0 renamed /loop → /drive: Claude Code's own built-in /loop shadowed ours, so a leftover
+        # commands\loop.md is a command the user can never reach — scrub it rather than leave a decoy.
+        Remove-Item -LiteralPath (Join-Path $dest 'commands\loop.md') -Force -ErrorAction SilentlyContinue
         # 0.1.19 split the bi-mode questionnaire-researcher into research-agent + questionnaire-architect;
         # copy-over never deletes, so scrub the retired agent lest a dead subagent_type linger.
         Remove-Item -LiteralPath (Join-Path $dest 'agents\questionnaire-researcher.md') -Force -ErrorAction SilentlyContinue

@@ -227,6 +227,14 @@ function copyFixedAgents() {
   // 1.5.0 removed the /smoke phase; copy-over never deletes, so scrub the orphan agent+command.
   fs.rmSync(path.join(dest, 'agents', 'smoke.md'), { force: true });
   fs.rmSync(path.join(dest, 'commands', 'smoke.md'), { force: true });
+  // 1.4.0 removed /cycle and its workflow — and no installer ever scrubbed them, so every
+  // install since has kept offering a command that dispatches a workflow whose phases were
+  // later deleted. A dead command is worse than a missing one: the model can still fire it.
+  fs.rmSync(path.join(dest, 'commands', 'cycle.md'), { force: true });
+  fs.rmSync(path.join(dest, 'workflows', 'cycle.js'), { force: true });
+  // 1.6.0 renamed /loop → /drive: Claude Code's own built-in /loop shadowed ours, so a leftover
+  // commands/loop.md is a command the user can never reach — scrub it rather than leave a decoy.
+  fs.rmSync(path.join(dest, 'commands', 'loop.md'), { force: true });
   scrubResearchQuestionnaire();
 }
 

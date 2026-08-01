@@ -3,13 +3,97 @@
 Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
 user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
 
+## 1.6.0 — 2026-08-01
+
+> **Re-run `npx cohorte@latest update --global` (or `update`)** to pick up the readiness gate, the
+> deferred-findings route, the resumable driver and the decision journal — the update *deletes* the
+> shadowed `/loop` command and the long-dead `/cycle` from your install, it does not just stop
+> shipping them. Existing specs keep working: the new front-matter fields are written on demand, and a
+> spec without them simply isn't resumable yet. **`/loop <id>` is now `/drive <id>`.**
+
+- **New — the readiness gate between `/spec` and `/build`.** `/build` §1.6 now scores the frozen spec
+  on **implementability** before authoring the contract and before dispatching anything: contract
+  shapes complete · every area owned by a surface · named dependencies actually exist · no ambiguity a
+  surface would have to guess at · design links present. The verdict goes to
+  `specs/reports/<id>.readiness.json` (`READY` · `RESERVATIONS` · `NOT-READY` + `gaps[]`).
+  **`NOT-READY` stops the build with zero agents spawned** — a spec that can't be built doesn't get
+  cheaper by being built on N surfaces in parallel — and sends you to `/spec`. `RESERVATIONS` never
+  blocks: each gap is inlined into the affected surface's dispatch as an assumption the implementer
+  applies *and* flags in its handoff. It costs **no extra agent**: the lead already holds the spec,
+  the profile and the reconciled surface list.
+- **New — deferred findings: `/review` stops throwing away what isn't blocking.** The review agent
+  now returns a separate `## Deferred` section (max 10) for what is real but **out of this feature's
+  scope** — pre-existing code the diff never touched, adjacent debt the spec never claims to fix —
+  each line carrying its own out-of-scope reason. Deferred items count in no severity row, move no
+  verdict, are never cross-checked, and on **every** verdict get routed into
+  `specs/refactor-backlog.md` under the owning surface's `## <domain>` heading, tagged
+  `deferred:<id>`. So `/review` feeds `/refactor` for free instead of dropping everything
+  non-blocking on the floor. Never into `## Remediation`, which is what `/fix` re-dispatches. Not
+  deferrable, ever: anything the diff touched, any spec violation, any security issue on a path this
+  feature adds or calls. `/audit` now **carries open `deferred:` items over** when it rewrites the
+  backlog. The verdict JSON gains `deferred: <n>` (informational, outside `blocking`).
+- **BREAKING — `/loop` is renamed `/drive`, because Claude Code shadowed it.** Claude Code ships its
+  own built-in `/loop` (run a prompt on a recurring interval), which won the name: typing
+  `/loop <id>` started the *interval runner* with the feature id as its prompt, so cohorte's driver
+  never ran — and the session, having never seen `loop.md`, reported a loop that did not exist. Same
+  command, same flags, same script (`pipeline/scripts/loop.sh` keeps its name — nothing about your
+  install paths changes): type **`/drive <id>`**. The update scrubs the old `commands/loop.md`, so a
+  stale shadowed copy can't linger.
+- **`/drive` is resumable — the spec's status is the state machine.** The lifecycle is now
+  `draft → frozen → in-progress → in-review → shipped` plus `blocked`. Before every phase the driver
+  stamps `status: in-progress` + `loop_pass` + `loop_phase` into the spec's front-matter — plain
+  `awk`, a temp file and `mv`, **zero tokens** — and on exit a terminal `in-review` (clean) or
+  `blocked`. **`/drive <id> --resume`** then continues at the pass it reached instead of re-paying the
+  ones already made, whether the session died, the ceiling hit, or the fix stopped converging.
+  `--max` stays a ceiling on the *total* passes. New **exit 4** (`not implementable`) relays the
+  readiness gate's `NOT-READY`: the one loop outcome more passes cannot fix. The dashboard's specs
+  board gains In-progress and Blocked columns and shows `↻ pass 3 · /review` on the card; `/doctor`
+  names any spec left mid-loop.
+- **Fixed — a dead subagent no longer reads as a clean one on the conversational path.** The
+  "a dead agent is never a clean result" doctrine existed since 1.3.4 — but only inside the
+  **workflows**. `/build`, `/review` and `/fix` had nothing: a subagent that dies (rate limit,
+  transport error, exhausted context) returns *nothing*, and nothing was indistinguishable from
+  "finished, nothing to report". Concretely, a dead **reviewer** produced zero findings ⇒
+  `blocking: 0` ⇒ verdict `SHIP` ⇒ `/drive` exit 0 ⇒ the human sent to `/ship` — a clean bill of
+  health on code no agent ever read. Now every fan-out phase does a **roll call** before integrating:
+  a silent surface is retried **once** alone (byte-identical prompt, so recovery costs one agent, not
+  a rebuild), then `/build` marks it `dead` and verifies the tree with that surface's own quiet
+  commands instead of speaking for the agent, `/review` lists it in the verdict's new `unreviewed[]`
+  and **refuses to score `SHIP`**, and `/fix` leaves every one of its items `- [ ]` (a dead agent
+  never ticks a box). `/build` also writes `specs/reports/<id>.build.json` with `dead[]`, and
+  `loop.sh` aborts on either signal with **exit 2** *before* reading `blocking` — because a dead
+  reviewer makes `blocking == 0` a statement about unread code. `unreviewed` is deliberately kept
+  out of `blocking`: faking a count there would corrupt the one field the driver contract rests on.
+  The metrics line is now written even when a surface died (`"<key>":"dead"`) — an incomplete batch
+  is exactly the batch worth recording.
+- **Fixed — `/cycle` and its workflow were removed in 1.4.0 but no installer ever scrubbed them.**
+  Every install since has kept `commands/cycle.md` + `workflows/cycle.js` on disk, so a dead command
+  stayed listed and invokable — dispatching a workflow whose phases 1.5.0 then deleted. All three
+  installers now remove them (as they already did for `/smoke`), and CI **plants the orphans before
+  re-installing** instead of asserting their absence on a fresh scratch home, which is exactly the
+  blind spot that let this survive four releases.
+- **Reconcile now tops up `specs/_template.md`.** It was seeded once at install and never refreshed,
+  so every repo kept the front-matter its core shipped with. `/update-pipeline` adds the missing
+  front-matter fields (never the body — the section list is yours).
+- **New — `specs/_decisions.md`, the transverse decision journal.** `PIPELINE.md` is a *stack* profile;
+  it says nothing about what the project has **decided**, so every `/spec` re-discovered or
+  contradicted the same choices. The journal is deliberately tiny: **append-only, one line per
+  decision** (`- <date> · <area> · <decision> — because <reason> · <feature_id>`), reversal by a
+  superseding line rather than an edit. Written by `/spec` at freeze (typically 0–3 lines; zero is
+  normal) and by `/build` when it adds or splits a surface. Read by the **deciding** stages only —
+  `/brainstorm`, `/spec`, `/audit`. **Implementers and reviewers never load it:** they have the frozen
+  contract, and shipping them the rationale would cost `surfaces × dispatches` tokens per feature for
+  a fact they can't act on. That exclusion is what keeps it cheap enough to be worth having. The `_`
+  prefix means `/doctor`, the dashboard scanner and the kanban backfill already skip it.
+
 ## 1.5.0 — 2026-08-01
 
 > **Re-run `npx cohorte@latest update --global` (or `update`)** to pick up the collector and the
 > `/smoke` removal — the update *deletes* the command and its agent from your install, it does not
 > just stop shipping them. The new dashboard panel comes with `npx cohorte dashboard`.
 
-- **New — `/loop <id>`: the review ⇄ fix cycle, run for you.** `/build` → `/review` → `/fix` →
+- **New — `/loop <id>`: the review ⇄ fix cycle, run for you.** _(renamed `/drive` in 1.6.0 — see
+  there.)_ `/build` → `/review` → `/fix` →
   `/review` … until a review reports **zero blocking findings** (a CRITICAL or a security issue —
   a LOW nit never costs a pass), or the pass ceiling (`--max=N`, default 5), or two consecutive
   reviews returning the *same* blocking findings, which means the fix is treading water and more

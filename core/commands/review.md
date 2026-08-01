@@ -86,9 +86,25 @@ metrics line needs it.
 
 ## 3. Merge & relay the verdict
 
-Merge the returned reports into **one** REVIEW REPORT (same template): findings concatenated and
+**Roll call FIRST — a dead reviewer is not a clean surface.** Every surface you dispatched in §2 must
+come back with a REVIEW REPORT. A reviewer that died (rate limit, transport error, exhausted context)
+returns **nothing**, and zero findings from a dead reviewer is byte-identical to zero findings from a
+genuinely clean one — which is how "every reviewer crashed" reads as the strongest possible verdict
+from no evidence at all (SCHEMA.md §Dead agents). So:
+
+- **Retry a silent surface ONCE**, byte-identical dispatch. Most deaths are transient, and the staged
+  diff is already on disk — the retry costs one agent, not a re-review.
+- **Silent twice ⇒ that surface is `unreviewed`.** Name it in the report under
+  `## NOT reviewed (no verdict on these)`, list it in the verdict JSON's `unreviewed`, and **refuse to
+  score `SHIP`** — the merged verdict is at least `REVISE`. Absence of evidence is not evidence of
+  absence, and it must never reach `/ship` or tick a DoD box.
+- **Never re-review the other surfaces** to compensate: their reports are valid and already on disk.
+
+Then merge the returned reports into **one** REVIEW REPORT (same template): findings concatenated and
 re-ordered by severity, counts summed, duplicates collapsed, verdict = the worst returned
-(`BLOCK` > `REVISE` > `SHIP`). Append ONE metrics line for the batch to `pipeline-metrics.jsonl`
+(`BLOCK` > `REVISE` > `SHIP`). The `## Deferred` sections merge the same way (dedupe by
+`file` + problem) and stay **out of the severity table and out of the verdict** — see §3.5, which
+routes them. Append ONE metrics line for the batch to `pipeline-metrics.jsonl`
 (main-checkout path + rules in `/build` §4): `{"ts":"<ISO>","feature":"$ARGUMENTS","phase":"review","seconds":<wall-clock>,"surfaces":{"<key>":"<verdict>:<finding count>",…}}`.
 In the same Bash call, chain the opt-in usage ping (`/build` §4, `phase: "review"`, results = the
 merged verdict + total finding count, e.g. `"REVISE:3"`).
@@ -97,11 +113,11 @@ merged verdict + total finding count, e.g. `"REVISE:3"`).
 non-recursive `specs/*.md` glob, so it's never mistaken for a spec (no phantom card, no bogus stage).
 **Write the machine-readable verdict** to `specs/reports/$ARGUMENTS.verdict.json` (overwrite) — on
 **every** run, including the small-diff fast path of §2 and a `SHIP`. This file is the ONLY contract
-between the pipeline and an automated driver (`/loop`), which parses no prose:
+between the pipeline and an automated driver (`/drive`), which parses no prose:
 
 ```json
 { "id": "$ARGUMENTS", "phase": "review", "ts": "<ISO>", "verdict": "REVISE",
-  "findings": 7, "blocking": 2, "security": 1,
+  "findings": 7, "blocking": 2, "security": 1, "deferred": 3, "unreviewed": [],
   "severity": {"CRITICAL": 1, "HIGH": 2, "MEDIUM": 3, "LOW": 1},
   "surfaces": {"backend": {"verdict":"BLOCK","findings":4,"blocking":2}},
   "blocking_items": ["backend|apps/api/src/routes/order.ts|missing authz on post"],
@@ -121,12 +137,42 @@ between the pipeline and an automated driver (`/loop`), which parses no prose:
   `printf '%s\n' "<item>" … | LC_ALL=C sort | sha256sum | cut -c1-16` (`shasum -a 256` where there
   is no `sha256sum`). Empty list ⇒ `""`. A driver comparing two consecutive fingerprints detects a
   fix loop that is treading water.
+- **`deferred`** — the count of merged `## Deferred` items §3.5 parked in the backlog. Informational:
+  it never enters `blocking`, so it can never cost a driver an iteration.
+- **`unreviewed`** — the surface keys whose reviewer died twice, `[]` on a complete run. It is
+  **separate from `blocking` on purpose**: `blocking` counts real findings (CRITICAL + security), and
+  faking a number there to force a driver's hand would corrupt the one field the whole contract rests
+  on. A non-empty `unreviewed` means "this run does not cover everything" — a driver treats it as no
+  usable verdict, never as clean, whatever `blocking` says.
+
+## 3.5 Route the deferred findings — the backlog, not the fix loop
+
+Do this on **every** run, before the verdict branch below, and whatever the verdict — a deferred
+finding that is only routed on a `SHIP` is a deferred finding lost on every other verdict, which is
+exactly the leak this step closes. Append each merged `## Deferred` item to
+**`specs/refactor-backlog.md`**, under the `## <domain>` heading of the surface that owns its
+`file:line` (create the file and/or heading if absent — same grouping `/audit` writes, so
+`/refactor <domain>` picks them up with no extra plumbing):
+
+```
+- [ ] <SEVERITY> · <file:line> · <quality|security|rule> · <concrete fix> · deferred:$ARGUMENTS
+```
+
+- **Never into the spec's `## Remediation`** — that list is what `/fix` re-dispatches and what `/drive`
+  waits on, so a deferred item there would re-trigger the very loop it was deferred out of.
+- **Dedupe before appending:** `grep -F` the backlog for the item's `<file>` + the first words of its
+  problem; already there (from a prior round or an `/audit`) ⇒ skip it, don't stack duplicates round
+  after round.
+- Append with `>>` in ONE Bash call; never read the whole backlog into context to rewrite it (it grows
+  with every audit the repo has ever run).
+- Report it as **one line** in chat: `deferred: <n> parked in specs/refactor-backlog.md (<domains>)`.
 
 In chat print ONLY: the verdict, the severity-count table, a one-line digest of each CRITICAL/security
 finding, and `Full report: specs/reports/$ARGUMENTS.md` — never echo the findings body into chat (it
 would sit in this session's history, re-sent every turn). Then:
 
-- **SHIP** → a SHIP verdict *is* the pipeline's statement that the feature meets its Definition of
+- **SHIP** → only reachable with `unreviewed` empty (the roll call above forbids it otherwise). A SHIP
+  verdict *is* the pipeline's statement that the feature meets its Definition of
   Done, so **tick the DoD**: in `specs/$ARGUMENTS.md` §`Acceptance criteria / DoD`, flip each `- [ ]`
   → `- [x]` for the criteria the pipeline has actually verified — spec conformance + `ui_language`
   copy (this review), tests · lint · typecheck (a green `/build`), mobile-first as far as the code
@@ -141,12 +187,15 @@ would sit in this session's history, re-sent every turn). Then:
   of exactly the source you just reviewed (specs excluded, so DoD ticks + the ship status flip don't
   trip it). Then tell the human they can `/ship` — **recommend a `/clear` first**, the handoff is
   fully on disk. **SHIP with leftover LOW findings** (or LOW+MEDIUM at the human's call) does NOT
-  force a fix cycle for nits: park them in `specs/refactor-backlog.md` tagged `deferred:<id>` (NOT as
-  open `## Remediation` items, which would re-trigger the fix loop), keep the SHIP verdict and the
-  freshness stamp, and let the human ship.
+  force a fix cycle for nits: park them through §3.5's exact route (the backlog, under their surface's
+  domain heading, tagged `deferred:$ARGUMENTS` — never as open `## Remediation` items, which would
+  re-trigger the fix loop), keep the SHIP verdict and the freshness stamp, and let the human ship.
 - **REVISE / BLOCK**, or any CRITICAL/HIGH/security finding → tell the human to run
   **`/fix $ARGUMENTS`** — it appends the report to the spec's `## Remediation` and re-dispatches ONLY
-  the surfaces with findings. The full path (`/spec` Mode B then `/build`) remains for findings that
+  the surfaces with findings. (If they'd rather automate the rounds, the autonomous driver is
+  `disable-model-invocation: true` on purpose: **you cannot start it, they must type it**. Name the
+  exact line for them to type rather than attempting it — an attempt that silently fails reads as a
+  loop that is running when nothing is.) The full path (`/spec` Mode B then `/build`) remains for findings that
   change the contract in ways that ripple into clean surfaces. _The report is staged to
   `specs/reports/$ARGUMENTS.md`, so you can `/clear` before `/fix` — it reads the findings back from
   disk._

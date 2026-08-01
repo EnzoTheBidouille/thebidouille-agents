@@ -84,7 +84,12 @@ actually connected) and repair whatever fails — wiring that worked at
 init can rot (PATH changes, uninstalls, hand-edits). Report what was reconciled; if nothing was
 missing, say so. This is why `/init-pipeline` never needs re-running for a core upgrade.
 
-Two of the §Reconcile steps matter specifically here:
+Three of the §Reconcile steps matter specifically here:
+
+- **Spec-template top-up** (§Reconcile step 7): `specs/_template.md` was seeded at install and never
+  refreshed since, so add the front-matter fields the current `templates/spec.template.md` has and the
+  repo's copy lacks (1.6 added `loop_pass`/`loop_phase` and two states to the `status:` comment) —
+  front-matter only, never the body.
 
 - **Global config seed** (§Reconcile step 5): if `~/.claude/cohorte.config.yaml` is absent, seed it
   from the template so the kanban + shared-vault config has a home. Never clobber an existing filled

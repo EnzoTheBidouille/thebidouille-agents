@@ -84,9 +84,14 @@ fix only with the human's go-ahead (or hand them the command).
    End the check with ONE summary line, e.g.
    `workflows: available (opt-in — ask to "run the review workflow")` or
    `workflows: unavailable (<first failing prerequisite>) — conversational commands (the default)`.
-9. **Specs & metrics.** Every `specs/*.md` front-matter `status` is a valid stage — excluding
-   `_`-prefixed files and `specs/refactor-backlog.md`, which `/audit` writes as a backlog, not a
-   spec, and which has no front-matter to check; `shipped` specs
+9. **Specs & metrics.** Every `specs/*.md` front-matter `status` is a valid stage — one of
+   `draft · frozen · in-progress · in-review · shipped · blocked` (SCHEMA.md §Spec status; the last two
+   are written by the `/drive` driver, so flagging them would report the pipeline's own state as a
+   defect) — excluding
+   `_`-prefixed files (the spec template and `specs/_decisions.md`, the decision journal) and
+   `specs/refactor-backlog.md`, which `/audit` writes as a backlog, not a
+   spec, and which has no front-matter to check. A spec left `in-progress`/`blocked` with
+   `loop_pass` > 0 is a loop that never finished ⇒ say so and name `/drive <id> --resume`. `shipped` specs
    with a live worktree flagged (see 6). `.claude/pipeline-metrics.jsonl` and `specs/reports/` (the
    `/review` report buffer that lets a `/fix` survive a `/clear`) are gitignored. Metrics
    belong to the **main checkout** — a `pipeline-metrics.jsonl` inside a live feature worktree is a

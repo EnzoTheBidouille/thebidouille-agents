@@ -11,6 +11,12 @@ at Finish, when a board is configured.
 > Read `PIPELINE.md` §Personas (the panel) and §`rbac` first. If `rbac.enabled`, the panel must
 > pressure-test the idea so it serves **every** role, not just admins.
 >
+> Also read `specs/_decisions.md` §Live if it exists (SCHEMA.md §Decisions) — one line per standing
+> decision. The panel argues about the idea, not about settled ground: a persona that proposes
+> something a live line already decided must be told so by another persona, and an idea that genuinely
+> needs to overturn one must say which line, out loud, so the human decides it here rather than
+> discovering the contradiction at `/spec`.
+>
 > Template paths below (`.claude/templates/…`) resolve to `~/.claude/templates/…` when the core is
 > installed globally — read whichever exists.
 >

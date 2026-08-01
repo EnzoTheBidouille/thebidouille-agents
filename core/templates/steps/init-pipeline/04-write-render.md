@@ -28,9 +28,9 @@
    `Bash(git status:*)`, `Bash(git diff:*)`, `Bash(git log:*)`, `Bash(git rev-parse:*)` — plus the
    shipped pipeline scripts for BOTH cores (`Bash(.claude/pipeline/scripts/:*)` and
    `Bash(~/.claude/pipeline/scripts/:*)` — preflight, kanban-move, telemetry-send) **plus the
-   `bash`-prefixed form the `/loop` driver uses** (`Bash(bash .claude/pipeline/scripts/loop.sh:*)`
+   `bash`-prefixed form the `/drive` driver uses** (`Bash(bash .claude/pipeline/scripts/loop.sh:*)`
    and `Bash(bash ~/.claude/pipeline/scripts/loop.sh:*)`) — those prefix rules match a command
-   *starting* with the path, so `bash <path>` needs its own entry or `/loop` stalls on a permission
+   *starting* with the path, so `bash <path>` needs its own entry or `/drive` stalls on a permission
    prompt at every launch, and the
    retrieval provider's MCP tools when wired (e.g. `mcp__serena`). Never allowlist anything matching
    a `gate.ask`/`gate.deny` pattern. Mention the human can widen it later with

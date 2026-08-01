@@ -131,11 +131,29 @@ const FINDING = {
   },
 }
 
+// A DEFERRED finding is real but out of this feature's scope (pre-existing code the
+// diff never touched). It carries its own out-of-scope reason, counts in no severity
+// row, is never cross-checked, and can never move the verdict — it is routed to
+// specs/refactor-backlog.md so /refactor owns it. See core/agents/review.md §Deferred.
+const DEFERRED = {
+  type: 'object', required: ['severity', 'file', 'line', 'kind', 'problem', 'fix', 'outOfScope'],
+  additionalProperties: false,
+  properties: {
+    severity: { enum: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] },
+    file: { type: 'string' }, line: { type: 'integer' },
+    kind: { enum: ['quality', 'security', 'rule'] },
+    problem: { type: 'string', description: 'one line, no code excerpts' },
+    fix: { type: 'string', description: 'one concrete change, one line' },
+    outOfScope: { type: 'string', description: 'one line: why this feature does not own it' },
+  },
+}
+
 const REPORT = {
   type: 'object', required: ['verdict', 'findings'], additionalProperties: false,
   properties: {
     verdict: { enum: ['SHIP', 'REVISE', 'BLOCK'] },
     findings: { type: 'array', maxItems: 20, items: FINDING },
+    deferred: { type: 'array', maxItems: 10, items: DEFERRED },
     overflow: { type: 'integer', description: 'findings beyond the 20-item cap, if any' },
     notes: { type: 'string', description: 'RBAC / mobile-first assessment only, when the profile enables them' },
   },
@@ -222,7 +240,8 @@ const reviewed = await pipeline(
   s => agent(
     'Review one feature surface against its frozen spec, per your agent instructions (read the staged ' +
     'diff FIRST; open a full source file only when a finding demands it; capped shape — max 20 findings, ' +
-    'one line each, no code excerpts). — Variable slots: ' +
+    'one line each, no code excerpts). Put anything real but OUT of this feature\'s scope in `deferred` ' +
+    '(max 10, each with its out-of-scope reason) per your §Deferred rules — never in `findings`. — Variable slots: ' +
     `feature ${feature} · scope: the ${s.key} surface only · spec: specs/${feature}.md · ` +
     `staged diff: ${s.diff} · changed files: ${s.files.join(', ')}`,
     { agentType: 'review', label: `review:${s.key}`, phase: 'Review', schema: REPORT },
@@ -231,7 +250,10 @@ const reviewed = await pipeline(
     if (!report) return null
     const hard = report.findings.filter(f => f.severity === 'CRITICAL' || f.kind === 'security')
     const rest = report.findings.filter(f => !hard.includes(f))
-    if (!hard.length) return { key: s.key, report, kept: rest, refuted: [] }
+    // Deferred items skip the cross-check entirely: refuting one would spend an agent
+    // to argue about something that cannot affect the verdict either way.
+    const deferred = report.deferred || []
+    if (!hard.length) return { key: s.key, report, kept: rest, refuted: [], deferred }
     const votes = await parallel(hard.map(f => () => agent(
       'Adversarially verify ONE review finding — your job is to REFUTE it if you can. Read the staged ' +
       'diff and the exact file:line; refuted=true when the code, a guard, a test, or the spec shows the ' +
@@ -246,6 +268,7 @@ const reviewed = await pipeline(
       report,
       kept: rest.concat(checkedVotes.filter(v => !v.refuted).map(v => v.f)),
       refuted: checkedVotes.filter(v => v.refuted).map(v => ({ ...v.f, reason: v.reason })),
+      deferred,
     }
   },
 )
@@ -259,6 +282,9 @@ const unreviewed = touched.filter(s => !results.some(r => r.key === s.key)).map(
 if (unreviewed.length) log(`Reviewer died on: ${unreviewed.join(', ')} — those surfaces are NOT reviewed`)
 const kept = results.flatMap(r => r.kept.map(f => ({ ...f, surface: r.key })))
 const refuted = results.flatMap(r => r.refuted.map(f => ({ ...f, surface: r.key })))
+// Deferred findings are deliberately kept OUT of `counts`, out of `verdict` and out
+// of `clean`: they belong to /refactor, not to this feature's fix loop.
+const deferredAll = results.flatMap(r => (r.deferred || []).map(f => ({ ...f, surface: r.key })))
 const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }
 for (const f of kept) counts[f.severity] = (counts[f.severity] || 0) + 1
 // Verdict from the findings that SURVIVED the cross-check (a refuted CRITICAL
@@ -283,6 +309,10 @@ const reportBody = [
   ...['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map(s => `| ${s} | ${counts[s] || 0} |`), '',
   `Verdict: ${verdict}`, '', '## Findings', '',
   kept.length ? kept.map(findingLine).join('\n') : 'None.',
+  '', '## Deferred', '',
+  deferredAll.length
+    ? deferredAll.map(f => `${findingLine(f)} · out of scope: ${f.outOfScope} · deferred:${feature}`).join('\n')
+    : 'None.',
   ...(unreviewed.length ? ['', '## NOT reviewed (reviewer died — no verdict on these)', '',
     unreviewed.map(k => `- \`${k}\` — re-run /review ${feature} (or the review workflow)`).join('\n')] : []),
   ...(refuted.length ? ['', '## Refuted by cross-check (no action needed)', '',
@@ -295,6 +325,17 @@ const staging = await agent(
   `{"ts":"<ISO now>","feature":"${feature}","phase":"review","seconds":0,"surfaces":{${results.map(r => `"${r.key}":"${verdict}:${r.kept.length}"`).join(',')}}}\n` +
   `3. Chain the opt-in usage ping: <core>/pipeline/scripts/telemetry-send.sh review "${feature}" 0 "${verdict}:${kept.length}" || true ` +
   '(<core> = .claude if .claude/pipeline/scripts/telemetry-send.sh exists, else ~/.claude; script on neither ⇒ skip the ping).\n' +
+  // Deferred findings must land in the backlog on EVERY verdict — parked only on a
+  // SHIP is parked nowhere the rest of the time, which is the leak this closes.
+  (deferredAll.length
+    ? `3b. Route the deferred findings to specs/refactor-backlog.md (create it if absent): for each line below, ` +
+      `append it under the \`## <domain>\` heading named in its prefix (create that heading if absent) — with \`>>\`, ` +
+      `never by rewriting the file, and skip any whose file path + first words already appear there (grep -F first, ` +
+      `they may be left from a prior round or an /audit):\n` +
+      deferredAll.map(f =>
+        `${f.surface}||- [ ] ${f.severity} · ${f.file}:${f.line} · ${f.kind} · ${f.fix} · deferred:${feature}`).join('\n') +
+      '\n'
+    : '') +
   // Stamp + tick only when nothing above LOW survived: the conversational /review
   // keeps the stamp only for LOW findings, and a SHIP verdict here can still carry
   // HIGH/MEDIUM ones — certifying those for /ship would ship known defects. A dead
@@ -318,6 +359,7 @@ const staged_ok = staging != null && /done/i.test(String(staging))
 return {
   verdict,
   counts,
+  deferred: deferredAll.length,     // parked in the backlog for /refactor — never blocking
   refutedByCrossCheck: refuted.length,
   reportStaged: staged_ok,
   unreviewedSurfaces: unreviewed,   // reviewers that died — these carry NO verdict
