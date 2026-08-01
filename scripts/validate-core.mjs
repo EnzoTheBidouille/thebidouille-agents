@@ -218,6 +218,23 @@ for (const f of workflowNames) {
     fail("dashboard/server/doctor.js", `checkWorkflows() does not list ${f}`);
 }
 
+// ── every test suite must run in BOTH workflows ──────────────────────────────
+// publish.yml re-runs the test suites under the comment "same gate as CI", because
+// it has no dependency on the CI workflow's conclusion — a merge whose CI failed
+// would otherwise still ship to npm. That only holds if the two lists agree, and
+// they drift the moment a suite is added to one: test-loop.mjs landed in ci.yml and
+// publish.yml kept publishing without it. Neither list is the source of truth —
+// the directory is.
+const ciYml = existsSync(join(root, ".github/workflows/ci.yml")) ? read(".github/workflows/ci.yml") : "";
+const publishYml = existsSync(join(root, ".github/workflows/publish.yml"))
+  ? read(".github/workflows/publish.yml") : "";
+for (const f of readdirSync(join(root, "scripts")).filter((f) => /^test-.*\.mjs$/.test(f))) {
+  if (ciYml && !ciYml.includes(`scripts/${f}`))
+    fail(".github/workflows/ci.yml", `never runs scripts/${f} — a suite CI does not run is a suite that does not exist`);
+  if (publishYml && !publishYml.includes(`scripts/${f}`))
+    fail(".github/workflows/publish.yml", `never runs scripts/${f} — publish would ship past a failure that gate is meant to catch`);
+}
+
 // ── dashboard: the metrics phase list is duplicated server/client ────────────
 // A phase present in one and not the other parses fine and renders in no column —
 // silently invisible data, which is how a phase batch once went unnoticed.
