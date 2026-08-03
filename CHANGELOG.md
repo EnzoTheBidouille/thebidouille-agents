@@ -42,7 +42,12 @@ short, user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` secti
 - **`loop.sh` holds the machine awake for its whole run.** It re-execs itself under
   `caffeinate -ims` on macOS, `systemd-inhibit` on Linux, because system sleep aborts every
   in-flight `claude -p` request and the abort is byte-identical to "the agent returned nothing" —
-  the `dead` family the driver exists to catch. A no-op where neither exists, so CI is unaffected.
+  the `dead` family the driver exists to catch. The inhibitor is **probed before the `exec`**, since
+  `exec` replaces the shell: one that exists but is refused (`systemd-inhibit` answers `Failed to
+  inhibit: Access denied` in a container, in CI, or in any seatless session) would otherwise make its
+  own failure the driver's exit code and the run would never start — GitHub's Linux runners turned
+  all 24 loop tests red exactly that way. Absent or refused both fall through to a no-op; an unheld
+  power assertion is a degraded run, not a failed one, and `test-loop.mjs` now pins both directions.
   **This cannot prevent lid-close sleep** — no userspace assertion can on any platform; keep the
   lid open or use clamshell mode.
 

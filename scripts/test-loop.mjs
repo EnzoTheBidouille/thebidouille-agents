@@ -231,5 +231,39 @@ console.log("loop.sh — a spec with no front-matter still runs");
     !existsSync(join(s.dir, "specs/feat-x.md.loop.tmp")));
 }
 
+// ── the sleep inhibitor must never be able to fail the run ───────────────────
+// loop.sh re-execs itself under caffeinate/systemd-inhibit to hold a power assertion.
+// `exec` replaces the shell, so an inhibitor that EXISTS but is refused makes its own
+// failure the driver's exit code and the run never starts. CI found this the hard way:
+// GitHub's Linux runners ship systemd-inhibit and answer "Failed to inhibit: Access
+// denied", which turned all 24 loop tests red at once.
+console.log("loop.sh — the sleep inhibitor is best-effort, never fatal");
+{
+  const s = scenario(["build:ready", "review:clean"]);
+  // Both inhibitors present on PATH and both failing — the CI shape.
+  writeFileSync(join(s.bin, "systemd-inhibit"),
+    '#!/bin/sh\necho "Failed to inhibit: Access denied" >&2\nexit 1\n');
+  chmodSync(join(s.bin, "systemd-inhibit"), 0o755);
+  writeFileSync(join(s.bin, "caffeinate"), "#!/bin/sh\nexit 127\n");
+  chmodSync(join(s.bin, "caffeinate"), 0o755);
+  const r = runLoop(s, ["feat-x"]);
+  check("a refused inhibitor ⇒ the run still completes clean", r.code === 0,
+    `got ${r.code}: ${r.out.trim().split("\n").pop()}`);
+  check("a refused inhibitor ⇒ its error never reaches the driver's output",
+    !/Access denied/.test(r.out), r.out.trim().split("\n").pop());
+
+  // A WORKING inhibitor must still be used (or the probe would have disabled the feature).
+  const s2 = scenario(["build:ready", "review:clean"]);
+  writeFileSync(join(s2.bin, "systemd-inhibit"),
+    '#!/bin/sh\nwhile [ $# -gt 0 ]; do case "$1" in --*) shift ;; *) break ;; esac; done\n'
+    + 'echo "INHIBIT-HELD" >&2\nexec "$@"\n');
+  chmodSync(join(s2.bin, "systemd-inhibit"), 0o755);
+  writeFileSync(join(s2.bin, "caffeinate"), "#!/bin/sh\nexit 127\n");
+  chmodSync(join(s2.bin, "caffeinate"), 0o755);
+  const r2 = runLoop(s2, ["feat-x"]);
+  check("a usable inhibitor is still exec'd (the probe didn't kill the feature)",
+    /INHIBIT-HELD/.test(r2.out) && r2.code === 0, `${r2.code}: ${r2.out.trim().split("\n").pop()}`);
+}
+
 if (failures) { console.error(`\ntest-loop: ${failures} failure(s)`); process.exit(1); }
 console.log("\ntest-loop: OK");

@@ -63,15 +63,24 @@ set -uo pipefail
 # display on. Linux gets the systemd equivalent. Windows has no scriptable
 # equivalent, and neither does a systemd-less Linux, so both fall through to a
 # no-op rather than pretending: the run still works, it is just as sleep-proof as
-# the machine's own settings make it.
+# the machine's own settings make it. A *refused* inhibitor falls through the same
+# way — an unheld power assertion is a degraded run, not a failed one.
 #
 # THIS CANNOT PREVENT LID-CLOSE SLEEP on any platform. No userspace assertion can
 # override it — keep the lid open, or use clamshell mode (AC + external display +
 # external input).
+#
+# PROBE before exec'ing. `exec` replaces this shell, so an inhibitor that *exists* but is
+# refused — `systemd-inhibit` in a container, in CI, or in any session without a logind
+# seat answers `Failed to inhibit: Access denied` and exits 1 — would become the driver's
+# own exit code, and the run would never start at all. "Present" and "usable" are not the
+# same test; only the second one is safe to build an `exec` on. One fast subprocess on a
+# run measured in hours.
 if [ -z "${COHORTE_CAFFEINATED:-}" ]; then
-  if command -v caffeinate >/dev/null 2>&1; then
+  if command -v caffeinate > /dev/null 2>&1 && caffeinate -ims true > /dev/null 2>&1; then
     COHORTE_CAFFEINATED=1 exec caffeinate -ims "$0" "$@"
-  elif command -v systemd-inhibit >/dev/null 2>&1; then
+  elif command -v systemd-inhibit > /dev/null 2>&1 \
+    && systemd-inhibit --what=sleep:idle --who=cohorte --why="probe" true > /dev/null 2>&1; then
     COHORTE_CAFFEINATED=1 exec systemd-inhibit \
       --what=sleep:idle --who=cohorte --why="autonomous $0 run" "$0" "$@"
   fi

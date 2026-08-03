@@ -53,8 +53,12 @@ over a status line.
 Unlike the other shipped executables, its call site does **not** chain `|| true` — its exit code
 *is* the result, and `/cohorte-doctor` check 1 verifies it is present and executable.
 
-It re-execs itself under `caffeinate -ims` (guarded by `COHORTE_CAFFEINATED`, a no-op where
-`caffeinate` is absent, so Linux CI is unaffected). System sleep aborts every in-flight `claude -p`
+It re-execs itself under `caffeinate -ims` (guarded by `COHORTE_CAFFEINATED`). The inhibitor is
+**probed before the `exec`**, not merely looked up on PATH: `exec` replaces the shell, so an
+inhibitor that exists but is *refused* — `systemd-inhibit` answers `Failed to inhibit: Access
+denied` in a container, in CI, or in any session without a logind seat — would become the driver's
+own exit code and the run would never start. Absent or refused both fall through to a no-op: an
+unheld power assertion is a degraded run, not a failed one. System sleep aborts every in-flight `claude -p`
 request, and that abort is byte-identical to "the agent returned nothing" — the `dead` family this
 driver exists to catch. It **cannot** prevent lid-close sleep; no userspace assertion can.
 
@@ -94,7 +98,7 @@ matters for survival is escaping the caller's process *group*, not merely ignori
 | | detach (`loop-detach.sh`) | stay-awake (`loop.sh`) |
 | --- | --- | --- |
 | **macOS** | `screen` (ships at `/usr/bin/screen`) — fully detached | `caffeinate -ims` |
-| **Linux** | `screen` if present, else `setsid` (util-linux) — both fully detached | `systemd-inhibit --what=sleep:idle`, or a no-op without systemd |
+| **Linux** | `screen` if present, else `setsid` (util-linux) — both fully detached | `systemd-inhibit --what=sleep:idle`, or a no-op without systemd (or where it is refused — containers, CI, seatless sessions) |
 | **Windows** (Git Bash) | `nohup` only — **not** detached | no-op |
 
 On Windows the driver still runs and still ignores `SIGHUP`, but it stays in the calling process
