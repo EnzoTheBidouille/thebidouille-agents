@@ -7,6 +7,39 @@ short, user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` secti
 > They are history and are deliberately not rewritten — every command gained a `cohorte-` prefix
 > in 2.0.0.
 
+## 2.0.1 — 2026-08-03
+
+Three fixes, one failure: an autonomous `/cohorte-loop` run that built 1 surface of 3, stamped
+itself green, and then hung asking a human to approve its own pre-flight. All in `loop.sh` — no
+repo files change, so `npx cohorte@latest update --global` (or `update`) is the whole migration.
+
+- **Child sessions now run in `bypassPermissions`, not `acceptEdits`.** `acceptEdits` auto-approves
+  Write/Edit and *nothing else*, so the first `Bash` call no `allow` prefix in `settings.json`
+  covers raises a permission prompt — and a `claude -p` child has nobody to answer it. It stalls,
+  prints prose asking you to approve, and **exits 0**, which the driver scores as a clean phase.
+  That is the whole content of one observed run: the review child blocked on invoking
+  `preflight.sh` and the loop logged `▶ /cohorte-review … ok`. It is also backwards from what the
+  gate is built for — `hooks/gate.py` escalates every `ask` match to a hard **deny** under
+  `bypassPermissions` precisely because an unattended run cannot confirm. So the dangerous commands
+  from PIPELINE.md `gate` stay blocked deterministically, while typecheck/lint/tests/`git diff` stop
+  needing a human. `CLAUDE_FLAGS` still overrides it for a watched run.
+
+- **A build phase that reported nothing is no longer treated as a build that found nothing.** The
+  driver checked `dead[]` in `specs/reports/<id>.build.json` but accepted the file being **absent** —
+  and a phase cut short never reaches the step that writes it, so there was no file to grep and no
+  surface to name while the child still exited 0. A 3-surface build that lost 2 of them mid-write
+  stamped `<id>.built` and sent reviewers at the result. A missing `build.json` after a build now
+  aborts as **exit 2**, naming the cause, and leaves no stamp so a re-run rebuilds.
+
+- **`CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` is exported for every child.** Print mode otherwise
+  *terminates* still-running background tasks at its ceiling ("Background tasks still running after
+  600s; terminating") — which is 25–40 min short of a real implementer batch, and killed the two
+  surfaces above mid-write. The phase is bounded by its own completion (and by the `caffeinate`
+  assertion the driver already holds), not by a stopwatch that fires inside the longest phase.
+
+`test-loop.mjs` pins all three, including the fixture bug that hid the second one: its `ready`
+build wrote no `build.json` either.
+
 ## 2.0.0 — 2026-08-03
 
 > **Breaking: every command is renamed.** `/build` → `/cohorte-build`, `/review` →

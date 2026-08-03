@@ -25,7 +25,7 @@ loop.sh <feature-id> [--max=N] [--no-build] [--rebuild] [--resume]
 ```
 
 Backs [`/cohorte-loop`](/reference/commands). Runs each phase as a **separate `claude -p` child session**
-(flags from `CLAUDE_FLAGS`, default `--permission-mode acceptEdits`) so the calling session never
+(flags from `CLAUDE_FLAGS`, default `--permission-mode bypassPermissions` — see below) so the calling session never
 accumulates the diff, the N review reports or the N contracts — all child output goes to
 `specs/reports/<id>.loop.log`, and `/cohorte-loop` is forbidden to read it back. stdout is one line per
 phase plus a closing verdict line, nothing else.
@@ -34,7 +34,10 @@ Reads four fields from `specs/reports/<id>.verdict.json` — `blocking`, `finger
 `unreviewed` — plus `verdict` from `<id>.readiness.json` and `dead` from `<id>.build.json`, all with
 `sed`/`grep`, so it needs no `jq` and no runtime dependency. A non-empty `dead[]` (an implementer never
 built its surface) or `unreviewed[]` (a reviewer never audited one) aborts as **exit 2**, checked
-*before* `blocking` — a dead reviewer makes `blocking == 0` a claim about code nobody read. Otherwise it
+*before* `blocking` — a dead reviewer makes `blocking == 0` a claim about code nobody read. A build
+phase that produced **no `<id>.build.json` at all** aborts the same way: a phase cut short never
+reaches the step that writes the report, so there is no `dead[]` to find and no surface to name,
+while the child still exits 0. "No report" is not "nothing to report". Otherwise it
 stops on `blocking == 0` (exit 0), the
 `--max` ceiling (1), a missing or preflight-aborted verdict (2), a fingerprint identical to the
 previous pass (3), or a `NOT-READY` readiness verdict from `/cohorte-build` (4 — the spec cannot be built, so
@@ -49,6 +52,17 @@ GNU/BSD `sed -i` divergence), and on exit a terminal `in-review` or `blocked`. `
 `loop_pass` back and continues from that pass. A spec with no front-matter makes every stamp a silent
 no-op: this is bookkeeping for resume and the dashboard, never a precondition — the loop must not die
 over a status line.
+
+**Why `bypassPermissions` and not `acceptEdits`.** `acceptEdits` auto-approves Write/Edit and nothing
+else, so every child `Bash` call falls back to the `settings.json` rules — and the first one no
+`allow` prefix covers raises a permission prompt that a `claude -p` child has nobody to answer. It
+stalls, prints prose asking for approval, and **exits 0**, which the driver scores as a clean phase.
+`bypassPermissions` is also the mode [`gate.py`](gate.md) is built for: it escalates every `ask`
+match to a hard **deny** there, so the dangerous commands stay blocked deterministically from
+PIPELINE.md `gate` while typecheck/lint/tests/`git diff` stop needing a human. Set `CLAUDE_FLAGS` to
+run children in a stricter mode when you are watching. The driver also exports
+`CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0`: print mode otherwise *terminates* still-running background
+tasks after its ceiling, which cuts a 25–40 min implementer batch off mid-write and still exits 0.
 
 Unlike the other shipped executables, its call site does **not** chain `|| true` — its exit code
 *is* the result, and `/cohorte-doctor` check 1 verifies it is present and executable.

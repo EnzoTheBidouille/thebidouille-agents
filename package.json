@@ -1,6 +1,6 @@
 {
   "name": "cohorte",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Portable, stack-agnostic multi-agent development pipeline for Claude Code — install the core, run /cohorte-init-pipeline, and it adapts to your project's stack.",
   "bin": {
     "cohorte": "bin/cli.js"

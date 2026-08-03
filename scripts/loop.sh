@@ -99,7 +99,7 @@ usage: loop.sh <feature-id> [--max=N] [--no-build] [--rebuild] [--resume]
                (loop_pass), instead of starting over at pass 1
 
   env CLAUDE_FLAGS   flags for every child session
-                     (default: --permission-mode acceptEdits)
+                     (default: --permission-mode bypassPermissions)
 EOF
   exit 64
 }
@@ -194,7 +194,32 @@ fm_set() {                        # fm_set <key> <value>  (replace, else append)
     mv "$spec.loop.tmp" "$spec" 2>/dev/null || rm -f "$spec.loop.tmp"
 }
 
-: "${CLAUDE_FLAGS:=--permission-mode acceptEdits}"
+# --- child session flags -----------------------------------------------------
+# bypassPermissions, NOT acceptEdits. acceptEdits auto-approves Write/Edit and
+# NOTHING else, so every Bash call in a child falls back to the settings.json
+# rules — and the first one no `allow` prefix covers raises a permission prompt.
+# In `claude -p` there is nobody to answer it: the child stalls, eventually
+# prints prose asking the human to approve, and EXITS 0. The driver then reads
+# that as a clean phase. Observed on a real run: the review child hung on its own
+# preflight.sh call ("could you approve the pending tool-call prompt") and the
+# loop scored the phase `ok`.
+#
+# This is also what the gate hook is built for: hooks/gate.py escalates every
+# `ask` match to a hard DENY under bypassPermissions, precisely because an
+# unattended run has nobody to confirm. The dangerous commands stay blocked — by
+# the gate, deterministically, from PIPELINE.md `gate` — while the mechanical
+# ones (typecheck, lint, tests, git diff) stop needing a human. Driving the loop
+# in acceptEdits gets this backwards: nothing is auto-denied and everything is
+# auto-hung. Override with CLAUDE_FLAGS to run in a stricter mode interactively.
+: "${CLAUDE_FLAGS:=--permission-mode bypassPermissions}"
+
+# A `/cohorte-build` implementer batch runs 25–40 min as background tasks. In print
+# mode the harness waits a bounded time for background work and then TERMINATES it
+# ("Background tasks still running after 600s; terminating"), which cuts implementers
+# off mid-write and still exits the child 0. 0 = wait indefinitely; the caffeinate
+# assertion above and the phase's own completion are what bound a phase, not a
+# stopwatch that fires in the middle of the longest one.
+export CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0
 
 : >"$log"
 {
@@ -309,6 +334,14 @@ spawned no agent; see $readiness, then /cohorte-spec $id"
     finish 2 "✗ an implementer died — the surface(s) in \"dead\" were never built; see $buildjson and $log"
   fi
   [ "$build_ok" -eq 1 ] || finish 2 "✗ /cohorte-build failed — see $log"
+  # An ABSENT build.json is the same class of lie as a dead implementer, and the `dead`
+  # check above cannot see it: a phase cut short (harness background-task ceiling, a
+  # Claude Code teardown, a crash) never reaches §3's report, so there is no file to
+  # grep and no surface to name — while the child still exits 0. Treating "no report"
+  # as "nothing to report" is what let a build of 3 surfaces stamp itself green with 2
+  # of them never written, and sent reviewers at the result.
+  [ -f "$buildjson" ] || finish 2 "✗ /cohorte-build wrote no $buildjson — the phase was cut short \
+(background-task ceiling, teardown or crash) and the surfaces it never reported are unbuilt; see $log"
   date -u +%Y-%m-%dT%H:%M:%SZ >"$stamp"
 fi
 

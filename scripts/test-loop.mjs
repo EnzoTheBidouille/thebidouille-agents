@@ -59,6 +59,9 @@ case "$cmd" in
   *) echo "fake claude: expected a /cohorte-* command, got '$cmd'" >&2; exit 9 ;;
 esac
 cmd="\${cmd#/cohorte-}"          # scenarios are keyed on the PHASE, which stays unprefixed
+# Echoed so the tests can assert what the driver hands its children: an unattended child
+# that cannot answer a permission prompt, and a background ceiling that must not fire.
+echo "fake claude: bgceil=\${CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS:-unset}"
 n=0; [ -f "$SCEN_DIR/count" ] && n=$(cat "$SCEN_DIR/count")
 n=$((n + 1)); echo "$n" >"$SCEN_DIR/count"
 step=$(sed -n "\${n}p" "$SCEN_DIR/phases")
@@ -72,6 +75,13 @@ case "$do_what" in
       >specs/reports/feat-x.readiness.json ;;
   ready)
     printf '{"id":"feat-x","phase":"readiness","ts":"t","verdict":"READY","gaps":[],"surfaces":["backend"]}' \\
+      >specs/reports/feat-x.readiness.json
+    printf '{"id":"feat-x","phase":"build","ts":"t","surfaces":{"backend":"ok"},"dead":[]}' \\
+      >specs/reports/feat-x.build.json ;;
+  # READY, dispatched, and then cut short before §3's report — the harness terminating
+  # background implementers, a teardown, a crash. No build.json, and exit 0 anyway.
+  cutshort)
+    printf '{"id":"feat-x","phase":"readiness","ts":"t","verdict":"READY","gaps":[],"surfaces":["backend","frontend"]}' \\
       >specs/reports/feat-x.readiness.json ;;
   clean)
     printf '{"id":"feat-x","phase":"review","ts":"t","verdict":"SHIP","findings":2,"blocking":0,"deferred":2,"unreviewed":[],"fingerprint":""}' \\
@@ -114,24 +124,26 @@ function scenario(phases, { frontmatter = FM } = {}) {
 }
 
 function runLoop({ dir, bin }, args) {
-  const r = spawnSync("bash", [LOOP, ...args], {
-    cwd: dir,
-    encoding: "utf8",
-    env: {
-      ...process.env,
-      PATH: `${bin}:${process.env.PATH}`,
-      SCEN_DIR: dir,
-      CLAUDE_FLAGS: "--permission-mode acceptEdits",
-      GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t.t",
-      GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t.t",
-    },
-  });
+  const env = {
+    ...process.env,
+    PATH: `${bin}:${process.env.PATH}`,
+    SCEN_DIR: dir,
+    GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t.t",
+    GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t.t",
+  };
+  // Never inherit these from whoever runs the suite: the default child flags and the
+  // background ceiling are exactly what the assertions below are about.
+  delete env.CLAUDE_FLAGS;
+  delete env.CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS;
+  const r = spawnSync("bash", [LOOP, ...args], { cwd: dir, encoding: "utf8", env });
   const spec = readFileSync(join(dir, "specs/feat-x.md"), "utf8");
   const fm = k => {
     const m = spec.match(new RegExp(`^${k}:\\s*([^#\\n]*)`, "m"));
     return m ? m[1].trim() : null;
   };
-  return { code: r.status, out: `${r.stdout}${r.stderr}`, spec, fm };
+  const logPath = join(dir, "specs/reports/feat-x.loop.log");
+  const log = existsSync(logPath) ? readFileSync(logPath, "utf8") : "";
+  return { code: r.status, out: `${r.stdout}${r.stderr}`, spec, fm, log };
 }
 
 console.log("loop.sh — readiness gate");
@@ -187,6 +199,55 @@ console.log("loop.sh — a dead subagent is never a clean result");
     r.out.trim().split("\n").pop());
   check("dead reviewer ⇒ never says clean", !/✓ clean/.test(r.out));
   check("dead reviewer ⇒ spec is NOT left in-review", r.fm("status") === "blocked", r.fm("status"));
+}
+
+console.log("loop.sh — a build that never reported is never a built build");
+{
+  // The absent-file twin of the dead implementer, and the one the `dead[]` grep cannot
+  // see: a phase cut short never reaches the step that writes build.json, so there is no
+  // file to read and no surface to name — while the child still exits 0. Scoring that as
+  // a clean build stamps `.built` over a half-written tree and sends reviewers at it.
+  const s = scenario(["build:cutshort"]);
+  const r = runLoop(s, ["feat-x"]);
+  check("no build.json ⇒ exit 2, not a review pass", r.code === 2, `got ${r.code}: ${r.out}`);
+  check("no build.json ⇒ no reviewer was spawned", !/phase=review/.test(r.out));
+  check("no build.json ⇒ names the cut-short phase", /wrote no .*build\.json/.test(r.out),
+    r.out.trim().split("\n").pop());
+  check("no build.json ⇒ the build stamp is NOT written (a re-run must rebuild)",
+    !existsSync(join(s.dir, "specs/reports/feat-x.built")));
+  check("no build.json ⇒ spec left blocked", r.fm("status") === "blocked", r.fm("status"));
+}
+
+console.log("loop.sh — what the children are handed");
+{
+  // acceptEdits auto-approves Write/Edit and NOTHING else, so the first child Bash call no
+  // `allow` rule covers raises a prompt no `claude -p` can answer: the child stalls, asks
+  // the human in prose, and exits 0 — which the driver scores `ok`. Seen on a real run,
+  // where the review child hung on its own preflight.sh call. gate.py is built for the
+  // other mode: it escalates `ask` to a hard deny under bypassPermissions.
+  const s = scenario(["build:ready", "review:clean"]);
+  const r = runLoop(s, ["feat-x"]);
+  check("default child flags are bypassPermissions, not acceptEdits",
+    /# flags: --permission-mode bypassPermissions/.test(r.log) && !/acceptEdits/.test(r.log),
+    r.log.split("\n")[1]);
+  // Print mode TERMINATES still-running background tasks at its ceiling ("Background tasks
+  // still running after 600s"), which cuts a 25–40 min implementer batch off mid-write.
+  check("children inherit an unbounded background-task ceiling",
+    /fake claude: bgceil=0/.test(r.log), (r.log.match(/bgceil=\S*/) || ["absent"])[0]);
+}
+{
+  // The override is the escape hatch for a watched run — it must not have been hard-coded away.
+  const s = scenario(["review:clean"]);
+  const r = spawnSync("bash", [LOOP, "feat-x", "--no-build"], {
+    cwd: s.dir, encoding: "utf8",
+    env: { ...process.env, PATH: `${s.bin}:${process.env.PATH}`, SCEN_DIR: s.dir,
+      CLAUDE_FLAGS: "--permission-mode acceptEdits",
+      GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t.t",
+      GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t.t" },
+  });
+  const log = readFileSync(join(s.dir, "specs/reports/feat-x.loop.log"), "utf8");
+  check("CLAUDE_FLAGS overrides the default", /# flags: --permission-mode acceptEdits/.test(log),
+    `${r.status}: ${log.split("\n")[1]}`);
 }
 
 console.log("loop.sh — non-convergent + resume");
