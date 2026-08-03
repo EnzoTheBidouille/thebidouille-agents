@@ -1,6 +1,6 @@
 # PIPELINE.md profile — field reference
 
-`/init-pipeline` fills the `yaml pipeline-profile` block in `PIPELINE.md` (from
+`/cohorte-init-pipeline` fills the `yaml pipeline-profile` block in `PIPELINE.md` (from
 `PIPELINE.template.md`) plus the prose sections. This documents every field and how the
 generic pipeline uses it, so a stateless agent can read/regenerate the profile correctly.
 
@@ -29,12 +29,12 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
 | `surfaces[].*_cmd`                   | string       | implementer                       | test/lint/format/typecheck/build commands.                    |
 | `surfaces[].test_quiet_cmd` `.lint_quiet_cmd` | string | implementer, preflight, workflows | Bridled variants agents actually run (dot reporter / `--quiet` / failures-only). `""` ⇒ `<cmd> 2>&1 \| tail -40`. See §Output discipline. |
 | `surfaces[].uses_design`             | bool         | build, frontend                   | Whether this surface consumes designs.                        |
-| `contract.enabled`                   | bool         | build                             | `false` ⇒ skip contract authoring (§2 of /build).             |
+| `contract.enabled`                   | bool         | build                             | `false` ⇒ skip contract authoring (§2 of /cohorte-build).             |
 | `contract.mechanism`                 | enum         | build, lead                       | `shared-types-zod`/`openapi`/`protobuf`/`json-schema`/`none`. |
 | `contract.path` `.ext` `.index`      | string       | build                             | Where `<feature_id>` contract is authored + barrel.           |
 | `contract.authored_by`               | const `lead` | build                             | Implementers import it read-only, never edit.                 |
 | `commands.*`                         | string       | all                               | Repo-wide install/dev/lint/format/typecheck/test + migrate.   |
-| `commands.test_quiet` `.lint_quiet`  | string       | review, audit, workflows          | Repo-wide bridled variants — what the `/review` pre-flight runs. Same fallback as the per-surface ones. |
+| `commands.test_quiet` `.lint_quiet`  | string       | review, audit, workflows          | Repo-wide bridled variants — what the `/cohorte-review` pre-flight runs. Same fallback as the per-surface ones. |
 | `rbac.enabled`                       | bool         | brainstorm, review                | Toggle RBAC personas + authz audit.                           |
 | `rbac.hierarchy`                     | list         | review                            | Highest→lowest role list.                                     |
 | `design.enabled`                     | bool         | build, frontend, align-ds         | `false` ⇒ design steps are no-ops.                            |
@@ -60,14 +60,14 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
 
 - **Conventions** — per-surface rules the implementer follows and review audits.
 - **Testing** — the TDD contract per surface (what a test must cover, DB isolation).
-- **Design brief note** — feeds `/spec` §8 and the Claude Design step.
-- **Personas** — the `/brainstorm` panel; include one per RBAC role when `rbac.enabled`.
+- **Design brief note** — feeds `/cohorte-spec` §8 and the Claude Design step.
+- **Personas** — the `/cohorte-brainstorm` panel; include one per RBAC role when `rbac.enabled`.
 
 ## How the pieces reference this file
 
 - **Agents** (`implementer`, `review`, `release`) are told at dispatch: _read `PIPELINE.md`
   §Commands / §Conventions / §Surfaces first._ They have `Read`, so they load it live.
-- **Commands** (`/build`, `/review`, …) parse the `yaml pipeline-profile` block to know how
+- **Commands** (`/cohorte-build`, `/cohorte-review`, …) parse the `yaml pipeline-profile` block to know how
   many surfaces to dispatch, the contract mechanism, the commands, and the capability flags.
 - **Hook** (`gate.py`) reads `gate.deny`/`gate.ask`/`gate.ask_on_default_branch`/`gate.default_branch`
   from a generated `.claude/gate-config.json`. The last two make git + docker free on feature branches
@@ -87,7 +87,7 @@ follow is provider-agnostic: _"prefer the retrieval MCP tools over Grep/Glob + w
 | `graphify` | persistent tree-sitter knowledge graph over code + docs | as fresh as the last rescan | index step + re-index discipline |
 | `none` | agents fall back to Grep/Glob/Read | — | — |
 
-**Wiring (done by `/init-pipeline`, or `/update-pipeline` retroactively):**
+**Wiring (done by `/cohorte-init-pipeline`, or `/cohorte-update-pipeline` retroactively):**
 
 - `serena` — requires the `serena` CLI (`uv tool install -p 3.13 serena-agent`). For day-to-day CLI
   use it should also be on PATH (`uv tool update-shell`; uv installs to `~/.local/bin`). Register at
@@ -113,7 +113,7 @@ follow is provider-agnostic: _"prefer the retrieval MCP tools over Grep/Glob + w
 - Rendered agents get the provider's MCP tools appended to their `tools:` list (e.g. `mcp__serena`
   grants the whole server); `none` ⇒ nothing appended.
 
-**Serena health check** — run after wiring in `/init-pipeline` AND on every `/update-pipeline`
+**Serena health check** — run after wiring in `/cohorte-init-pipeline` AND on every `/cohorte-update-pipeline`
 reconcile (wiring that worked once can rot: PATH changes, tool uninstalled, entry hand-edited):
 
 1. **CLI resolves:** `command -v serena`. Fails but `~/.local/bin/serena` exists ⇒ PATH repair
@@ -135,7 +135,7 @@ Grep/Read; the health check above is the diagnostic.
 
 ## Specialization — when to split one surface into more agents
 
-`/build` dispatches ONE agent per surface, in parallel, so build wall-clock ≈ the **slowest single
+`/cohorte-build` dispatches ONE agent per surface, in parallel, so build wall-clock ≈ the **slowest single
 surface**. More agents only build faster when they let the *slowest* surface's work run concurrently —
 and only if the split is safe. The invariant that keeps parallelism safe is **one owner per tree, and
 the frozen contract as the only cross-surface channel**. So specialization means carving a surface into
@@ -161,8 +161,8 @@ the frozen contract as the only cross-surface channel**. So specialization means
 Coarse first, specialize on evidence: start with one `frontend` / `backend` surface each; split only a
 surface that's proven slow and cleanly separable. The evidence lives in
 the **main checkout's** `.claude/pipeline-metrics.jsonl` (gitignored) — one JSONL line per phase batch
-(`ts`/`feature`/`phase`/`seconds`/`surfaces:{key: result}`), appended by `/build`, `/review`
-and `/fix`.
+(`ts`/`feature`/`phase`/`seconds`/`surfaces:{key: result}`), appended by `/cohorte-build`, `/cohorte-review`
+and `/cohorte-fix`.
 **`surfaces` keys are surface keys, nothing else** — run-level facts go in their own top-level
 fields. Anything put inside `surfaces` is read
 as a surface: the dashboard renders it as a row in the per-surface table and scores a non-`ok`
@@ -178,8 +178,8 @@ what's SLOW. It deliberately does NOT record tokens: the lead can't reliably rea
 to log it. For what's EXPENSIVE, use Claude Code's own accounting:
 
 - **`/cost`** (built-in, zero setup) — reports per-**subagent** and per-**slash-command** share of your usage
-  over the last 24 h / 7 d (e.g. _"Top subagents: frontend 7 %, backend 4 % · Top skills: /build 1 %,
-  /review 1 %"_). That IS the per-phase ledger — approximate (share-of-total, machine-local, not exact
+  over the last 24 h / 7 d (e.g. _"Top subagents: frontend 7 %, backend 4 % · Top skills: /cohorte-build 1 %,
+  /cohorte-review 1 %"_). That IS the per-phase ledger — approximate (share-of-total, machine-local, not exact
   tokens). Read it to see which surface/command actually dominates the bill before you tune a `model` tier.
 - **OpenTelemetry** (exact numbers + dashboards) — add an `env` block to `~/.claude/settings.json`:
   `{"env":{"CLAUDE_CODE_ENABLE_TELEMETRY":"1","OTEL_METRICS_EXPORTER":"otlp","OTEL_EXPORTER_OTLP_PROTOCOL":"http/protobuf","OTEL_EXPORTER_OTLP_ENDPOINT":"http://localhost:4318"}}`
@@ -207,35 +207,35 @@ context. The profile therefore stores **two forms of each noisy command**:
   (`--reporter=dot`, `--quiet`, `-q`, `--silent`, framework equivalent) so a green run costs lines,
   not pages, and a red run prints only the failures.
 
-Rules for every consumer (implementers, preflight, `/audit` gates, workflow agents):
+Rules for every consumer (implementers, preflight, `/cohorte-audit` gates, workflow agents):
 
 1. Run the quiet variant when set.
 2. Quiet variant empty/absent (older profile) ⇒ run `<full cmd> 2>&1 | tail -40` — never the bare
    command into your context.
 3. Need the full log? Redirect it to a file and grep it; never print it.
 
-`/init-pipeline` **asks** for these variants (detected defaults offered first) instead of silently
-storing a bare `pnpm test` as the thing agents execute; `/update-pipeline` tops up older profiles.
+`/cohorte-init-pipeline` **asks** for these variants (detected defaults offered first) instead of silently
+storing a bare `pnpm test` as the thing agents execute; `/cohorte-update-pipeline` tops up older profiles.
 
 ## Spec status — the lifecycle state machine (and the loop's resume state)
 
 A spec's front-matter `status` is not a label, it is the pipeline's **state**: every command routes on
-it, the dashboard boards on it, the kanban backfill maps it to a column, and `/drive --resume` reads it
+it, the dashboard boards on it, the kanban backfill maps it to a column, and `/cohorte-loop --resume` reads it
 back to continue an interrupted autonomous run. Six states, and exactly one writer each:
 
 | status | meaning | written by | who may build it |
 | --- | --- | --- | --- |
-| `draft` | the interview is open, nothing is frozen | `/spec` Mode A | no |
-| `frozen` | the contract is frozen — the handoff to `/build` | `/spec` Mode A freeze | yes |
-| `in-progress` | a `/drive` is driving this spec right now (or died doing it) | `scripts/loop.sh`, before each phase | yes |
-| `in-review` | reviewed / awaiting the next round or `/ship` | `/spec` Mode B, `/fix`, `loop.sh` on a clean exit | yes |
+| `draft` | the interview is open, nothing is frozen | `/cohorte-spec` Mode A | no |
+| `frozen` | the contract is frozen — the handoff to `/cohorte-build` | `/cohorte-spec` Mode A freeze | yes |
+| `in-progress` | a `/cohorte-loop` is driving this spec right now (or died doing it) | `scripts/loop.sh`, before each phase | yes |
+| `in-review` | reviewed / awaiting the next round or `/cohorte-ship` | `/cohorte-spec` Mode B, `/cohorte-fix`, `loop.sh` on a clean exit | yes |
 | `blocked` | a loop gave up here (ceiling, non-convergent, no verdict, not implementable) | `loop.sh` on any non-zero exit | yes, with the reason named |
-| `shipped` | the PR is open; the status flip is part of the release commit | `/ship` | no |
+| `shipped` | the PR is open; the status flip is part of the release commit | `/cohorte-ship` | no |
 
 **The resume contract.** Before every phase, `loop.sh` stamps `status: in-progress` plus `loop_pass`
 (the review pass it is on) and `loop_phase` (`build`/`review`/`fix`) into the spec — deterministically,
 with `awk`, spending **no tokens** on state it will need later. On exit it stamps a terminal status:
-`in-review` + `loop_phase: done` when clean, `blocked` otherwise. `/drive <id> --resume` then continues
+`in-review` + `loop_phase: done` when clean, `blocked` otherwise. `/cohorte-loop <id> --resume` then continues
 at the recorded pass instead of pass 1, so a session killed at pass 3 of 5 does not re-pay passes 1–2.
 The build is still skipped or redone by the build stamp alone (`specs/reports/<id>.built`, written only
 after a build that finished), so an interrupted *build* correctly rebuilds.
@@ -244,10 +244,10 @@ Corollaries worth knowing:
 
 - A spec with no front-matter makes every stamp a **silent no-op** — the state is bookkeeping, and the
   loop must never die over a status line.
-- Child commands write `status` too (`/fix` sets `in-review`); re-stamping before each phase is what
+- Child commands write `status` too (`/cohorte-fix` sets `in-review`); re-stamping before each phase is what
   keeps `in-progress` true for the duration of the run rather than for its first phase.
-- `blocked` is not a failure to hide: it is the resumable state. `/build` accepts it, names it, and
-  routes by the spec's `## Remediation` (open items ⇒ `/fix`).
+- `blocked` is not a failure to hide: it is the resumable state. `/cohorte-build` accepts it, names it, and
+  routes by the spec's `## Remediation` (open items ⇒ `/cohorte-fix`).
 
 ## Dead agents — silence is not a green light
 
@@ -258,9 +258,9 @@ integrates anything, because the default reading of silence is the most dangerou
 
 | phase | what a dead agent looks like | what the phase must do |
 | --- | --- | --- |
-| `/build` | a surface with no handoff | retry it **once** alone (byte-identical prompt), then mark it `dead`, verify the tree with that surface's own quiet commands, never call the batch ok |
-| `/review` | a reviewer with no report ⇒ **zero findings** | retry once, then list the surface in `unreviewed` and refuse to score `SHIP` |
-| `/fix` | a re-dispatched agent with no handoff | retry once, then leave **every** one of its items `- [ ]` — a dead agent never ticks a box |
+| `/cohorte-build` | a surface with no handoff | retry it **once** alone (byte-identical prompt), then mark it `dead`, verify the tree with that surface's own quiet commands, never call the batch ok |
+| `/cohorte-review` | a reviewer with no report ⇒ **zero findings** | retry once, then list the surface in `unreviewed` and refuse to score `SHIP` |
+| `/cohorte-fix` | a re-dispatched agent with no handoff | retry once, then leave **every** one of its items `- [ ]` — a dead agent never ticks a box |
 | workflows | `agent()` resolves to `null` | already enforced (`review.js` `unreviewedSurfaces`) — the doctrine started here |
 
 Non-negotiables, in every phase:
@@ -269,8 +269,8 @@ Non-negotiables, in every phase:
   already on disk — so recovery costs one agent, never a rebuild. Never retry an agent that answered.
 - **Never speak for a dead agent.** You did not see its work: report what the *tree* says (quiet
   commands, redirected to a file, grepped), not what a handoff would have said.
-- **Never let it reach a driver as clean.** `/build` writes `dead[]` into
-  `specs/reports/<id>.build.json`, `/review` writes `unreviewed[]` into the verdict; `scripts/loop.sh`
+- **Never let it reach a driver as clean.** `/cohorte-build` writes `dead[]` into
+  `specs/reports/<id>.build.json`, `/cohorte-review` writes `unreviewed[]` into the verdict; `scripts/loop.sh`
   aborts on either with **exit 2** *before* it reads `blocking`, since a dead reviewer makes
   `blocking == 0` a statement about code nobody read.
 - **`unreviewed` is separate from `blocking` on purpose.** Faking a count in `blocking` to force a
@@ -281,7 +281,7 @@ Non-negotiables, in every phase:
 
 ## Readiness — the gate between a frozen spec and N implementers
 
-`/build` §1.6 scores the frozen spec on **implementability** before authoring the contract and before
+`/cohorte-build` §1.6 scores the frozen spec on **implementability** before authoring the contract and before
 dispatching anything, and writes `specs/reports/<id>.readiness.json`
 (`verdict`: `READY` · `RESERVATIONS` · `NOT-READY`, plus `gaps[]`). It costs **zero extra agents** — the
 lead already holds the spec, the profile and the reconciled surface list — which is the whole economics
@@ -290,7 +290,7 @@ of the step: a spec that cannot be built does not get cheaper by being built on 
 - Five checks: contract completeness · surface coverage · dependencies exist · residual ambiguity ·
   the design gate. Each maps to `NOT-READY` (a surface would have to invent the answer) or
   `RESERVATIONS` (a surface can proceed on a stated assumption).
-- **`NOT-READY` aborts the build with no agent spawned** and sends the human to `/spec`.
+- **`NOT-READY` aborts the build with no agent spawned** and sends the human to `/cohorte-spec`.
   `scripts/loop.sh` reads the same file and exits **4** (`not implementable`) — the one loop outcome
   that more passes cannot fix.
 - **`RESERVATIONS` never blocks.** Each gap is inlined verbatim into the dispatch of the surface it
@@ -299,7 +299,7 @@ of the step: a spec that cannot be built does not get cheaper by being built on 
 
 ## Deferred findings — real, but not this feature's problem
 
-`/review` ends on "zero blocking findings", so everything non-blocking used to be discarded with the
+`/cohorte-review` ends on "zero blocking findings", so everything non-blocking used to be discarded with the
 report. A **deferred** finding is one the reviewer judges true and **out of this feature's scope**
 (pre-existing code the staged diff never touched, adjacent debt the spec never claims to fix). The
 review agent returns them in their own `## Deferred` section — never in `findings` — each carrying its
@@ -310,51 +310,55 @@ own out-of-scope reason.
   something that cannot change the outcome.
 - **Not deferrable, ever:** anything the diff touched or introduced, any spec violation, any security
   issue on a path this feature adds, calls or modifies.
-- `/review` §3.5 routes them, **on every verdict**, into `specs/refactor-backlog.md` under the
+- `/cohorte-review` §3.5 routes them, **on every verdict**, into `specs/refactor-backlog.md` under the
   `## <domain>` heading of the owning surface, tagged `deferred:<feature_id>` — the same grouping
-  `/audit` writes, so `/refactor <domain>` picks them up with no extra plumbing. Never into the spec's
-  `## Remediation`, which is what `/fix` re-dispatches.
-- `/audit` **carries open `deferred:` items over** when it rewrites the backlog; overwriting them away
+  `/cohorte-audit` writes, so `/cohorte-refactor <domain>` picks them up with no extra plumbing. Never into the spec's
+  `## Remediation`, which is what `/cohorte-fix` re-dispatches.
+- `/cohorte-audit` **carries open `deferred:` items over** when it rewrites the backlog; overwriting them away
   is the one way they silently vanish.
-- The verdict JSON carries `deferred: <n>` (informational, outside `blocking`), so `/drive` can name
+- The verdict JSON carries `deferred: <n>` (informational, outside `blocking`), so `/cohorte-loop` can name
   them in its closing line without reading a report.
 
 ## Decisions — the transverse decision journal
 
 `PIPELINE.md` is a **stack profile** (surfaces, commands, conventions); it says nothing about what this
-project has *decided*. Without somewhere for those, every `/spec` re-discovers or contradicts them.
+project has *decided*. Without somewhere for those, every `/cohorte-spec` re-discovers or contradicts them.
 `specs/_decisions.md` (from `core/templates/decisions.template.md`) is that place, deliberately small:
 
 - **Append-only, one line per decision, ≤ ~160 chars:**
   `- <YYYY-MM-DD> · <area> · <decision> — because <reason> · <feature_id>`. Reversal never edits a line:
   append a superseding one (`· supersedes <date> <area>`) and move the old one to `## Superseded`. When
   `## Live` passes ~100 lines, sweep the superseded ones down.
-- **Written by** `/spec` at freeze (the decisions that outlive the feature — typically 0–3 lines, and
-  zero is a normal outcome) and `/build` §1.5 when it adds or splits a surface.
-- **Read by the deciding stages only** — `/brainstorm` (so the panel argues about the idea, not about
-  settled ground), `/spec` (so a new spec does not silently un-decide something), `/audit` (standing
+- **Written by** `/cohorte-spec` at freeze (the decisions that outlive the feature — typically 0–3 lines, and
+  zero is a normal outcome) and `/cohorte-build` §1.5 when it adds or splits a surface.
+- **Read by the deciding stages only** — `/cohorte-brainstorm` (so the panel argues about the idea, not about
+  settled ground), `/cohorte-spec` (so a new spec does not silently un-decide something), `/cohorte-audit` (standing
   decisions are part of the rulebook it audits against).
 - **Never read by implementers or reviewers.** They work from the frozen contract, which already tells
   them what to do; shipping them the rationale would cost `surfaces × dispatches` tokens per feature
   for a fact they cannot act on. This is what keeps the journal cheap enough to be worth having.
-- The `_` prefix is load-bearing: `/doctor`, the dashboard spec scanner and the kanban backfill all skip
+- The `_` prefix is load-bearing: `/cohorte-doctor`, the dashboard spec scanner and the kanban backfill all skip
   `specs/_*.md`, so the journal is never mistaken for a spec (no phantom card, no bogus stage).
 
 ## Preflight — the deterministic phase gate
 
-`/review` starts by running `pipeline/scripts/preflight.sh` — a plain shell script (no
+`/cohorte-review` starts by running `pipeline/scripts/preflight.sh` — a plain shell script (no
 agent) that executes the profile's mechanical checks in order (typecheck → lint → tests, quiet
 variants) with all output redirected to `specs/reports/<id>.preflight.txt`:
 
 - **Any check red** ⇒ the script prints the last 40 lines raw and exits 1. The command **aborts
   there: zero agents are spawned.** A reviewer dispatched onto code that doesn't compile burns its
   whole run rediscovering what `tsc` already printed for free — the failure goes straight to the
-  human (or `/fix`) instead.
-- **All green** ⇒ the script stamps `.claude/preflight.ok` (`<epoch> <HEAD sha>`).
+  human (or `/cohorte-fix`) instead.
+- **All green** ⇒ the script stamps `.claude/preflight.ok` (`<epoch> <HEAD sha> <tree digest>` —
+  local and **gitignored**; a versioned stamp describes the tree *before* its own commit and rides
+  into every clone and worktree, which breaks the gate both ways).
 
 `hooks/gate.py` enforces the stamp as a **phase gate** (the `preflight` block of `gate-config.json`,
 generated from `gate.preflight`): a Task dispatch of a listed `subagent_type` (default
-`review`) with a missing/stale stamp — older than `max_age_minutes`, or HEAD moved — gets an
+`review`) with a missing/stale stamp — older than `max_age_minutes`, or the digest no longer
+matches the working tree (`.claude` and `specs` excluded, so the pipeline's own writes and a
+commit of already-verified code do not invalidate it) — gets an
 "ask", so a lead can't accidentally skip the gate but a human can consciously override it. The gate
 hook fires for **every** agent in the session, including subagents spawned by the Workflow runtime
 (they run in `acceptEdits` whatever the session mode — Write/Edit auto-approved — but Bash and Task
@@ -363,7 +367,7 @@ hard deny, because nobody is there to answer a prompt.
 
 ## Rendering / reconciling a surface agent (shared procedure)
 
-Both `/init-pipeline` (initial render) and `/build` (auto-reconcile when a spec needs a new agent) use
+Both `/cohorte-init-pipeline` (initial render) and `/cohorte-build` (auto-reconcile when a spec needs a new agent) use
 this exact procedure so a surface is always defined the same way. To add surface `S`:
 
 1. **Add the `surfaces[]` entry** to `PIPELINE.md`: `key`, `path` (the disjoint tree it exclusively
@@ -382,7 +386,7 @@ this exact procedure so a surface is always defined the same way. To add surface
    **baked at render time**: `PIPELINE.md` §Conventions `### Shared` + this surface's
    `### Surface: <key>` stanza + its §Testing lines, verbatim. At runtime the agent then reads only
    the profile's machine block (the fenced `yaml pipeline-profile`) — never the prose sections. The
-   bake stays honest because §Conventions edits go through `/update-pipeline`, whose reconcile
+   bake stays honest because §Conventions edits go through `/cohorte-update-pipeline`, whose reconcile
    re-renders every agent (step 2 below); hand-edit the prose without re-rendering and the baked
    slice goes stale — that's the trade for not re-reading the prose on every dispatch. For a `uses_design` surface, fill them **link-based** (never with a
    stored `design_project` id — that goes stale on a DS rebuild):
@@ -410,7 +414,7 @@ conventions. Never leave an agent file with no matching `surfaces[]` entry (orph
 
 ## Reconcile — bringing generated files up to the current core
 
-`/init-pipeline` is **one-time per project**. Afterwards, `/update-pipeline` runs this procedure so a
+`/cohorte-init-pipeline` is **one-time per project**. Afterwards, `/cohorte-update-pipeline` runs this procedure so a
 core upgrade never requires re-running init — new pipeline features flow into the repo's generated
 files automatically. It works because every generated artifact is a **deterministic function of
 (current template × the profile's data)**; nothing needs re-detecting or re-interviewing.
@@ -428,7 +432,7 @@ files automatically. It works because every generated artifact is a **determinis
    init spec (missing `allow` entries, hooks per install mode) — add what's missing, never remove or
    rewrite existing/custom keys.
 4. **Capability wiring.** If a top-up added a capability needing external setup (e.g. a `retrieval`
-   provider whose MCP server isn't registered yet), run its wiring step from `/init-pipeline` Phase 4.
+   provider whose MCP server isn't registered yet), run its wiring step from `/cohorte-init-pipeline` Phase 4.
    Even when nothing new was added, re-run the provider's health check (§Code retrieval) — wiring
    rots (PATH changes, uninstalls, hand-edits) — and repair whatever fails.
 5. **Global config seed.** If `~/.claude/cohorte.config.yaml` is absent, seed it from the template
@@ -446,20 +450,28 @@ files automatically. It works because every generated artifact is a **determinis
    demand when a driver needs them); it just keeps a new spec's front-matter honest about the states
    the pipeline can put it in.
 
-Re-running `/init-pipeline` remains possible (it reconciles too) but is only *needed* when the stack
-itself changes in ways `/build` §1.5 can't auto-grow (e.g. package manager or contract mechanism swap).
+8. **Local-artifact hygiene.** The pipeline's own runtime files must stay out of git:
+   `.claude/preflight.ok`, `.claude/pipeline-metrics.jsonl`, `specs/reports/`. Add any missing entry to
+   `.gitignore`, and **untrack** what a pre-2.0.0 install let slip in —
+   `git rm --cached --ignore-unmatch .claude/preflight.ok` (repeat per stray path). The stamp is the
+   one that actively breaks: it records the tree it verified, the commit carrying it moves HEAD past
+   that tree, and the committed copy lands in every clone and worktree — so the phase gate ends up
+   blocking clean trees and greening unchecked ones. Report what was untracked; the human commits it.
+
+Re-running `/cohorte-init-pipeline` remains possible (it reconciles too) but is only *needed* when the stack
+itself changes in ways `/cohorte-build` §1.5 can't auto-grow (e.g. package manager or contract mechanism swap).
 
 ## Workflows — deterministic multi-agent runs (opt-in)
 
 Three phases have a **workflow variant** — a deterministic orchestration script the Claude Code
 Workflow runtime executes instead of the lead reasoning out the fan-out turn by turn:
 `<core>/workflows/review.js`, `audit.js`, `refactor.js` (installed to `.claude/workflows/` bundled or
-`~/.claude/workflows/` global). The conversational commands (`/review`, `/audit`, `/refactor`)
+`~/.claude/workflows/` global). The conversational commands (`/cohorte-review`, `/cohorte-audit`, `/cohorte-refactor`)
 **remain the default path and the fallback** — a workflow runs only when the human explicitly asks
 for it ("run the review workflow"), and requires Claude Code ≥ **2.1.154** with workflows
 enabled.
-`/doctor` reports which path a session will take. The interactive commands (`/init-pipeline`,
-`/brainstorm`, `/spec`) and the dispatch-only ones (`/build`, `/ship`) have **no** workflow variant on
+`/cohorte-doctor` reports which path a session will take. The interactive commands (`/cohorte-init-pipeline`,
+`/cohorte-brainstorm`, `/cohorte-spec`) and the dispatch-only ones (`/cohorte-build`, `/cohorte-ship`) have **no** workflow variant on
 purpose: they're interviews or already a single parallel dispatch — a script adds nothing.
 
 Shared design, all four scripts:
@@ -488,13 +500,13 @@ Shared design, all four scripts:
 - **`audit.js`** — one auditor per domain (each surface + `shared`), concurrency capped by the
   runtime (~16), merged into the prioritized `specs/refactor-backlog.md`.
 - **`refactor.js`** — big domains only (it skips domains with a handful of open items — the
-  conversational `/refactor` is cheaper there): `shared` first and alone, then the other domains'
+  conversational `/cohorte-refactor` is cheaper there): `shared` first and alone, then the other domains'
   implementers in parallel, each verified per-domain.
 - **No input mid-run.** A workflow runs to completion without questions; anything interactive
   (contract changes, human decisions) belongs to the conversational path. The gate hook still
   fires on workflow subagents (see
   §Preflight) — in unattended runs its asks become denies.
-- **Permissions:** `/init-pipeline` and `/update-pipeline` extend the generated `settings.json`
+- **Permissions:** `/cohorte-init-pipeline` and `/cohorte-update-pipeline` extend the generated `settings.json`
   `allow` list with what workflow agents need (the quiet commands, the shipped
   `pipeline/scripts/*.sh`, read-only git incl. `git rev-parse`, and the retrieval provider's MCP
   tools) so a run never stalls mid-workflow on a permission prompt nobody is watching.
@@ -517,11 +529,11 @@ present else `kanban.columns`. Not found ⇒ kanban off for this project.
 **Card format.** A card is a Kanban list item under a `## <column>` heading:
 `- [ ] <human title>  #<feature_id>`. The `#<feature_id>` tag is the join key between a card and its
 `specs/<feature_id>.md`; it is how every stage finds *its* card (Grep the board for `#<id>`). Free-text
-notes a human writes as sub-bullets under an Ideas card are seed context for `/brainstorm`. Never touch
+notes a human writes as sub-bullets under an Ideas card are seed context for `/cohorte-brainstorm`. Never touch
 the trailing `%% kanban:settings … %%` block or the `kanban-plugin: board` front-matter.
 
-Once shipped, `/ship` appends the **PR number** to the card — `- [ ] <title> #<feature_id> — PR #<num>`.
-The bare `#<num>` is what the dashboard renders as a clickable link to the GitHub PR, so `/ship` always
+Once shipped, `/cohorte-ship` appends the **PR number** to the card — `- [ ] <title> #<feature_id> — PR #<num>`.
+The bare `#<num>` is what the dashboard renders as a clickable link to the GitHub PR, so `/cohorte-ship` always
 writes it when a PR was actually created.
 
 **Move a card (the core op).** Use the shipped script — it does the whole op outside the agent's
@@ -540,15 +552,15 @@ card created in the target column if missing.
 | Pipeline moment                         | Column          |
 | --------------------------------------- | --------------- |
 | human drops a raw idea (manual)         | `ideas`         |
-| `/brainstorm` picks it up               | `brainstorm`    |
-| `/spec` opens (draft)                   | `spec`          |
-| `/spec` freezes (`status: frozen`)      | `ready`         |
-| `/build`                                | `building`      |
-| `/review`                               | `review`        |
-| `/fix`                                  | `fix`           |
-| a `/drive` is driving it (`in-progress`) | the current phase's column |
-| a `/drive` gave up (`blocked`)            | `fix`           |
-| `/ship` starts                          | `ship`          |
+| `/cohorte-brainstorm` picks it up               | `brainstorm`    |
+| `/cohorte-spec` opens (draft)                   | `spec`          |
+| `/cohorte-spec` freezes (`status: frozen`)      | `ready`         |
+| `/cohorte-build`                                | `building`      |
+| `/cohorte-review`                               | `review`        |
+| `/cohorte-fix`                                  | `fix`           |
+| a `/cohorte-loop` is driving it (`in-progress`) | the current phase's column |
+| a `/cohorte-loop` gave up (`blocked`)            | `fix`           |
+| `/cohorte-ship` starts                          | `ship`          |
 | PR opened (`status: shipped`)           | `shipped` (+ `PR #<num>` on the card) |
 
 **Backfill / sync from specs (reconcile).** `specs/*.md` is the source of truth. For each spec, read its
@@ -568,12 +580,12 @@ per configured column in pipeline order, and the closing `%% kanban:settings %%`
 ## Telemetry — anonymous usage stats, strictly opt-in (GDPR-first)
 
 Cohorte can send the maintainers anonymous usage pings so the pipeline improves where it's actually
-slow. **Nothing is ever sent without explicit consent**: `/init-pipeline` (and `/update-pipeline` on
+slow. **Nothing is ever sent without explicit consent**: `/cohorte-init-pipeline` (and `/cohorte-update-pipeline` on
 pre-telemetry installs) ask ONE question, once per machine, default **No**, and record the answer in
 `~/.claude/cohorte.config.yaml` §`telemetry` (`enabled`, `install_id`, `consent_date`). The sender —
 `pipeline/scripts/telemetry-send.sh` — is a silent no-op unless `enabled: true` AND `install_id` AND
 `endpoint` are all set, times out at 2s, and never fails the pipeline. Callers chain it with
-`|| true`, so a **missing** script is equally silent: `/doctor` check 1 verifies `pipeline/scripts/`
+`|| true`, so a **missing** script is equally silent: `/cohorte-doctor` check 1 verifies `pipeline/scripts/`
 is fully populated.
 
 **Which commands ping** — the six that make up the feature funnel, and only those. The point is to
@@ -593,8 +605,8 @@ see where features stall, so every stage of `idea → PR` reports and nothing el
 > forms are valid — but read the `fix` column knowing which path produced it.
 
 `seconds: 0` marks a phase whose duration is human thinking time, not pipeline wall-clock — the
-funnel signal there is the event, not how long it took. `/doctor`, `/audit`, `/refactor`,
-`/align-ds`, `/init-pipeline` and `/update-pipeline` **never** ping: they sit outside the funnel, and
+funnel signal there is the event, not how long it took. `/cohorte-doctor`, `/cohorte-audit`, `/cohorte-refactor`,
+`/cohorte-align-ds`, `/cohorte-init-pipeline` and `/cohorte-update-pipeline` **never** ping: they sit outside the funnel, and
 keeping them out is what holds the collected set to what the consent text describes.
 
 **What one event contains** (strict allowlist, ~200 bytes):
@@ -614,7 +626,7 @@ work without revealing what is being built.
 - **Consent** — opt-in only, recorded with a date; "No" is also recorded so nothing re-asks.
 - **Withdrawal** — set `telemetry.enabled: false` in `~/.claude/cohorte.config.yaml`; effective on
   the next phase, no restart.
-- **Erasure** — `/doctor` prints your `install_id`; send
+- **Erasure** — `/cohorte-doctor` prints your `install_id`; send
   `curl -X DELETE <endpoint-origin>/v1/install/<install_id>` and the collector drops every event
   for that id (the deployed collector implements this and stores no IPs).
 - **Access/portability** — events are keyed by your `install_id`; ask the operator for an export.

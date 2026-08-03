@@ -1,7 +1,7 @@
 import React from 'react';
 
-// Mirrors SCHEMA.md §Spec status — `in-progress` (a /drive is driving this spec) and
-// `blocked` (a /drive gave up on it) are terminal-ish states the driver writes, and the
+// Mirrors SCHEMA.md §Spec status — `in-progress` (a /cohorte-loop is driving this spec) and
+// `blocked` (a /cohorte-loop gave up on it) are terminal-ish states the driver writes, and the
 // board is where a human notices a loop that died mid-flight.
 const STAGES = [
   { key: 'draft', label: 'Draft' },
@@ -39,7 +39,7 @@ export default function SpecsBoard({ specs }) {
       </div>
 
       {specs.length === 0 ? (
-        <p className="muted">No specs yet — run <code>/spec</code> to freeze one.</p>
+        <p className="muted">No specs yet — run <code>/cohorte-spec</code> to freeze one.</p>
       ) : (
         <div className="board-scroll">
           <div className="board">

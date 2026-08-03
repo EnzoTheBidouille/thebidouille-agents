@@ -1,6 +1,6 @@
 # BRAINSTORM RETURN — <feature title>
 
-> Paste this into `/spec`.
+> Paste this into `/cohorte-spec`.
 
 **One-liner:** <what we're building, in one sentence>
 
@@ -24,13 +24,13 @@
 
 - **Data:** <entities / fields touched>
 - **Screens:** <key screens/flows — mobile-first if the project has UI>
-- **Interface (rough):** <endpoints / methods we'll need — refined into the contract in /spec>
+- **Interface (rough):** <endpoints / methods we'll need — refined into the contract in /cohorte-spec>
 
 ## Risks & open questions
 
 - <risk / unknown>
-- <open question for /spec to resolve>
+- <open question for /cohorte-spec to resolve>
 
 ## Panel dissent (what was contested)
 
-<the strongest disagreement the panel surfaced — so /spec doesn't paper over it>
+<the strongest disagreement the panel surfaced — so /cohorte-spec doesn't paper over it>

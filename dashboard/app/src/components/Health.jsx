@@ -2,7 +2,7 @@ import React from 'react';
 
 const ICON = { ok: '✓', warn: '!', bad: '✕', skip: '–' };
 
-// Health panel — the /doctor checklist, live.
+// Health panel — the /cohorte-doctor checklist, live.
 export default function Health({ checks, summary }) {
   if (!checks) {
     return (

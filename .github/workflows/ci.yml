@@ -43,8 +43,8 @@ jobs:
         run: node scripts/test-gate.mjs
 
       # The dashboard server is shipped runtime code: a hand-rolled YAML parser
-      # every /doctor check derives from, a metrics aggregator, the JS port of
-      # /doctor, the board parser, the fleet registry — plus the HTTP guards that
+      # every /cohorte-doctor check derives from, a metrics aggregator, the JS port of
+      # /cohorte-doctor, the board parser, the fleet registry — plus the HTTP guards that
       # are the only thing standing between a web page and the local agent.
       - name: Dashboard server tests
         run: node scripts/test-dashboard.mjs
@@ -75,8 +75,8 @@ jobs:
           HOME="$scratch" sh ./install.sh --global
           test -f "$scratch/.claude/pipeline/VERSION"
           test -f "$scratch/.claude/agents/review.md"
-          test -f "$scratch/.claude/commands/build.md"
-          grep -q "^model: sonnet" "$scratch/.claude/commands/build.md"
+          test -f "$scratch/.claude/commands/cohorte-build.md"
+          grep -q "^model: sonnet" "$scratch/.claude/commands/cohorte-build.md"
           # 1.5.0 retired /smoke — the installer must scrub it, not just stop copying it.
           test ! -e "$scratch/.claude/agents/smoke.md"
           test ! -e "$scratch/.claude/commands/smoke.md"
@@ -86,6 +86,9 @@ jobs:
           test -x "$scratch/.claude/pipeline/scripts/kanban-move.sh"
           test -x "$scratch/.claude/pipeline/scripts/preflight.sh"
           test -x "$scratch/.claude/pipeline/scripts/loop.sh"
+          # Without loop-detach.sh, /cohorte-loop silently reverts to a foreground run that dies
+          # at the 600 s tool ceiling — a missing script here is not a loud failure.
+          test -x "$scratch/.claude/pipeline/scripts/loop-detach.sh"
           test -f "$scratch/.claude/pipeline/CHANGELOG.md"
           # Workflow variants + their phase-0 agent must ship together.
           test -f "$scratch/.claude/workflows/review.js"
@@ -106,6 +109,14 @@ jobs:
           : >"$scratch/.claude/workflows/cycle.js"
           : >"$scratch/.claude/agents/smoke.md"
           : >"$scratch/.claude/commands/smoke.md"
+          # 2.0.0 prefixed all 13 commands. Same reasoning as /cycle above: a fresh
+          # install has nothing to delete, so only a planted pre-2.0.0 layout proves the
+          # scrub loop exists. A surviving bare /build is the worst decoy of the set — it
+          # still dispatches implementers, from a 1.x file that knows nothing of this core.
+          for c in align-ds audit brainstorm build doctor drive fix init-pipeline \
+                   refactor review ship spec update-pipeline; do
+            echo "stale 1.x" >"$scratch/.claude/commands/$c.md"
+          done
           # Install a SECOND time before asserting the hook: until 1.3.2 the
           # registration appended if-absent behind a quote-blind "already?" test,
           # so every re-install added another copy (gate.py then ran once per
@@ -116,6 +127,11 @@ jobs:
           for orphan in commands/cycle.md workflows/cycle.js commands/loop.md agents/smoke.md commands/smoke.md; do
             test ! -e "$scratch/.claude/$orphan" || { echo "installer left $orphan behind"; exit 1; }
           done
+          # Assert the whole command surface is prefixed, not just that named files went:
+          # this also catches a NEW unprefixed command being added later.
+          stale=$(ls "$scratch/.claude/commands" | grep -v '^cohorte-' || true)
+          test -z "$stale" || { echo "unprefixed command files survived: $stale"; exit 1; }
+          test -f "$scratch/.claude/commands/cohorte-loop.md"
 
       # bin/cli.js is what `npx cohorte install/update` actually runs — a
       # hand-written port of install.sh, so it drifts silently (until 1.2.4 it
@@ -128,7 +144,7 @@ jobs:
           # while HOME is ignored on Windows (os.homedir reads USERPROFILE there).
           CLAUDE_CONFIG_DIR="$scratch/.claude" node bin/cli.js install --global
           test -f "$scratch/.claude/pipeline/VERSION"
-          test -f "$scratch/.claude/commands/build.md"
+          test -f "$scratch/.claude/commands/cohorte-build.md"
           # The command is useless without the agent it dispatches: until 1.2.6 this
           # port copied a hardcoded review+release and shipped a command with no
           # agent. The shell dry-run above asserted it; this one didn't, so CI stayed
@@ -144,6 +160,9 @@ jobs:
           test -x "$scratch/.claude/pipeline/scripts/kanban-move.sh"
           test -x "$scratch/.claude/pipeline/scripts/preflight.sh"
           test -x "$scratch/.claude/pipeline/scripts/loop.sh"
+          # Without loop-detach.sh, /cohorte-loop silently reverts to a foreground run that dies
+          # at the 600 s tool ceiling — a missing script here is not a loud failure.
+          test -x "$scratch/.claude/pipeline/scripts/loop-detach.sh"
           test -f "$scratch/.claude/pipeline/CHANGELOG.md"
           test -f "$scratch/.claude/workflows/review.js"
           test -f "$scratch/.claude/workflows/audit.js"
@@ -161,11 +180,17 @@ jobs:
           : >"$scratch/.claude/commands/loop.md"
           : >"$scratch/.claude/workflows/cycle.js"
           : >"$scratch/.claude/agents/smoke.md"
+          for c in align-ds audit brainstorm build doctor drive fix init-pipeline \
+                   refactor review ship spec update-pipeline; do
+            echo "stale 1.x" >"$scratch/.claude/commands/$c.md"
+          done
           CLAUDE_CONFIG_DIR="$scratch/.claude" node bin/cli.js update --global
           node scripts/assert-gate-hook.mjs "$scratch/.claude/settings.json"
           for orphan in commands/cycle.md workflows/cycle.js commands/loop.md agents/smoke.md; do
             test ! -e "$scratch/.claude/$orphan" || { echo "cli.js left $orphan behind"; exit 1; }
           done
+          stale=$(ls "$scratch/.claude/commands" | grep -v '^cohorte-' || true)
+          test -z "$stale" || { echo "cli.js left unprefixed command files: $stale"; exit 1; }
 
       # Bundled (per-project) mode has its own postconditions the --global runs
       # can't see: the committed .claude/ payload and the specs/ seed.
@@ -227,14 +252,39 @@ jobs:
         shell: pwsh
         run: |
           $env:CLAUDE_CONFIG_DIR = Join-Path $env:RUNNER_TEMP 'coh-ps'
+          $cmds = Join-Path $env:CLAUDE_CONFIG_DIR 'commands'
+          # Seed the pre-2.0.0 layout so the update path's scrub is actually exercised:
+          # a fresh install has nothing to delete, so it would pass no matter what.
+          New-Item -ItemType Directory -Force -Path $cmds | Out-Null
+          foreach ($c in @('build','review','fix','drive','doctor')) {
+            Set-Content -Path (Join-Path $cmds "$c.md") -Value 'stale 1.x'
+          }
           .\install.ps1 -Global
           .\install.ps1 -Update -Global
           node scripts/assert-gate-hook.mjs (Join-Path $env:CLAUDE_CONFIG_DIR 'settings.json')
+          # Every command must be prefixed and every bare name gone. This is Windows-only
+          # code (install.ps1's scrub loop) that no other job can reach — without this the
+          # 13 decoys could survive an upgrade on Windows and nothing would notice.
+          $stale = Get-ChildItem $cmds -Filter *.md | Where-Object { $_.Name -notlike 'cohorte-*' }
+          if ($stale) { throw "unprefixed command files survived the update: $($stale.Name -join ', ')" }
+          if (-not (Test-Path (Join-Path $cmds 'cohorte-loop.md'))) { throw 'cohorte-loop.md missing' }
+          $detach = Join-Path $env:CLAUDE_CONFIG_DIR 'pipeline\scripts\loop-detach.sh'
+          if (-not (Test-Path $detach)) { throw 'loop-detach.sh was never copied' }
 
       - name: Dry-run the npx CLI twice + assert the hook (win32 quoting)
         shell: pwsh
         run: |
           $env:CLAUDE_CONFIG_DIR = Join-Path $env:RUNNER_TEMP 'coh-cli'
+          $cmds = Join-Path $env:CLAUDE_CONFIG_DIR 'commands'
+          New-Item -ItemType Directory -Force -Path $cmds | Out-Null
+          foreach ($c in @('build','review','fix','drive','doctor')) {
+            Set-Content -Path (Join-Path $cmds "$c.md") -Value 'stale 1.x'
+          }
           node bin/cli.js install --global
           node bin/cli.js update --global
           node scripts/assert-gate-hook.mjs (Join-Path $env:CLAUDE_CONFIG_DIR 'settings.json')
+          # bin/cli.js has its OWN scrub list (it is a third installer, not a wrapper), so it
+          # needs the same assertion — a name added to install.ps1 and forgotten here would
+          # leave decoys for every `npx cohorte update` user.
+          $stale = Get-ChildItem $cmds -Filter *.md | Where-Object { $_.Name -notlike 'cohorte-*' }
+          if ($stale) { throw "unprefixed command files survived the update: $($stale.Name -join ', ')" }

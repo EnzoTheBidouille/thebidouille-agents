@@ -4,13 +4,13 @@
 
 - **Claude Code** — any recent version for the conversational pipeline; **≥ 2.1.154 with
   workflows enabled** if you want the [workflow variants](/guide/workflows) (review /
-  audit / refactor workflows). `/doctor` tells you which path your session will take.
+  audit / refactor workflows). `/cohorte-doctor` tells you which path your session will take.
 - **Node ≥ 18** for `npx cohorte` (the shell installers work without Node).
 - **Python 3** on PATH — the destructive-command gate hook (`gate.py`) runs through it.
 - Optional: [`uv`](https://docs.astral.sh/uv/) to install **Serena** (the default code-retrieval
   provider): `uv tool install -p 3.13 serena-agent`, and make sure `~/.local/bin` is on PATH
   (`uv tool update-shell`).
-- Optional: `gh` (GitHub CLI) — `/ship` uses it to open PRs and watch CI; without it you get a
+- Optional: `gh` (GitHub CLI) — `/cohorte-ship` uses it to open PRs and watch CI; without it you get a
   compare URL + drafted PR body instead.
 
 ## Install the core
@@ -68,7 +68,7 @@ clobbered on update).
 Open the project in Claude Code and run:
 
 ```
-/init-pipeline
+/cohorte-init-pipeline
 ```
 
 One-time per project, interactive, in five steps:
@@ -87,7 +87,7 @@ One-time per project, interactive, in five steps:
    - **UI language**, **RBAC** hierarchy, **design system** (provider, kit/token paths),
      **code retrieval** provider (Serena by default), **isolation** (parallel git worktrees with
      per-feature DB + ports), **gate** patterns (destructive commands to deny / confirm), and the
-     `/brainstorm` **personas**.
+     `/cohorte-brainstorm` **personas**.
    - Optional: **kanban** mirror (Obsidian board) and the one-time **telemetry** consent
      question (default No).
 3. **Draft** — shows you the assembled `PIPELINE.md` for approval.
@@ -108,7 +108,7 @@ git commit -m "chore: install cohorte pipeline"
 ## Sanity check
 
 ```
-/doctor
+/cohorte-doctor
 ```
 
 Verifies the whole wiring: core version + pointer coherence, agents ↔ surfaces (no orphans),
@@ -119,15 +119,15 @@ comes with its exact fix command.
 ## Your first feature
 
 ```
-/brainstorm          ← pressure-test the idea with the persona panel
+/cohorte-brainstorm          ← pressure-test the idea with the persona panel
 /clear
-/spec                ← freeze specs/<id>.md — the single source of truth
+/cohorte-spec                ← freeze specs/<id>.md — the single source of truth
 /clear
-/ship <id>           ← commit, push, PR (the one human-confirmed step)
+/cohorte-ship <id>           ← commit, push, PR (the one human-confirmed step)
 ```
 
 Prefer manual control? The conversational path is the same pipeline, one phase at a time:
-`/build <id>` → `/review <id>` → `/fix <id>` → `/ship <id>`. See
+`/cohorte-build <id>` → `/cohorte-review <id>` → `/cohorte-fix <id>` → `/cohorte-ship <id>`. See
 [The feature cycle](/guide/feature-cycle).
 
 ## Keeping it current
@@ -139,11 +139,11 @@ npx cohorte@latest update --global   # refresh the core (never touches generated
 then, inside each project:
 
 ```
-/update-pipeline
+/cohorte-update-pipeline
 ```
 
 which **reconciles** the generated files to the new core: tops up new profile fields at their
 defaults (asking only for genuine human decisions, batched), re-renders the surface agents (this
 also refreshes their baked conventions), additively patches `settings.json`/`gate-config.json`,
 re-runs capability wiring health checks, and shows the CHANGELOG entries you just gained.
-`/init-pipeline` never needs re-running for an upgrade.
+`/cohorte-init-pipeline` never needs re-running for an upgrade.

@@ -13,7 +13,7 @@ DS — that would overwrite it.
 Two granularities:
 
 - **The design system project** (`design.design_system_project`) — the UI kit: primitives,
-  tokens, foundations. Long-lived, aligned into code by `/align-ds`.
+  tokens, foundations. Long-lived, aligned into code by `/cohorte-align-ds`.
 - **Feature designs** — the pages a specific feature touches, referenced from the spec.
 
 ## Feature design links — self-contained by construction
@@ -32,21 +32,21 @@ fallback.)
 
 ## Where design enters the pipeline
 
-1. **`/spec`** captures the design brief interactively and authors it to
+1. **`/cohorte-spec`** captures the design brief interactively and authors it to
    `specs/design/<id>.md` (spec §8 keeps only a summary + pointer, so non-design surfaces never
    re-read the full brief). You copy the brief into your design tool, produce the pages, and
-   paste the links into `design_files` — or hand them to `/build`'s design gate.
-2. **`/build`'s design gate** — for a UI feature with empty `design_files`, the lead asks for
+   paste the links into `design_files` — or hand them to `/cohorte-build`'s design gate.
+2. **`/cohorte-build`'s design gate** — for a UI feature with empty `design_files`, the lead asks for
    the links before dispatching. Fix loops whose open items are all non-visual pass `none`
    instead, skipping the DesignSync fetch entirely.
 3. **The design-surface implementer** (rendered with `uses_design: true`) pulls the feature
    design first, then translates it into the **code design system** — `@/components/ui/*`
    primitives, `cn()` + CVA, tokens — never ad-hoc CSS, always **mobile-first**. It reads a DS
    primitive via `get_file` only if it's missing or stale in code.
-4. **`/review`** audits mobile-first/responsive from the code (base styles small-screen, additive
+4. **`/cohorte-review`** audits mobile-first/responsive from the code (base styles small-screen, additive
    `sm:/md:/lg:`, no fixed widths) whenever a touched surface `uses_design`.
 
-## `/align-ds` — keeping the kit honest
+## `/cohorte-align-ds` — keeping the kit honest
 
 Diffs the **live design system** against the committed snapshot (`design.snapshot_dir`) and
 applies the deltas to code:

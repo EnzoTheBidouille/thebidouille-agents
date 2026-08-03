@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 #
-# loop.sh — autonomous /build → /review → /fix → /review … loop for ONE feature.
+# loop.sh — autonomous /cohorte-build → /cohorte-review → /cohorte-fix → /cohorte-review …
+#           loop for ONE feature.
 #
 #   loop.sh <feature-id> [--max=N] [--no-build] [--rebuild] [--resume]
 #
 # THE POINT: every phase runs as a SEPARATE `claude -p` child with its own fresh
-# context. The session that typed /drive never sees the diff, the N review reports
+# context. The session that typed /cohorte-loop never sees the diff, the N review reports
 # or the N contracts — it reads only this script's one-line-per-phase stdout and,
 # at the end, the verdict JSON. Running the loop inside the calling session would
 # accumulate all of it in a history that is re-sent at input price on every turn,
 # which is the exact cost the pipeline's /clear discipline exists to avoid.
 #
-# Contract with the pipeline: /review writes specs/reports/<id>.verdict.json on
-# every run, and /build writes <id>.readiness.json + <id>.build.json. Those three
+# Contract with the pipeline: /cohorte-review writes specs/reports/<id>.verdict.json on
+# every run, and /cohorte-build writes <id>.readiness.json + <id>.build.json. Those three
 # files — `blocking`, `fingerprint`, `unreviewed`, `verdict`, `dead` — are the ONLY
 # channel between cohorte and this driver. No prose is parsed.
 #
@@ -25,16 +26,16 @@
 #   0   clean — a review returned blocking == 0
 #   1   ceiling — --max passes used, still blocking (the fix was progressing;
 #       re-run with a higher --max)
-#   2   no usable verdict — /review produced nothing, or aborted on a red
+#   2   no usable verdict — /cohorte-review produced nothing, or aborted on a red
 #       preflight (typecheck/lint/tests broken; the message says which)
 #   3   non-convergent — two consecutive reviews returned the SAME blocking
 #       fingerprint: the fix is treading water, a higher --max will not help
-#   4   not implementable — /build's readiness gate returned NOT-READY and spawned
+#   4   not implementable — /cohorte-build's readiness gate returned NOT-READY and spawned
 #       no agent: the frozen spec cannot be built (missing contract shape, unowned
-#       area, absent dependency). Needs /spec, not more passes.
+#       area, absent dependency). Needs /cohorte-spec, not more passes.
 #   64  usage — bad flag, bad id, missing spec, no `claude` on PATH
 #
-# No /fix runs on the last pass: fixing without a review behind it ships
+# No /cohorte-fix runs on the last pass: fixing without a review behind it ships
 # unaudited code. Each fix pass is committed — that commit is the only way back
 # after N autonomous passes.
 #
@@ -49,15 +50,42 @@
 
 set -uo pipefail
 
+# --- hold the machine awake for the whole run --------------------------------
+# System sleep aborts every in-flight `claude -p` request, so a loop that spans
+# hours must own a power assertion for its entire life — a driver killed at hour
+# two has spent hour one for nothing, and the abort is indistinguishable from a
+# clean "agent returned nothing" (which is the `dead` family this script exists
+# to catch). Re-exec ourselves under caffeinate once; the guard keeps it to one
+# level, and `exec` leaves no extra process to reap.
+#
+# macOS `caffeinate -ims`: `-i` idle system sleep · `-m` disk sleep · `-s` system
+# sleep (AC only). NOT `-d`/`-u` — an unattended build has no reason to hold the
+# display on. Linux gets the systemd equivalent. Windows has no scriptable
+# equivalent, and neither does a systemd-less Linux, so both fall through to a
+# no-op rather than pretending: the run still works, it is just as sleep-proof as
+# the machine's own settings make it.
+#
+# THIS CANNOT PREVENT LID-CLOSE SLEEP on any platform. No userspace assertion can
+# override it — keep the lid open, or use clamshell mode (AC + external display +
+# external input).
+if [ -z "${COHORTE_CAFFEINATED:-}" ]; then
+  if command -v caffeinate >/dev/null 2>&1; then
+    COHORTE_CAFFEINATED=1 exec caffeinate -ims "$0" "$@"
+  elif command -v systemd-inhibit >/dev/null 2>&1; then
+    COHORTE_CAFFEINATED=1 exec systemd-inhibit \
+      --what=sleep:idle --who=cohorte --why="autonomous $0 run" "$0" "$@"
+  fi
+fi
+
 usage() {
   cat >&2 <<'EOF'
 usage: loop.sh <feature-id> [--max=N] [--no-build] [--rebuild] [--resume]
 
   --max=N      stop after N review passes (default 5) — a ceiling on the TOTAL
                pass count, so it still means "5 passes" when resuming at pass 3
-  --no-build   never build — re-run the /review ⇄ /fix loop on a feature that
+  --no-build   never build — re-run the /cohorte-review ⇄ /cohorte-fix loop on a feature that
                is already built (the common case; the build stamp is ignored)
-  --rebuild    force a /build even if the stamp says it was already built
+  --rebuild    force a /cohorte-build even if the stamp says it was already built
   --resume     continue from the pass recorded in the spec's front-matter
                (loop_pass), instead of starting over at pass 1
 
@@ -111,7 +139,7 @@ cd "$root" || exit 64
 
 spec="specs/$id.md"
 [ -f "$spec" ] || {
-  echo "loop: no spec at $spec — run /spec $id first" >&2; exit 64; }
+  echo "loop: no spec at $spec — run /cohorte-spec $id first" >&2; exit 64; }
 
 reports="specs/reports"
 mkdir -p "$reports"
@@ -170,15 +198,24 @@ fm_set() {                        # fm_set <key> <value>  (replace, else append)
 # parent re-imports the children's transcripts, the whole point is lost.
 # $CLAUDE_FLAGS is intentionally unquoted — it is a flag list, not one word.
 run_phase() {
-  cmd="$1"
+  # $1 is the PHASE name (build|review|fix), which is not the same string as the
+  # command that runs it (`/cohorte-build`). Every command gained a `cohorte-`
+  # prefix in 2.0.0 so Claude Code's built-ins can never shadow them again — but
+  # the phase name is a DATA CONTRACT, written into the spec's `loop_phase`, into
+  # specs/reports/<id>.*.json and into pipeline-metrics.jsonl, and read back by
+  # --resume and the dashboard. Prefixing it too would orphan every historical
+  # metrics line and break resume on specs written by 1.x. So: prefix the command,
+  # never the phase.
+  phase="$1"
+  cmd="cohorte-$phase"
   # Stamp the state BEFORE the phase runs: if this child dies (or the whole
   # session does), the spec already says where the loop was — that is what
-  # --resume reads back. Child commands write `status` themselves (/fix sets
-  # in-review); re-stamping here each phase is what keeps `in-progress` true.
+  # --resume reads back. Child commands write `status` themselves (/cohorte-fix
+  # sets in-review); re-stamping here each phase keeps `in-progress` true.
   fm_set status in-progress
   fm_set loop_pass "$pass"
-  fm_set loop_phase "$cmd"
-  printf '▶ /%-6s %-24s ' "$cmd" "$id"
+  fm_set loop_phase "$phase"
+  printf '▶ /%-14s %-24s ' "$cmd" "$id"
   printf '\n\n===== /%s %s =====\n' "$cmd" "$id" >>"$log"
   # shellcheck disable=SC2086
   if claude -p "/$cmd $id" $CLAUDE_FLAGS >>"$log" 2>&1; then
@@ -196,7 +233,7 @@ json_num() { sed -n 's/.*"'"$2"'"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p
 json_str() { sed -n 's/.*"'"$2"'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$1" | head -n1; }
 
 # Terminal status goes into the spec, not just into this stdout: a clean run
-# leaves the feature ready to /ship, any failure leaves it visibly `blocked` for
+# leaves the feature ready to /cohorte-ship, any failure leaves it visibly `blocked` for
 # the human and for the dashboard. Exit 64 never reaches here (usage dies earlier),
 # so every code handled below is a real run outcome.
 finish() {
@@ -214,7 +251,7 @@ finish() {
 # One short clause naming the deferred findings, appended to a closing line.
 # They are NOT blocking (they live in the backlog, not in ## Remediation), so
 # they never change an exit code — but a loop that silently drops them is the
-# leak /review §3.5 exists to close, so the driver names them.
+# leak /cohorte-review §3.5 exists to close, so the driver names them.
 def_note() {
   d="$(json_num "$verdict" deferred 2>/dev/null)"
   case "$d" in ''|0) return 0 ;; esac
@@ -222,7 +259,7 @@ def_note() {
 }
 
 # --- build -------------------------------------------------------------------
-# The stamp is the driver's own bookkeeping — /build knows nothing about it.
+# The stamp is the driver's own bookkeeping — /cohorte-build knows nothing about it.
 case "$build_mode" in
   force) do_build=1 ;;
   never) do_build=0 ;;
@@ -247,21 +284,22 @@ if [ "$do_build" -eq 1 ]; then
   rm -f "$readiness" "$buildjson"
   build_ok=0
   run_phase build && build_ok=1
-  # The readiness gate is checked BEFORE the child's exit status: /build aborting
-  # on NOT-READY is a cleaner diagnosis than "/build failed", and it is the one
+  # The readiness gate is checked BEFORE the child's exit status: /cohorte-build aborting
+  # on NOT-READY is a cleaner diagnosis than "/cohorte-build failed", and it is the one
   # outcome that more passes cannot fix.
   if [ -f "$readiness" ] &&
      grep -q '"verdict"[[:space:]]*:[[:space:]]*"NOT-READY"' "$readiness"; then
-    finish 4 "✗ spec not implementable — /build's readiness gate returned NOT-READY and spawned no agent; see $readiness, then /spec $id"
+    finish 4 "✗ spec not implementable — /cohorte-build's readiness gate returned NOT-READY and \
+spawned no agent; see $readiness, then /cohorte-spec $id"
   fi
-  # A dead implementer returns nothing, so /build can finish "successfully" having
+  # A dead implementer returns nothing, so /cohorte-build can finish "successfully" having
   # built one surface of two. Reviewing that would spend N reviewers auditing a
   # half-built feature and report its gaps as findings to fix — the wrong diagnosis
   # at the wrong price. `dead` is a non-empty array only when a surface died twice.
   if [ -f "$buildjson" ] && grep -q '"dead"[[:space:]]*:[[:space:]]*\[[^]]' "$buildjson"; then
     finish 2 "✗ an implementer died — the surface(s) in \"dead\" were never built; see $buildjson and $log"
   fi
-  [ "$build_ok" -eq 1 ] || finish 2 "✗ /build failed — see $log"
+  [ "$build_ok" -eq 1 ] || finish 2 "✗ /cohorte-build failed — see $log"
   date -u +%Y-%m-%dT%H:%M:%SZ >"$stamp"
 fi
 
@@ -274,10 +312,11 @@ while [ "$pass" -le "$max" ]; do
   run_phase review || true          # exit status of the child is not the verdict
 
   [ -f "$verdict" ] || finish 2 \
-    "✗ /review wrote no verdict (pass $pass) — see $log"
+    "✗ /cohorte-review wrote no verdict (pass $pass) — see $log"
 
   if grep -q '"aborted"' "$verdict"; then
-    finish 2 "✗ /review aborted on a red preflight — typecheck/lint/tests are broken, see $reports/$id.preflight.txt"
+    finish 2 "✗ /cohorte-review aborted on a red preflight — typecheck/lint/tests are broken, \
+see $reports/$id.preflight.txt"
   fi
 
   # A reviewer that died twice leaves its surface unaudited, and `blocking` counts only
@@ -300,7 +339,7 @@ while [ "$pass" -le "$max" ]; do
   fi
   prev_fp="$fp"
 
-  # Last pass: report and stop. A /fix here would leave unreviewed code behind.
+  # Last pass: report and stop. A /cohorte-fix here would leave unreviewed code behind.
   [ "$pass" -eq "$max" ] && finish 1 \
     "✗ ceiling — $blocking blocking finding(s) after $max pass(es); re-run with a higher --max --resume$(def_note)"
 

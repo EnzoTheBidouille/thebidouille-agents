@@ -231,6 +231,64 @@ console.log("gate.py — preflight phase gate");
     run(task("review"), { projectDir: noblock }).decision === null);
 }
 
+// ── the content digest (2.0.0): freshness keyed on code, not on HEAD ─────────
+// Before this, the stamp recorded the HEAD sha — backwards on both sides. The
+// reviewed tree is normally DIRTY, so committing already-verified code made the
+// gate ask on a clean tree (and a committed stamp made it ask forever), while an
+// implementer's edit between preflight and dispatch invalidated nothing.
+console.log("gate.py — preflight content digest");
+{
+  const pf = { enabled: true, agents: ["review"], max_age_minutes: 30 };
+  const d = scratch(); writeConfig(d, { ...GATE_CFG, preflight: pf });
+  gitRepo(d, "main");
+  mkdirSync(join(d, "specs", "reports"), { recursive: true });
+  writeFileSync(join(d, "specs", "s.md"), "spec\n");
+  writeFileSync(join(d, "src.txt"), "code v1\n");     // uncommitted feature work
+  const git = (...a) => execFileSync("git", a, { cwd: d, stdio: "ignore" });
+  const at = { projectDir: d };
+  const runPreflight = () =>
+    spawnSync("sh", [join(root, "scripts", "preflight.sh"), join(d, "specs", "reports", "r.txt"), "true"],
+      { cwd: d, encoding: "utf8" });
+
+  const pre = runPreflight();
+  const raw = execFileSync("cat", [join(d, ".claude", "preflight.ok")], { encoding: "utf8" }).trim();
+  check("preflight.sh stamps three fields (epoch, sha, digest)",
+    raw.split(/\s+/).length === 3, `${pre.status}: ${raw}`);
+  check("fresh stamp on a dirty tree ⇒ passes", run(task("review"), at).decision === null);
+
+  // The regression that started this: commit the very code the preflight verified.
+  git("add", "-A"); git("commit", "-qm", "wip");
+  const afterCommit = run(task("review"), at);
+  check("committing the verified code ⇒ still passes (HEAD moved, code did not)",
+    afterCommit.decision === null, `got ${afterCommit.decision} — ${afterCommit.reason}`);
+
+  // The pipeline's own writes must never invalidate its own stamp.
+  writeFileSync(join(d, "specs", "s.md"), "spec + DoD ticks\n");
+  writeFileSync(join(d, "specs", "reports", "r2.txt"), "report\n");
+  writeFileSync(join(d, ".claude", "pipeline-metrics.jsonl"), "{}\n");
+  check("spec ticks, report buffer and metrics writes ⇒ still passes",
+    run(task("review"), at).decision === null);
+
+  // …and a real edit must.
+  writeFileSync(join(d, "src.txt"), "code v2\n");
+  const edited = run(task("review"), at);
+  check("an uncommitted code edit ⇒ ask", edited.decision === "ask", edited.decision);
+  check("…and the reason says the code changed", /code changed/.test(edited.reason || ""));
+
+  // A brand-new untracked source file is a code change too (the sha never saw these).
+  writeFileSync(join(d, "src.txt"), "code v1\n");
+  writeFileSync(join(d, "extra.txt"), "new surface\n");
+  check("a new untracked source file ⇒ ask", run(task("review"), at).decision === "ask");
+  rmSync(join(d, "extra.txt"));
+  check("reverting to the verified content ⇒ passes again",
+    run(task("review"), at).decision === null);
+
+  // The hook must never touch the caller's index — it computes in a throwaway one.
+  const status = execFileSync("git", ["status", "--porcelain"], { cwd: d, encoding: "utf8" });
+  check("the gate leaves the real index untouched (nothing staged)",
+    !/^[MARCD]/m.test(status), status.trim());
+}
+
 // ── worktree awareness (the 1.3.3 known_heads fix) ───────────────────────────
 console.log("gate.py — worktree awareness");
 {

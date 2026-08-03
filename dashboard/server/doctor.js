@@ -1,5 +1,5 @@
 'use strict';
-// Programmatic port of the /doctor checks (core/commands/doctor.md), for the dashboard.
+// Programmatic port of the /cohorte-doctor checks (core/commands/doctor.md), for the dashboard.
 // Read-only: inspects files only. Checks that need a live process (MCP connectivity,
 // git worktree state, DesignSync) are reported as `skip` with a note — the node server
 // can't run them, and honest "not checked here" beats a false green.
@@ -20,14 +20,14 @@ const FIXED_AGENTS = new Set([
 ]);
 
 // The spec lifecycle (SCHEMA.md §Spec status). `in-progress` and `blocked` are written by
-// the /drive driver — they are what makes an interrupted autonomous loop resumable, so a
+// the /cohorte-loop driver — they are what makes an interrupted autonomous loop resumable, so a
 // dashboard that flagged them as invalid would report the pipeline's own state as a defect.
 const VALID_STATUS = ['draft', 'frozen', 'in-progress', 'in-review', 'shipped', 'blocked'];
 
 // Artifacts the pipeline itself writes into specs/ that are NOT feature specs and have no
-// front-matter status. `/audit` writes specs/refactor-backlog.md by design, so scanning it
-// as a spec made /doctor warn about a file cohorte had just created — a false positive that
-// fired in every project that had ever run /audit. `_`-prefixed files (e.g. _template.md)
+// front-matter status. `/cohorte-audit` writes specs/refactor-backlog.md by design, so scanning it
+// as a spec made /cohorte-doctor warn about a file cohorte had just created — a false positive that
+// fired in every project that had ever run /cohorte-audit. `_`-prefixed files (e.g. _template.md)
 // are already skipped by the reader below.
 const NON_SPEC_FILES = new Set(['refactor-backlog.md']);
 
@@ -62,7 +62,7 @@ function checkCore(v) {
   if (v.freshness === -1) {
     return mk('core', 'Core & pointer', 'warn',
       `core ${v.installedVersion} installed (${v.installMode}); npm latest is ${v.latest}`,
-      '/update-pipeline   (or  npx cohorte update)');
+      '/cohorte-update-pipeline   (or  npx cohorte update)');
   }
   const tail = v.latest ? `, npm latest ${v.latest}` : ', npm unreachable';
   return mk('core', 'Core & pointer', 'ok', `core ${v.installedVersion} (${v.installMode})${tail}`);
@@ -71,12 +71,12 @@ function checkCore(v) {
 function checkProfile(profile, hasPipelineMd) {
   if (!hasPipelineMd) {
     return mk('profile', 'Profile (PIPELINE.md)', 'bad', 'PIPELINE.md not found',
-      '/init-pipeline   (generate the project profile)');
+      '/cohorte-init-pipeline   (generate the project profile)');
   }
   if (!profile) {
     return mk('profile', 'Profile (PIPELINE.md)', 'bad',
       'PIPELINE.md present but its `yaml pipeline-profile` block is missing or unparseable',
-      '/init-pipeline   (or fix the fenced yaml block)');
+      '/cohorte-init-pipeline   (or fix the fenced yaml block)');
   }
   const n = (profile.surfaces || []).length;
   return mk('profile', 'Profile (PIPELINE.md)', n ? 'ok' : 'warn',
@@ -101,7 +101,7 @@ function checkAgents(profile, projectRoot) {
   if (missing.length) {
     return mk('agents', 'Surfaces ↔ agents', 'bad',
       `surface(s) with no rendered agent: ${missing.join(', ')}`,
-      '/init-pipeline   (re-render surface agents)');
+      '/cohorte-init-pipeline   (re-render surface agents)');
   }
   if (orphans.length) {
     return mk('agents', 'Surfaces ↔ agents', 'warn',
@@ -120,7 +120,7 @@ function checkGate(profile, projectRoot) {
   const cfg = readJson(path.join(projectRoot, '.claude', 'gate-config.json'));
   if (!cfg) {
     return mk('gate', 'Gate config', 'bad', '.claude/gate-config.json missing or unreadable',
-      '/init-pipeline   (regenerate gate-config.json from the gate block)');
+      '/cohorte-init-pipeline   (regenerate gate-config.json from the gate block)');
   }
   const drifted = [];
   if (!sameSet(cfg.deny, gate.deny)) drifted.push('deny');
@@ -147,6 +147,55 @@ function checkGate(profile, projectRoot) {
     (branchGated ? `, ${branchGated} gated on ${gate.default_branch || 'main'}` : '') + ')');
 }
 
+// Local-only pipeline artifacts. `.claude/preflight.ok` is the one that BREAKS things when
+// versioned rather than merely being noise: the stamp names the tree it verified, committing
+// it moves HEAD past that, and the committed copy then rides into every fresh clone and
+// worktree — the phase gate either blocks a clean tree or greens one it never checked.
+const LOCAL_ARTIFACTS = [
+  { path: '.claude/preflight.ok', why: 'the phase-gate stamp — a versioned one breaks the gate in every clone and worktree' },
+  { path: '.claude/pipeline-metrics.jsonl', why: 'the per-dispatch metrics sink (local, append-only)' },
+  { path: 'specs/reports/', why: 'the /cohorte-review report buffer (derived, regenerated each run)' },
+];
+
+// Does any .gitignore in play cover `rel`? Deliberately literal — it recognizes the exact
+// path, its basename, a trailing-slash dir prefix and a `*.<ext>` glob, which is every form
+// /cohorte-init-pipeline writes. Anything more clever would need a real gitignore engine.
+function ignoreCovers(projectRoot, rel) {
+  const base = rel.replace(/\/$/, '').split('/').pop();
+  const ext = base.includes('.') ? '*' + base.slice(base.lastIndexOf('.')) : null;
+  const files = [
+    path.join(projectRoot, '.gitignore'),
+    path.join(projectRoot, '.claude', '.gitignore'),
+  ];
+  for (const f of files) {
+    const text = readText(f);
+    if (!text) continue;
+    for (let line of text.split('\n')) {
+      line = line.trim();
+      if (!line || line.startsWith('#')) continue;
+      const p = line.replace(/^\/+/, '').replace(/\/+$/, '');
+      if (!p) continue;
+      if (p === rel.replace(/\/$/, '') || p === base || p === ext) return true;
+      // A directory rule covers everything under it (`.claude/` ignores the stamp too).
+      if (rel.startsWith(p + '/')) return true;
+    }
+  }
+  return false;
+}
+
+function checkLocalArtifacts(projectRoot) {
+  const unignored = LOCAL_ARTIFACTS.filter(a => !ignoreCovers(projectRoot, a.path));
+  if (!unignored.length) {
+    return mk('artifacts', 'Local artifacts', 'ok',
+      `${LOCAL_ARTIFACTS.length} local-only artifact path(s) all gitignored`);
+  }
+  const stamp = unignored.find(a => a.path === '.claude/preflight.ok');
+  return mk('artifacts', 'Local artifacts', stamp ? 'bad' : 'warn',
+    `not gitignored: ${unignored.map(a => a.path).join(', ')} — ${unignored[0].why}`,
+    `add ${unignored.map(a => a.path).join(' + ')} to .gitignore`
+    + (stamp ? ', then `git rm --cached --ignore-unmatch .claude/preflight.ok`' : ''));
+}
+
 function gateRegs(settingsPath) {
   const data = readJson(settingsPath);
   const pre = data && data.hooks && Array.isArray(data.hooks.PreToolUse) ? data.hooks.PreToolUse : [];
@@ -159,7 +208,7 @@ function gateRegs(settingsPath) {
 
 function checkHooks(projectRoot, globalDir, installMode) {
   // A registration in EITHER scope serves the project: bundled repos get it from
-  // /init-pipeline in project settings, but on a machine with the global core the
+  // /cohorte-init-pipeline in project settings, but on a machine with the global core the
   // hook usually lives (correctly, exactly once) in global settings — warning
   // there would prescribe a re-registration that double-prompts.
   const scopes = [
@@ -173,7 +222,7 @@ function checkHooks(projectRoot, globalDir, installMode) {
     return mk('hooks', 'Gate hook', 'warn', 'gate.py not registered in project or global settings.json',
       installMode === 'global'
         ? 'npx cohorte install --global   (re-registers the hook)'
-        : '/init-pipeline   (register the PreToolUse gate hook)');
+        : '/cohorte-init-pipeline   (register the PreToolUse gate hook)');
   }
   const total = found.reduce((n, s) => n + s.regs.length, 0);
   if (total > 1) {
@@ -195,7 +244,7 @@ function checkRetrieval(profile, projectRoot) {
   if (!provider || provider === 'none' || String(provider).startsWith('<')) {
     return mk('retrieval', 'Code retrieval', 'skip', 'provider: none');
   }
-  // The profile alone isn't proof the provider was ever wired: /init-pipeline
+  // The profile alone isn't proof the provider was ever wired: /cohorte-init-pipeline
   // registers it at project scope in .mcp.json. Verify the entry exists on disk;
   // live connectivity still needs a session — note it, don't fake green.
   const mcp = readJson(path.join(projectRoot, '.mcp.json'));
@@ -204,10 +253,10 @@ function checkRetrieval(profile, projectRoot) {
   if (!wired) {
     return mk('retrieval', 'Code retrieval', 'warn',
       `profile says provider: ${provider} but .mcp.json has no matching server entry`,
-      '/init-pipeline or /update-pipeline   (re-wire the retrieval provider)');
+      '/cohorte-init-pipeline or /cohorte-update-pipeline   (re-wire the retrieval provider)');
   }
   return mk('retrieval', 'Code retrieval', 'ok',
-    `provider: ${provider} — registered in .mcp.json (connectivity needs /doctor in-session)`);
+    `provider: ${provider} — registered in .mcp.json (connectivity needs /cohorte-doctor in-session)`);
 }
 
 function checkDesign(profile, projectRoot) {
@@ -234,14 +283,14 @@ function checkIsolation(profile, projectRoot) {
   }
   if (problems.length) {
     return mk('isolation', 'Isolation', 'warn', problems.join('; '),
-      '/init-pipeline   (re-render the isolation scripts)');
+      '/cohorte-init-pipeline   (re-render the isolation scripts)');
   }
   return mk('isolation', 'Isolation', 'ok', 'feature scripts rendered (worktree state not checked here)');
 }
 
 // Workflow variants (review/audit/refactor as deterministic multi-agent runs) are opt-in;
 // the conversational commands stay the default path, so nothing here is ever 'bad'.
-// Whether the session has workflows ENABLED needs a live Claude session — /doctor
+// Whether the session has workflows ENABLED needs a live Claude session — /cohorte-doctor
 // in-session checks that; here we only check what's on disk.
 function checkWorkflows(projectRoot, globalDir, installMode) {
   if (installMode === 'none') return mk('workflows', 'Workflows', 'skip', 'no core installed');
@@ -269,7 +318,7 @@ function checkWorkflows(projectRoot, globalDir, installMode) {
   }
   return mk('workflows', 'Workflows', 'ok',
     'scripts + profile-reader installed — opt-in per run; needs Claude Code ≥ 2.1.154 with ' +
-    'workflows enabled (run /doctor in-session to check the live half)');
+    'workflows enabled (run /cohorte-doctor in-session to check the live half)');
 }
 
 function scanSpecs(projectRoot) {
@@ -284,7 +333,7 @@ function scanSpecs(projectRoot) {
     const body = fm ? fm[1] : '';
     const get = k => { const m = body.match(new RegExp(`^${k}:\\s*(.*)$`, 'm')); return m ? m[1].trim() : null; };
     const status = get('status');
-    // The loop driver's resume state, when a /drive is (or was) running on this spec.
+    // The loop driver's resume state, when a /cohorte-loop is (or was) running on this spec.
     const pass = parseInt(get('loop_pass'), 10);
     const phase = get('loop_phase');
     specs.push({
@@ -327,6 +376,7 @@ async function state({ projectRoot, globalDir, cliVersion }) {
     checkProfile(profile, pipelineMd != null),
     checkAgents(profile, projectRoot),
     checkGate(profile, projectRoot),
+    checkLocalArtifacts(projectRoot),
     checkHooks(projectRoot, globalDir, v.installMode),
     checkRetrieval(profile, projectRoot),
     checkDesign(profile, projectRoot),

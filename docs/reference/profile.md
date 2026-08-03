@@ -1,6 +1,6 @@
 # The profile — `PIPELINE.md`
 
-Generated once by `/init-pipeline` at the repo root, kept current by `/update-pipeline`. The
+Generated once by `/cohorte-init-pipeline` at the repo root, kept current by `/cohorte-update-pipeline`. The
 **single place** the pipeline reads for everything stack-specific — the core under `.claude/` is
 generic and references this file by section. **Machine block first, prose after**: the fenced
 `yaml pipeline-profile` block is the deterministic contract commands parse and branch on; the
@@ -24,7 +24,7 @@ repo: { layout: monorepo, workspace_tool: turborepo }
 ```
 
 `vcs.default_branch` is the diff base for reviews and the PR base; the branch prefix drives the
-isolation scripts and `/ship`.
+isolation scripts and `/cohorte-ship`.
 
 ### Code retrieval
 
@@ -37,7 +37,7 @@ A value, not a boolean — switching provider later is a one-line change + re-wi
 (default): live LSP symbol navigation, no index; registered as a **project-scope MCP server**
 (committed `.mcp.json`) with a PATH-proof launcher so it survives GUI launches with a bare PATH.
 `graphify`: persistent tree-sitter knowledge graph (needs indexing + rescans). Agents are told to
-prefer the provider's MCP tools over grep-and-read; `/doctor` runs the four-step health check
+prefer the provider's MCP tools over grep-and-read; `/cohorte-doctor` runs the four-step health check
 (CLI resolvable, registered, gitignored, actually connected).
 
 ### Surfaces
@@ -60,8 +60,8 @@ surfaces:
     uses_design: false
 ```
 
-One entry per independently-implemented area; `/build` dispatches one implementer per entry, in
-parallel. The list **grows automatically**: `/build` §1.5 adds a surface (and renders its agent)
+One entry per independently-implemented area; `/cohorte-build` dispatches one implementer per entry, in
+parallel. The list **grows automatically**: `/cohorte-build` §1.5 adds a surface (and renders its agent)
 when a spec touches an unowned tree, or splits a proven bottleneck into specialized sub-surfaces
 — shared code always gets its own single-owner surface, and the metrics file is the required
 evidence before any split. The `*_quiet_cmd` fields are the bridled forms agents actually run
@@ -92,7 +92,7 @@ commands:
   format: pnpm format
   typecheck: pnpm check-types
   test: pnpm test
-  test_quiet: pnpm test --reporter=dot   # what the /review preflight runs
+  test_quiet: pnpm test --reporter=dot   # what the /cohorte-review preflight runs
   migrate: "cd apps/api && node ace migration:run"
   make_migration: "cd apps/api && node ace make:migration"
 ```
@@ -112,7 +112,7 @@ design:
   tokens_path: apps/web/src/index.css
 ```
 
-`rbac.enabled` turns on the role personas in `/brainstorm`, and the authz audit in `/review`. See [Design system](/guide/design-system) for the design
+`rbac.enabled` turns on the role personas in `/cohorte-brainstorm`, and the authz audit in `/cohorte-review`. See [Design system](/guide/design-system) for the design
 block.
 
 ### Isolation
@@ -150,17 +150,17 @@ See [Gate & permissions](/reference/gate) for how `hooks/gate.py` enforces this.
   Baked into each rendered agent at render time; review audits against them. **This is where
   you customize agents** — never by editing the agent files, which reconcile regenerates.
 - **Testing** — the TDD contract per surface (what a test must cover, DB isolation).
-- **Design brief note** — feeds `/spec` §8 and the design step.
-- **Personas** — the `/brainstorm` panel; one per RBAC role when enabled.
+- **Design brief note** — feeds `/cohorte-spec` §8 and the design step.
+- **Personas** — the `/cohorte-brainstorm` panel; one per RBAC role when enabled.
 
 ## Reconcile — how the profile survives core upgrades
 
 Every generated artifact is a deterministic function of *(current core template × profile
-data)*. `/update-pipeline` therefore reconciles instead of regenerating: new fields are topped
+data)*. `/cohorte-update-pipeline` therefore reconciles instead of regenerating: new fields are topped
 up at their documented defaults (batched question only for genuine human decisions), agent files
 are re-rendered (refreshing baked conventions), `settings.json`/`gate-config.json` are patched
 additively, capability wiring is health-checked and repaired, the global config is seeded if
 absent, and the kanban board is synced. Your values are never overwritten; the prose sections
-are never touched. Re-running `/init-pipeline` stays possible but is only *needed* when the
-stack itself changes in ways `/build` can't auto-grow (package-manager or contract-mechanism
+are never touched. Re-running `/cohorte-init-pipeline` stays possible but is only *needed* when the
+stack itself changes in ways `/cohorte-build` can't auto-grow (package-manager or contract-mechanism
 swap).

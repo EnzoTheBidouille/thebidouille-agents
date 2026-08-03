@@ -1,4 +1,4 @@
-# /init-pipeline · 04 Write & render
+# /cohorte-init-pipeline · 04 Write & render
 
 ### Phase 4 — Write & render (after go-ahead)
 
@@ -28,9 +28,9 @@
    `Bash(git status:*)`, `Bash(git diff:*)`, `Bash(git log:*)`, `Bash(git rev-parse:*)` — plus the
    shipped pipeline scripts for BOTH cores (`Bash(.claude/pipeline/scripts/:*)` and
    `Bash(~/.claude/pipeline/scripts/:*)` — preflight, kanban-move, telemetry-send) **plus the
-   `bash`-prefixed form the `/drive` driver uses** (`Bash(bash .claude/pipeline/scripts/loop.sh:*)`
+   `bash`-prefixed form the `/cohorte-loop` driver uses** (`Bash(bash .claude/pipeline/scripts/loop.sh:*)`
    and `Bash(bash ~/.claude/pipeline/scripts/loop.sh:*)`) — those prefix rules match a command
-   *starting* with the path, so `bash <path>` needs its own entry or `/drive` stalls on a permission
+   *starting* with the path, so `bash <path>` needs its own entry or `/cohorte-loop` stalls on a permission
    prompt at every launch, and the
    retrieval provider's MCP tools when wired (e.g. `mcp__serena`). Never allowlist anything matching
    a `gate.ask`/`gate.deny` pattern. Mention the human can widen it later with
@@ -49,7 +49,7 @@
    Preserve any existing custom keys.
 6. **Wire the retrieval provider** (skip if `retrieval.provider: none`):
    - **serena:** if the `serena` CLI is missing, have the human install it (`uv tool install -p 3.13
-     serena-agent`) — or set the provider to `none` if they decline, and say `/update-pipeline` can wire
+     serena-agent`) — or set the provider to `none` if they decline, and say `/cohorte-update-pipeline` can wire
      it later. If the binary exists (e.g. `~/.local/bin/serena`) but `command -v serena` fails,
      recommend the PATH fix (`uv tool update-shell`, or add `~/.local/bin` to the shell profile) for
      CLI use. Then register at **project scope** (committed `.mcp.json`, portable —
@@ -82,19 +82,23 @@
    (or, without npm: curl -fsSL https://raw.githubusercontent.com/TheBidouilleAgency/cohorte/main/install.sh | sh -s -- --global;
    Windows: install.ps1 -Global from the same repo)> " }`.
    In **global** mode also add, near the top of `CLAUDE.md`, a one-liner:
-   `> Pipeline: global core — run the installer above if /brainstorm etc. are missing.`
+   `> Pipeline: global core — run the installer above if /cohorte-brainstorm etc. are missing.`
 10. **CI workflow** (if `vcs.host: github` and no existing workflow already runs the profile's
     checks): with the human's go-ahead, generate `.github/workflows/pipeline-ci.yml` — on
     `pull_request` to `<default_branch>`: checkout, set up the `package_manager` toolchain,
     `commands.install`, then `commands.lint` · `commands.typecheck` · `commands.test` (+ per-surface
     `build_cmd`s that are non-empty). Derive the setup steps from the detected stack — mirror what a
-    sibling workflow does if one exists. `/ship` watches these checks before the merge.
-11. **Metrics sink & report buffer:** add `.claude/pipeline-metrics.jsonl` to `.gitignore` — `/build`,
-    `/review` and `/fix` append per-dispatch evidence there (SCHEMA §Specialization reads it).
-    Also add `specs/reports/` — `/review` stages its last report there so a `/fix` (or
-    `/spec` Mode B) survives a `/clear`; it's a derived buffer, not a versioned artifact.
-12. **Design system:** if `design.enabled` with a snapshot dir, note that `/align-ds` is active; else the
-    `/align-ds` command will no-op with a clear message.
+    sibling workflow does if one exists. `/cohorte-ship` watches these checks before the merge.
+11. **Metrics sink, report buffer & preflight stamp:** add `.claude/pipeline-metrics.jsonl` to
+    `.gitignore` — `/cohorte-build`, `/cohorte-review` and `/cohorte-fix` append per-dispatch evidence
+    there (SCHEMA §Specialization reads it).
+    Also add `specs/reports/` — `/cohorte-review` stages its last report there so a `/cohorte-fix` (or
+    `/cohorte-spec` Mode B) survives a `/clear`; it's a derived buffer, not a versioned artifact.
+    And `.claude/preflight.ok` — a local, per-checkout freshness stamp. Versioning it breaks the phase
+    gate for good (a committed stamp describes the tree *before* its own commit, and it rides into every
+    new worktree as a green nobody earned). If it is already tracked: `git rm --cached .claude/preflight.ok`.
+12. **Design system:** if `design.enabled` with a snapshot dir, note that `/cohorte-align-ds` is active; else the
+    `/cohorte-align-ds` command will no-op with a clear message.
 13. **Kanban** (only if the human opted in at Phase 2): wire it per SCHEMA.md §Kanban, writing into the
     **global** `~/.claude/cohorte.config.yaml` (never into this repo — the board points at a
     personal vault). Create the file from `pipeline/cohorte.config.template.yaml` if absent; set

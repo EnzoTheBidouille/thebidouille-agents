@@ -2,8 +2,8 @@
 
 Installed to `<core>/pipeline/scripts/` (`~/.claude` global, `.claude` bundled). Two families:
 **shipped executables** used as-is by the commands, and **templates** rendered per project by
-`/init-pipeline`. Every call site chains them with `|| true`, so a missing script is a *silent*
-no-op — `/doctor` check 1 is what catches a half-copied core.
+`/cohorte-init-pipeline`. Every call site chains them with `|| true`, so a missing script is a *silent*
+no-op — `/cohorte-doctor` check 1 is what catches a half-copied core.
 
 ## `preflight.sh` — the deterministic phase gate
 
@@ -13,9 +13,10 @@ preflight.sh <report-file> "<cmd>" ["<cmd>"...]
 
 Runs each command through `sh -c`, all output appended to `<report-file>` (the bulk never enters
 any agent's context). First failure ⇒ prints the last 40 lines of the report raw to stderr, exit
-1 — the caller (**`/review` §0, the workflow preflight phases**) must stop there
-and spawn no agents. All green ⇒ writes `.claude/preflight.ok` (`<epoch> <HEAD sha>`), the stamp
-`gate.py` checks before letting review dispatches through.
+1 — the caller (**`/cohorte-review` §0, the workflow preflight phases**) must stop there
+and spawn no agents. All green ⇒ writes `.claude/preflight.ok` (`<epoch> <HEAD sha> <tree digest>`), the stamp
+`gate.py` checks before letting review dispatches through. It is a **local, gitignored** file —
+never commit it (see [gate.md](gate.md#the-preflight-phase-gate)).
 
 ## `loop.sh` — the autonomous review ⇄ fix driver
 
@@ -23,10 +24,10 @@ and spawn no agents. All green ⇒ writes `.claude/preflight.ok` (`<epoch> <HEAD
 loop.sh <feature-id> [--max=N] [--no-build] [--rebuild] [--resume]
 ```
 
-Backs [`/drive`](/reference/commands). Runs each phase as a **separate `claude -p` child session**
+Backs [`/cohorte-loop`](/reference/commands). Runs each phase as a **separate `claude -p` child session**
 (flags from `CLAUDE_FLAGS`, default `--permission-mode acceptEdits`) so the calling session never
 accumulates the diff, the N review reports or the N contracts — all child output goes to
-`specs/reports/<id>.loop.log`, and `/drive` is forbidden to read it back. stdout is one line per
+`specs/reports/<id>.loop.log`, and `/cohorte-loop` is forbidden to read it back. stdout is one line per
 phase plus a closing verdict line, nothing else.
 
 Reads four fields from `specs/reports/<id>.verdict.json` — `blocking`, `fingerprint`, `deferred` and
@@ -36,10 +37,10 @@ built its surface) or `unreviewed[]` (a reviewer never audited one) aborts as **
 *before* `blocking` — a dead reviewer makes `blocking == 0` a claim about code nobody read. Otherwise it
 stops on `blocking == 0` (exit 0), the
 `--max` ceiling (1), a missing or preflight-aborted verdict (2), a fingerprint identical to the
-previous pass (3), or a `NOT-READY` readiness verdict from `/build` (4 — the spec cannot be built, so
-no pass count will help); usage errors exit 64. Skips `/fix` on the last pass, and commits each fix pass
+previous pass (3), or a `NOT-READY` readiness verdict from `/cohorte-build` (4 — the spec cannot be built, so
+no pass count will help); usage errors exit 64. Skips `/cohorte-fix` on the last pass, and commits each fix pass
 as `loop(<id>): fix pass <i>`. The `specs/reports/<id>.built` stamp is the driver's own
-bookkeeping — `/build` knows nothing about it, which is why `--no-build` ignores the stamp
+bookkeeping — `/cohorte-build` knows nothing about it, which is why `--no-build` ignores the stamp
 entirely (a feature built before the stamp existed still skips correctly).
 
 **State in the spec, not in the driver.** Before each phase it stamps `status: in-progress`,
@@ -50,7 +51,63 @@ no-op: this is bookkeeping for resume and the dashboard, never a precondition �
 over a status line.
 
 Unlike the other shipped executables, its call site does **not** chain `|| true` — its exit code
-*is* the result, and `/doctor` check 1 verifies it is present and executable.
+*is* the result, and `/cohorte-doctor` check 1 verifies it is present and executable.
+
+It re-execs itself under `caffeinate -ims` (guarded by `COHORTE_CAFFEINATED`, a no-op where
+`caffeinate` is absent, so Linux CI is unaffected). System sleep aborts every in-flight `claude -p`
+request, and that abort is byte-identical to "the agent returned nothing" — the `dead` family this
+driver exists to catch. It **cannot** prevent lid-close sleep; no userspace assertion can.
+
+## `loop-detach.sh` — running the driver so it outlives the session
+
+```sh
+loop-detach.sh start <feature-id> [loop.sh flags…]
+loop-detach.sh wait  <feature-id>
+```
+
+Backs [`/cohorte-loop`](/reference/commands)'s launch. A multi-hour driver cannot be a foreground
+Bash call (one call is capped at 600 s) and must not be a backgrounded one: a backgrounded call is
+**not detached**, so the driver stays in the calling session's process group and a Claude Code
+restart, crash or laptop sleep takes `loop.sh` and every `claude -p` child down with it, mid-write.
+`start` launches it in its own `screen` session — `screen`'s server double-forks and reparents to
+init — and returns immediately. Without `screen` on `PATH` it falls back to `nohup` and **says so**:
+that fallback survives `SIGHUP` but not a teardown, and a silent downgrade would read as "safe to
+walk away" when it is not.
+
+`wait` blocks up to ~9 min (36 × 15 s, inside the tool ceiling) and prints the status file, ending
+in `__EXIT__ <code>` when finished or `__RUNNING__` when not — call it again on `__RUNNING__`. The
+exit code is `loop.sh`'s own, appended by the launch wrapper because `screen` discards it and
+`/cohorte-loop`'s whole report table is keyed on it.
+
+Two files, one letter apart, and the distinction is the command's entire token economy:
+`specs/reports/<id>.loop.status` is the driver's stdout — one line per phase, safe to read;
+`<id>.loop.log` is the full transcript of every child session and must never enter a session.
+`start` refuses to launch a second driver on a feature that already has one, since two would
+interleave commits and fight over the same verdict files — checked via `screen -ls` and, for the
+tiers that have no session to list, `pgrep`.
+
+### Platform support
+
+Both scripts degrade in tiers rather than failing, but the tiers are **not** equivalent — what
+matters for survival is escaping the caller's process *group*, not merely ignoring `SIGHUP`.
+
+| | detach (`loop-detach.sh`) | stay-awake (`loop.sh`) |
+| --- | --- | --- |
+| **macOS** | `screen` (ships at `/usr/bin/screen`) — fully detached | `caffeinate -ims` |
+| **Linux** | `screen` if present, else `setsid` (util-linux) — both fully detached | `systemd-inhibit --what=sleep:idle`, or a no-op without systemd |
+| **Windows** (Git Bash) | `nohup` only — **not** detached | no-op |
+
+On Windows the driver still runs and still ignores `SIGHUP`, but it stays in the calling process
+group, so a Claude Code restart or crash takes it down. `loop-detach.sh` prints that warning
+explicitly instead of degrading silently. For an unattended Windows run, either install `screen`
+into your Git Bash environment or start the driver from your own terminal — it is an ordinary
+script and needs nothing from the calling session:
+
+```sh
+bash <core>/pipeline/scripts/loop.sh <feature-id>
+```
+
+Lid-close sleep cannot be prevented on **any** platform by any userspace assertion.
 
 ## `kanban-move.sh` — board updates outside agent context
 
@@ -78,7 +135,7 @@ chars before sending; 2s timeout; never fails the pipeline. See
 
 ## `new-feature.sh` / `remove-feature.sh` — worktree isolation (templates)
 
-Shipped as `.template` files; `/init-pipeline` renders them to `scripts/` in your repo,
+Shipped as `.template` files; `/cohorte-init-pipeline` renders them to `scripts/` in your repo,
 substituting the `__TOKENS__` (project slug, DB pattern, port bases, compose file, branch
 prefix, install/dev/migrate commands, per-surface env stanzas).
 
@@ -116,7 +173,7 @@ prefix, install/dev/migrate commands, per-surface env stanzas).
   only that it parses.
 - `scripts/test-dashboard.mjs` — tests for `dashboard/server/*.js`, all shipped runtime code: the
   block-YAML parser (against the real `PIPELINE.template.md`), the metrics aggregator (new +
-  legacy line formats), the JS port of `/doctor` (each check green, then each one made to fail),
+  legacy line formats), the JS port of `/cohorte-doctor` (each check green, then each one made to fail),
   the Obsidian board parser, the fleet registry, and the HTTP guards — driven over a real socket,
   because `fetch` silently drops a forged `Host` header and would pass against no guard at all.
 - `scripts/assert-gate-hook.mjs` — post-install assertion on a `settings.json`: exactly one

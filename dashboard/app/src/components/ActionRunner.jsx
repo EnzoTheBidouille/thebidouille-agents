@@ -4,7 +4,7 @@ import { streamAction } from '../api.js';
 // Modal that runs an action and streams its output live. Confirms first (mutating action),
 // then reads the chunked response body. `command` (a whitelisted slash-command) routes the
 // server to the headless-Claude runner; otherwise it's a CLI install/update. `confirmText`
-// overrides the default confirmation copy (e.g. the /init-pipeline warning).
+// overrides the default confirmation copy (e.g. the /cohorte-init-pipeline warning).
 export default function ActionRunner({ title, action, scope, project, command, confirmText, onClose, onChanged }) {
   const [status, setStatus] = useState('confirm'); // confirm → running → done
   const [log, setLog] = useState('');

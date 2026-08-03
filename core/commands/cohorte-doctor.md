@@ -16,13 +16,16 @@ fix only with the human's go-ahead (or hand them the command).
    `.claude/pipeline/VERSION` bundled); `.claude/pipeline.json` names a mode + `core_version`
    coherent with the VERSION file. A **global**-mode pointer lagging the VERSION file is ⚠️, not ❌:
    nothing bumped that field before 1.2.5, so the core itself is fine and only the pointer is stale
-   ⇒ fix by running `/update-pipeline` (§3 syncs it now), or by editing the one field. Compare
-   against `npm view cohorte version` — behind ⇒ suggest `/update-pipeline`. Read `pipeline/CHANGELOG.md` for what they're missing. The router
+   ⇒ fix by running `/cohorte-update-pipeline` (§3 syncs it now), or by editing the one field. Compare
+   against `npm view cohorte version` — behind ⇒ suggest `/cohorte-update-pipeline`. Read `pipeline/CHANGELOG.md` for what they're missing. The router
    commands' step files are present — `templates/steps/init-pipeline/` non-empty (a router whose
    `templates/steps/<cmd>/` dir is missing is a partial/stale install ⇒
    re-run install/update). **Shipped scripts present and executable** in `<core>/pipeline/scripts/`:
-   `kanban-move.sh`, `telemetry-send.sh`, `preflight.sh`, `loop.sh`, `new-feature.sh.template`,
-   `remove-feature.sh.template` — ❌ any missing one. Every caller chains these with `|| true`, so an absent script is a **silent**
+   `kanban-move.sh`, `telemetry-send.sh`, `preflight.sh`, `loop.sh`, `loop-detach.sh`,
+   `new-feature.sh.template`, `remove-feature.sh.template` — ❌ any missing one.
+   `loop-detach.sh` absent is what silently turns `/cohorte-loop` back into a foreground run
+   that dies at the 600 s tool ceiling, so name it explicitly rather than folding it into
+   "some script is missing". Every caller chains these with `|| true`, so an absent script is a **silent**
    no-op (no kanban card moves, no telemetry ping, no error anywhere) — this check is the only thing
    that sees it. Also flag ❌ a `VERSION` **newer than** the other `pipeline/` files (compare mtimes):
    a version bumped without a full re-copy is a half-done update ⇒ re-run install/update.
@@ -47,6 +50,11 @@ fix only with the human's go-ahead (or hand them the command).
    it double-prompts) **with a matcher covering both `Bash` and `Task`** — a `Bash`-only matcher
    leaves the preflight phase gate dead (the 1.3.0–1.3.1 regression). Hook files exist at the
    registered paths.
+   Then the **preflight stamp is local, never versioned**: `git ls-files --error-unmatch
+   .claude/preflight.ok` must miss, and `.gitignore` must cover it. A tracked stamp is a ❌ (not a
+   ⚠️) — it records the tree it verified, the commit that carries it moves HEAD past that tree, and
+   the committed copy lands in every clone and new worktree; the gate then blocks clean trees and
+   greens unchecked ones. fix: `git rm --cached .claude/preflight.ok` + add it to `.gitignore`.
 4. **Retrieval** (if `retrieval.provider` ≠ `none`). Run the SCHEMA.md §Code retrieval health
    check: CLI resolvable from PATH, `.mcp.json` entry present in PATH-proof launcher form,
    `.serena/` gitignored, server actually connects.
@@ -67,7 +75,7 @@ fix only with the human's go-ahead (or hand them the command).
    (the install_id is the human's GDPR erasure key — see SCHEMA.md §Telemetry). Flag ❌ any
    incoherent state: `enabled: true` with no `install_id` or no `consent_date` (sending without
    recorded consent — fix: set `enabled: false` until the consent question is re-run), or a
-   `telemetry:` block missing entirely on a current core (top up via `/update-pipeline`).
+   `telemetry:` block missing entirely on a current core (top up via `/cohorte-update-pipeline`).
 8. **Workflows** (the opt-in execution path — SCHEMA.md §Workflows; the conversational commands
    stay the default, so failures here are ⚠️ at most, never ❌). Report which path this machine will
    take and why:
@@ -86,14 +94,14 @@ fix only with the human's go-ahead (or hand them the command).
    `workflows: unavailable (<first failing prerequisite>) — conversational commands (the default)`.
 9. **Specs & metrics.** Every `specs/*.md` front-matter `status` is a valid stage — one of
    `draft · frozen · in-progress · in-review · shipped · blocked` (SCHEMA.md §Spec status; the last two
-   are written by the `/drive` driver, so flagging them would report the pipeline's own state as a
+   are written by the `/cohorte-loop` driver, so flagging them would report the pipeline's own state as a
    defect) — excluding
    `_`-prefixed files (the spec template and `specs/_decisions.md`, the decision journal) and
-   `specs/refactor-backlog.md`, which `/audit` writes as a backlog, not a
+   `specs/refactor-backlog.md`, which `/cohorte-audit` writes as a backlog, not a
    spec, and which has no front-matter to check. A spec left `in-progress`/`blocked` with
-   `loop_pass` > 0 is a loop that never finished ⇒ say so and name `/drive <id> --resume`. `shipped` specs
+   `loop_pass` > 0 is a loop that never finished ⇒ say so and name `/cohorte-loop <id> --resume`. `shipped` specs
    with a live worktree flagged (see 6). `.claude/pipeline-metrics.jsonl` and `specs/reports/` (the
-   `/review` report buffer that lets a `/fix` survive a `/clear`) are gitignored. Metrics
+   `/cohorte-review` report buffer that lets a `/cohorte-fix` survive a `/clear`) are gitignored. Metrics
    belong to the **main checkout** — a `pipeline-metrics.jsonl` inside a live feature worktree is a
    stale-core sign (its lines die at teardown) ⇒ suggest appending its lines to the main checkout's
    file and deleting the stray.

@@ -45,7 +45,7 @@ Commands:
   update    Refresh the stack-agnostic core only. PIPELINE.md, rendered surface
             agents, gate-config.json, settings.json and your filled
             ~/.claude/cohorte.config.yaml are never touched.
-  dashboard Serve a local web cockpit for the pipeline (freshness, /doctor
+  dashboard Serve a local web cockpit for the pipeline (freshness, /cohorte-doctor
             health, specs board, install/update actions). Binds 127.0.0.1:4317
             by default (loopback only — its actions execute code). --host=ADDR
             to expose (e.g. --host=0.0.0.0, prints a security warning). --open
@@ -163,7 +163,7 @@ function copyCore() {
   // every caller chains them with `|| true`, the result was silent: no kanban card
   // moves, no telemetry pings, no error. The shell installers named them explicitly
   // and this port drifted. The rule below needs no list to keep in sync: a `<x>.sh`
-  // with an `<x>.sh.template` sibling is rendered per-project by /init-pipeline, so
+  // with an `<x>.sh.template` sibling is rendered per-project by /cohorte-init-pipeline, so
   // only the template ships; every other `.sh` is a shipped executable.
   const scriptFiles = fs.readdirSync(path.join(src, 'scripts'));
   for (const f of scriptFiles) {
@@ -178,7 +178,7 @@ function copyCore() {
   }
   fs.copyFileSync(path.join(src, 'core', 'agents', 'implementer.template.md'),
                   path.join(pipelineDir, 'implementer.template.md'));
-  // /doctor reads this to tell the human what they're missing; the shell installers
+  // /cohorte-doctor reads this to tell the human what they're missing; the shell installers
   // have always copied it, this port never did.
   const changelog = path.join(src, 'CHANGELOG.md');
   if (fs.existsSync(changelog)) fs.copyFileSync(changelog, path.join(pipelineDir, 'CHANGELOG.md'));
@@ -211,7 +211,7 @@ function scrubTddGate() {
 // the fixed (non-rendered) agents: the dev review/release pipeline agents
 function copyFixedAgents() {
   fs.mkdirSync(path.join(dest, 'agents'), { recursive: true });
-  // Every agent in core/agents/ EXCEPT the *.template.md ones, which /init-pipeline renders
+  // Every agent in core/agents/ EXCEPT the *.template.md ones, which /cohorte-init-pipeline renders
   // per-surface. Until 1.2.6 this was a hardcoded ['review.md', 'release.md'] that never grew
   // the agents the shell installers copy, so `npx cohorte install` shipped a command with no
   // agent to dispatch — the run reported the command as not installed.
@@ -235,6 +235,14 @@ function copyFixedAgents() {
   // 1.6.0 renamed /loop → /drive: Claude Code's own built-in /loop shadowed ours, so a leftover
   // commands/loop.md is a command the user can never reach — scrub it rather than leave a decoy.
   fs.rmSync(path.join(dest, 'commands', 'loop.md'), { force: true });
+  // 2.0.0 prefixed every command with `cohorte-`, which ends the shadowing problem for good.
+  // Copy-over never deletes, so all 13 bare names would survive an upgrade as decoys — and a
+  // stale /build is the worst kind: it still dispatches implementers, from a 1.x command file
+  // that knows nothing of this core's contract. /drive goes too (it became /cohorte-loop).
+  for (const c of ['align-ds', 'audit', 'brainstorm', 'build', 'doctor', 'drive', 'fix',
+                   'init-pipeline', 'refactor', 'review', 'ship', 'spec', 'update-pipeline']) {
+    fs.rmSync(path.join(dest, 'commands', `${c}.md`), { force: true });
+  }
   scrubResearchQuestionnaire();
 }
 
@@ -279,10 +287,10 @@ function setCfg(text, cfgKey, value) {
 }
 
 // Fill the seeded config from a short TTY interview (shared Obsidian vault for the kanban mirror).
-// Kanban is per-project, so it is wired later by /init-pipeline — not asked here.
+// Kanban is per-project, so it is wired later by /cohorte-init-pipeline — not asked here.
 async function promptConfig(text) {
   console.log('\n  Quick setup (Enter to skip — you can also wire this later via');
-  console.log('  /init-pipeline or /update-pipeline):');
+  console.log('  /cohorte-init-pipeline or /cohorte-update-pipeline):');
   const vault = await ask('    · absolute path to your shared Obsidian vault (for the kanban mirror): ');
   if (vault) text = setCfg(text, 'vault_path', `"${vault}"`);
   return text;
@@ -299,7 +307,7 @@ async function seedConfig() {
   if (fs.existsSync(cfg)) { console.log(`  · kept your existing ${cfg}`); return; }
   if (legacy) {
     console.log(`  · found legacy ${legacy} — kept as-is (still read as a fallback).`);
-    console.log('    Run /update-pipeline to migrate it into cohorte.config.yaml + wire the kanban.');
+    console.log('    Run /cohorte-update-pipeline to migrate it into cohorte.config.yaml + wire the kanban.');
     return;
   }
   fs.mkdirSync(path.dirname(cfg), { recursive: true });
@@ -310,7 +318,7 @@ async function seedConfig() {
     console.log(`  · seeded ${cfg} from your answers`);
   } else {
     fs.writeFileSync(cfg, text);
-    console.log(`  · seeded ${cfg} (disabled defaults — enable via /init-pipeline or /update-pipeline)`);
+    console.log(`  · seeded ${cfg} (disabled defaults — enable via /cohorte-init-pipeline or /cohorte-update-pipeline)`);
   }
 }
 
@@ -391,21 +399,21 @@ if (scope === 'global') {
 ✓ pipeline core installed globally into ${dest}  (version ${VERSION})
   gate hook: ${hookState}  (reads each repo's .claude/gate-config.json; silent where absent)
 
-The commands (/init-pipeline, /brainstorm, /build …) and the review/release agents are now
+The commands (/cohorte-init-pipeline, /cohorte-brainstorm, /cohorte-build …) and the review/release agents are now
 available in EVERY project on this machine — nothing is copied per repo.
 
 Per repo:
   1. Open the project in Claude Code.
-  2. Run  /init-pipeline  — it generates PIPELINE.md, renders the surface agents, writes
+  2. Run  /cohorte-init-pipeline  — it generates PIPELINE.md, renders the surface agents, writes
      .claude/gate-config.json, and drops a committed .claude/pipeline.json pointer so
      teammates know to install the global core (${REPO_URL}).
-  3. Commit PIPELINE.md + .claude/, then  /brainstorm  to start a feature.
+  3. Commit PIPELINE.md + .claude/, then  /cohorte-brainstorm  to start a feature.
 
 Update later with:  npx cohorte@latest update --global
 
 Global kanban config, user-scoped — optional:
   · One consolidated file: ${path.join(globalDir, 'cohorte.config.yaml')}
-  · Don't hand-edit it — /init-pipeline (new project) and /update-pipeline (existing) wire it
+  · Don't hand-edit it — /cohorte-init-pipeline (new project) and /cohorte-update-pipeline (existing) wire it
     for you: creating + syncing an Obsidian kanban board of the pipeline in your shared vault.`);
 } else if (mode === 'install') {
   console.log(`→ installing pipeline core into ${dest}`);
@@ -422,9 +430,9 @@ Global kanban config, user-scoped — optional:
 
 Next:
   1. Open the project in Claude Code.
-  2. Run  /init-pipeline   — it detects your stack, asks the gaps, and generates
+  2. Run  /cohorte-init-pipeline   — it detects your stack, asks the gaps, and generates
      PIPELINE.md + renders one implementer agent per surface.
-  3. Commit PIPELINE.md, then  /brainstorm  to start a feature.
+  3. Commit PIPELINE.md, then  /cohorte-brainstorm  to start a feature.
 
 Update later with:  npx cohorte@latest update
 Prefer one shared core across all your repos?  Re-run with  --global.`);
@@ -436,6 +444,6 @@ Prefer one shared core across all your repos?  Re-run with  --global.`);
   bumpPointerVersion(path.join(dest, 'pipeline.json'));
   console.log(`
 ✓ core refreshed to ${VERSION}. Your PIPELINE.md, rendered surface agents, gate-config.json and
-  settings.json were left as-is. Re-run /init-pipeline if your stack changed.`);
+  settings.json were left as-is. Re-run /cohorte-init-pipeline if your stack changed.`);
 }
 })();

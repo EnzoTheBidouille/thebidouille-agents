@@ -22,7 +22,7 @@ Patterns come from `.claude/gate-config.json`, generated from the profile's `gat
 
 Design decisions worth knowing:
 
-- **It fires for every agent in the session** — the lead, `/build`'s implementers, and
+- **It fires for every agent in the session** — the lead, `/cohorte-build`'s implementers, and
   subagents spawned by the Workflow runtime alike. Workflow subagents run in `acceptEdits`
   whatever the session mode (their Write/Edit calls are auto-approved), but `acceptEdits` does
   **not** auto-approve Bash or Task — the gate still sees and can block them.
@@ -38,13 +38,13 @@ The `preflight` block of `gate-config.json` (from `gate.preflight` in the profil
 gate enforce **pipeline ordering**, not just command safety: a `Task` dispatch of a listed
 `subagent_type` (default `review`) requires a fresh `.claude/preflight.ok` stamp —
 written by `pipeline/scripts/preflight.sh` only when typecheck + lint + tests are green.
-Missing stamp, stamp older than `max_age_minutes` (default 30), or HEAD moved since ⇒ the
+Missing stamp, stamp older than `max_age_minutes` (default 30), or the code changed since ⇒ the
 dispatch gets an "ask": a lead can't accidentally review red code, a human can consciously
 override. Profiles without the block simply skip the phase gate (older installs keep working).
 
 ## `settings.json` permissions
 
-`/init-pipeline` writes the repo's `.claude/settings.json`:
+`/cohorte-init-pipeline` writes the repo's `.claude/settings.json`:
 
 - **`ask`/`deny` rules** mirroring the gate patterns (defense in depth — the hook catches
   chained forms the rules miss; the rules catch anything if the hook is unregistered).
@@ -58,8 +58,8 @@ override. Profiles without the block simply skip the phase gate (older installs 
   registered here; global ⇒ the gate is already in `~/.claude/settings.json` (re-registering
   would double-prompt), only the formatter + permissions are written.
 
-`/update-pipeline` patches all of this **additively** — it adds missing entries, never removes
-or rewrites your custom keys. `/doctor` check 3 flags drift between the profile's gate block and
+`/cohorte-update-pipeline` patches all of this **additively** — it adds missing entries, never removes
+or rewrites your custom keys. `/cohorte-doctor` check 3 flags drift between the profile's gate block and
 `gate-config.json`, and double hook registrations.
 
 ## Division-of-labor rules the agents themselves enforce
@@ -71,6 +71,6 @@ Beyond the mechanical gate, the agent instructions carry hard rules the pipeline
 - Migrations are **append-only** everywhere; `gate.deny` commands are never run even if the
   hook were absent.
 - The `release` agent never edits source, never force-pushes, refuses staged secrets.
-- `/align-ds` uses DesignSync strictly read-only — never write/delete/finalize on a curated
+- `/cohorte-align-ds` uses DesignSync strictly read-only — never write/delete/finalize on a curated
   design system.
-- `/ship` is the only outward-facing step, and it always waits for an explicit human yes.
+- `/cohorte-ship` is the only outward-facing step, and it always waits for an explicit human yes.

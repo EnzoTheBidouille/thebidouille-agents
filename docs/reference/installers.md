@@ -22,7 +22,7 @@ npx cohorte version
 
 **Update never touches generated files**: `PIPELINE.md`, rendered surface agents,
 `gate-config.json`, `settings.json`, and your filled `~/.claude/cohorte.config.yaml` are always
-preserved. Bringing those up to a new core is `/update-pipeline`'s reconcile job.
+preserved. Bringing those up to a new core is `/cohorte-update-pipeline`'s reconcile job.
 
 ## What gets copied
 
@@ -49,14 +49,14 @@ scrubs are explicit.
 
 ## The pointer — `.claude/pipeline.json`
 
-Committed by `/init-pipeline`:
+Committed by `/cohorte-init-pipeline`:
 
 ```json
 { "pipeline": "cohorte", "mode": "global", "core_version": "1.3.1", "install": "npx cohorte install --global …" }
 ```
 
-It's how a teammate cloning the repo knows which core to install, and how `/doctor` detects
-version drift. `/update-pipeline` syncs `core_version` in **both** modes (a shared global core
+It's how a teammate cloning the repo knows which core to install, and how `/cohorte-doctor` detects
+version drift. `/cohorte-update-pipeline` syncs `core_version` in **both** modes (a shared global core
 can't know which repos point at it, so nothing else can).
 
 ## Version flow
@@ -65,8 +65,8 @@ can't know which repos point at it, so nothing else can).
 package.json (semver source of truth)
   → npm publish (CI, on main, trusted publishing + provenance)
     → installers stamp <core>/pipeline/VERSION
-      → /doctor compares VERSION ↔ pointer ↔ npm latest
-        → /update-pipeline shows CHANGELOG entries between old and new
+      → /cohorte-doctor compares VERSION ↔ pointer ↔ npm latest
+        → /cohorte-update-pipeline shows CHANGELOG entries between old and new
 ```
 
 Releases are fully automated: bump `package.json`, add the `## <version>` CHANGELOG section,

@@ -1,4 +1,4 @@
-# /init-pipeline · 02 Interview the gaps
+# /cohorte-init-pipeline · 02 Interview the gaps
 
 ### Phase 2 — Interview the gaps (AskUserQuestion)
 
@@ -11,7 +11,7 @@ Ask ONLY what you couldn't confidently detect. Batch related questions. Cover:
   cost), `haiku` for purely mechanical surfaces (scaffolding), `inherit` only for surfaces with real
   design decisions worth running on the lead's model.
 - **Specialization (only if Phase 1 flagged a large + cleanly-separable surface)** — offer to split it
-  into specialized sub-surfaces (e.g. `web-checkout`, `web-billing`) so `/build` runs them in parallel,
+  into specialized sub-surfaces (e.g. `web-checkout`, `web-billing`) so `/cohorte-build` runs them in parallel,
   per SCHEMA.md §Specialization. If the human accepts, apply the rules: **shared code (routing, global
   state, DS kit/tokens) becomes its own single-owner surface**, and cross-slice shapes go through the
   contract. Default to NOT splitting when boundaries are tangled or slices are tiny — coarse is fine.
@@ -20,7 +20,7 @@ Ask ONLY what you couldn't confidently detect. Batch related questions. Cover:
   Recommended option: dot/failures-only reporter (`--reporter=dot` vitest/playwright, `--silent`
   jest, `-q` pytest, `--quiet` eslint/ruff — whatever the detected runner supports). These land in
   `test_quiet_cmd`/`lint_quiet_cmd` + `commands.test_quiet`/`lint_quiet` and are what agents and the
-  `/review` pre-flight actually run (SCHEMA.md §Output discipline). If the human declines or
+  `/cohorte-review` pre-flight actually run (SCHEMA.md §Output discipline). If the human declines or
   the runner has no such flag, leave `""` — consumers then fall back to `<cmd> 2>&1 | tail -40`.
 - **Contract** — mechanism (`shared-types-zod` / `openapi` / `protobuf` / `json-schema` / `none`) and
   where feature contracts are authored. If `none`, surfaces sync by the spec prose alone.
@@ -35,11 +35,11 @@ Ask ONLY what you couldn't confidently detect. Batch related questions. Cover:
   main checkout? If worktrees: DB-per-worktree? port bases? compose file?
 - **Gate** — confirm the destructive commands to hard-deny and the ones to confirm-first (seed from the
   detected DB/migration tooling + always git commit/push/merge/rebase/reset).
-- **Personas** — keep the default `/brainstorm` panel, or customize members for this domain?
+- **Personas** — keep the default `/cohorte-brainstorm` panel, or customize members for this domain?
 
 Prefer sensible defaults from Phase 1 as the first (Recommended) option in each question.
 
-- **Kanban** (optional) — mirror this project's pipeline (`/brainstorm`…`/ship`) onto an Obsidian
+- **Kanban** (optional) — mirror this project's pipeline (`/cohorte-brainstorm`…`/cohorte-ship`) onto an Obsidian
   Kanban board? If the human says yes: confirm the shared vault path (`obsidian.vault_path` in
   `~/.claude/cohorte.config.yaml`; ask if empty) and the board's location inside it (default
   `<ProjectName>/Tasks.md`). Phase 4 creates the board and records the link. Default: no.
@@ -50,7 +50,7 @@ Prefer sensible defaults from Phase 1 as the first (Recommended) option in each 
 - **Telemetry** (optional, machine-scoped — SKIP entirely if `~/.claude/cohorte.config.yaml` already
   has a `telemetry:` block with a `consent_date`, i.e. the human already answered on this machine).
   Ask ONE opt-in question, stating exactly: _"Share anonymous usage stats with the cohorte project?
-  One ping per pipeline phase, `/brainstorm` through `/ship`: core version, OS, phase name, duration,
+  One ping per pipeline phase, `/cohorte-brainstorm` through `/cohorte-ship`: core version, OS, phase name, duration,
   per-surface result counts, and a hash of the feature id — never repo names, paths, code, or IPs.
   Setup and maintenance commands never ping. Off by default; withdraw anytime
   (`telemetry.enabled: false`); erase your history anytime (SCHEMA.md §Telemetry). Default: No."_

@@ -12,7 +12,7 @@ import ActionRunner from './ActionRunner.jsx';
 
 const INIT_WARNING = (
   <div>
-    <p><strong>Runs Claude Code headless</strong> (<code>claude -p "/init-pipeline"</code>) in this
+    <p><strong>Runs Claude Code headless</strong> (<code>claude -p "/cohorte-init-pipeline"</code>) in this
       project, autonomously (no permission prompts). It <strong>consumes tokens</strong> and needs the
       <code> claude</code> CLI authenticated.</p>
     <p className="warn-line">⚠ Headless skips the interactive interview — Claude <strong>guesses</strong> your
@@ -23,7 +23,7 @@ const INIT_WARNING = (
 
 const UPDATE_WARNING = (
   <div>
-    <p><strong>Runs Claude Code headless</strong> (<code>claude -p "/update-pipeline"</code>) in this
+    <p><strong>Runs Claude Code headless</strong> (<code>claude -p "/cohorte-update-pipeline"</code>) in this
       project, autonomously. It refreshes the core and reconciles the generated files (re-renders agents,
       patches settings). <strong>Consumes tokens</strong>; needs the <code>claude</code> CLI authenticated.</p>
   </div>
@@ -31,14 +31,14 @@ const UPDATE_WARNING = (
 
 const AUDIT_WARNING = (
   <div>
-    <p><strong>Runs Claude Code headless</strong> (<code>claude -p "/audit"</code>) in this project,
+    <p><strong>Runs Claude Code headless</strong> (<code>claude -p "/cohorte-audit"</code>) in this project,
       autonomously (no permission prompts). It runs the mechanical gates + a convention/TDD audit and
       writes the prioritized backlog to <code>specs/refactor-backlog.md</code>. Read-only on your source.
       <strong> Consumes tokens</strong> (it dispatches agents); needs the <code>claude</code> CLI
       authenticated.</p>
     <p className="warn-line">⚠ Headless means the run <strong>starts without any prompt</strong> and
       cannot ask you anything mid-run — and there is <strong>no resume</strong>: if the session dies,
-      the run is gone (re-launch it). Prefer running <code>/audit</code> in a Claude Code session for
+      the run is gone (re-launch it). Prefer running <code>/cohorte-audit</code> in a Claude Code session for
       anything you want to steer.</p>
   </div>
 );
@@ -90,17 +90,17 @@ export default function ProjectDetail({ project }) {
           <div className="detail-tools">
             {!hasProfile && (
               <button className="tool-btn" onClick={() => setRunner({
-                title: 'Init pipeline (headless Claude)', command: '/init-pipeline', confirmText: INIT_WARNING,
+                title: 'Init pipeline (headless Claude)', command: '/cohorte-init-pipeline', confirmText: INIT_WARNING,
               })}>Init-pipeline…</button>
             )}
             {hasProfile && (
               <button className="tool-btn" onClick={() => setRunner({
-                title: 'Update pipeline (headless Claude)', command: '/update-pipeline', confirmText: UPDATE_WARNING,
+                title: 'Update pipeline (headless Claude)', command: '/cohorte-update-pipeline', confirmText: UPDATE_WARNING,
               })}>Update-pipeline…</button>
             )}
             {hasProfile && (
               <button className="tool-btn" onClick={() => setRunner({
-                title: 'Audit (headless Claude)', command: '/audit', confirmText: AUDIT_WARNING,
+                title: 'Audit (headless Claude)', command: '/cohorte-audit', confirmText: AUDIT_WARNING,
               })}>Audit…</button>
             )}
             {hasFootprint && (

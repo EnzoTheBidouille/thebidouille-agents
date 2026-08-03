@@ -7,7 +7,7 @@ bounded retries are *code* — free and exact — and the lead stops paying for 
 
 ## Prerequisites & opt-in
 
-- **Claude Code ≥ 2.1.154** with workflows enabled. `/doctor` check 8 reports the full wiring
+- **Claude Code ≥ 2.1.154** with workflows enabled. `/cohorte-doctor` check 8 reports the full wiring
   (CLI version, scripts present, `profile-reader` agent, runtime available in-session) and which
   path your session will take.
 - **The conversational commands stay the default and the fallback.** A workflow runs only when
@@ -33,7 +33,7 @@ Every script follows the same skeleton:
 - **The gate still applies.** `hooks/gate.py` fires on workflow subagents too (they run in
   `acceptEdits`, which auto-approves Write/Edit but *not* Bash or Task). In unattended runs,
   gate confirms are escalated to hard denies — nobody is there to answer a prompt.
-- **Permissions pre-widened.** `/init-pipeline` / `/update-pipeline` extend the generated
+- **Permissions pre-widened.** `/cohorte-init-pipeline` / `/cohorte-update-pipeline` extend the generated
   `settings.json` allow-list with what workflow agents need (quiet commands, the shipped
   `pipeline/scripts/*.sh`, read-only git incl. `git rev-parse`, the retrieval MCP tools) so a
   run never stalls on a permission prompt nobody is watching.
@@ -46,8 +46,8 @@ cross-check of CRITICAL/security findings → merged report staged to `specs/rep
 metrics + telemetry chained — and only the verdict, counts, and critical one-liners return. Deferred
 findings (real, but out of the feature's scope) skip the cross-check — they cannot move the verdict —
 and are appended to `specs/refactor-backlog.md` under their surface's domain heading, tagged
-`deferred:<id>`, exactly as the conversational `/review` §3.5 does.
-`/fix <id>` consumes the staged report exactly as after a conversational `/review`.
+`deferred:<id>`, exactly as the conversational `/cohorte-review` §3.5 does.
+`/cohorte-fix <id>` consumes the staged report exactly as after a conversational `/cohorte-review`.
 
 ## `audit.js` — codebase audit
 
@@ -61,7 +61,7 @@ severity-ordered backlog written to `specs/refactor-backlog.md`, grouped by doma
 
 Ask: *"run the refactor workflow on `<domains>`"* (or `all`). Reads the open backlog items; a
 domain with fewer than 5 open items is **skipped with a pointer to the conversational
-`/refactor`** — cheaper there. Then: the `shared` domain (contract package — every slice imports
+`/cohorte-refactor`** — cheaper there. Then: the `shared` domain (contract package — every slice imports
 it) first and **alone**, next the other domains' surface implementers in parallel (their trees
 are disjoint by construction), each followed by a per-domain verification (gates + item-by-item
 `file:line` check) and **one bounded retry** round. Cleared items are ticked off the backlog; the
@@ -69,7 +69,7 @@ leftovers return.
 
 ## Why not workflow-ize everything?
 
-`/init-pipeline`, `/brainstorm`, and `/spec` are interviews — their value *is* the back-and-forth,
-and a workflow cannot ask. `/build` is already a single parallel dispatch; `/ship` is the human
+`/cohorte-init-pipeline`, `/cohorte-brainstorm`, and `/cohorte-spec` are interviews — their value *is* the back-and-forth,
+and a workflow cannot ask. `/cohorte-build` is already a single parallel dispatch; `/cohorte-ship` is the human
 gate. A script would add nothing to those; the four scripts cover exactly the phases where
 deterministic fan-out, cross-checking, and looping pay.

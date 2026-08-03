@@ -92,7 +92,7 @@ jobs:
           if grep -qE "^## ${VERSION//./\\.}( |$)" CHANGELOG.md; then
             echo "CHANGELOG.md has an entry for $VERSION."
           else
-            echo "::error file=CHANGELOG.md::Missing '## $VERSION — <date>' section. Add the What's-new entry (shown by /update-pipeline) before releasing."
+            echo "::error file=CHANGELOG.md::Missing '## $VERSION — <date>' section. Add the What's-new entry (shown by /cohorte-update-pipeline) before releasing."
             exit 1
           fi
 

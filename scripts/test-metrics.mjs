@@ -59,7 +59,7 @@ const usageOpus = {
 };
 
 const lines = [
-  user(0, '<command-message>build</command-message>\n<command-name>/build</command-name>'),
+  user(0, '<command-message>build</command-message>\n<command-name>/cohorte-build</command-name>'),
   // Case 1: one response, three lines, identical usage on each. Only one should be billed.
   assistant('m1', 5, 'claude-opus-5', usageOpus, [{ type: 'thinking', thinking: '...' }]),
   assistant('m1', 5, 'claude-opus-5', usageOpus, [{ type: 'text', text: 'hello' }]),
@@ -74,26 +74,34 @@ const lines = [
   assistant('m4', 605, 'claude-opus-5', { input_tokens: 0, output_tokens: 40 }),
   // Case 6: a command named inside ordinary prose. The harness emits no <command-name>
   // for this, but it is the way commands actually get invoked in practice.
-  user(1200, 'move on branding-ramp and /review'),
+  user(1200, 'move on branding-ramp and /cohorte-review'),
   assistant('m5', 1205, 'claude-opus-5', { input_tokens: 0, output_tokens: 60 }),
-  // Case 7: a short steer continues the /review rather than opening an anonymous run.
+  // Case 7: a short steer continues the /cohorte-review rather than opening an anonymous run.
   user(1260, 'continue'),
   assistant('m6', 1265, 'claude-opus-5', { input_tokens: 0, output_tokens: 70 }),
   // Case 8: a slash token that is not a command must not invent one.
   user(1800, 'look at the /usr/local/share directory and report what you find there'),
   assistant('m7', 1805, 'claude-opus-5', { input_tokens: 0, output_tokens: 10 }),
   // Case 9: a long prompt that merely DISCUSSES a command is not an invocation of it.
-  // Without the length gate, writing about /review bills the conversation to /review —
+  // Without the length gate, writing about /cohorte-review bills the conversation to /cohorte-review —
   // which is what happened in cohorte's own repo while the pipeline was being designed.
-  user(2400, 'I want to talk through how /review behaves when a surface has no findings at '
+  user(2400, 'I want to talk through how /cohorte-review behaves when a surface has no findings at '
     + 'all, because the verdict logic there is what produced the false green we saw last week '
     + 'and I am not convinced the fix covers the case where every reviewer dies at once.'),
   assistant('m8', 2405, 'claude-opus-5', { input_tokens: 0, output_tokens: 20 }),
+  // Case 10: a RETIRED command name still attributes to itself. 2.0.0 prefixed every
+  // command, so months of existing transcripts say `/build` — and the collector reads its
+  // known names off the shipped core, where `build.md` no longer exists. Without the
+  // retired list every one of those runs silently reclassifies to (chat), rewriting spend
+  // history and inflating the catch-all. This is the largest instance of that bug class,
+  // so it gets pinned rather than trusted to a comment.
+  user(3000, '/build branding-ramp'),
+  assistant('m9', 3005, 'claude-opus-5', { input_tokens: 0, output_tokens: 90 }),
 ];
 fs.writeFileSync(path.join(projectDir, `${SESSION}.jsonl`),
   lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
 
-// Case 3: subagent spend, linked back to /build by the Task tool_use id.
+// Case 3: subagent spend, linked back to /cohorte-build by the Task tool_use id.
 const agentDir = path.join(projectDir, SESSION, 'subagents');
 fs.writeFileSync(path.join(agentDir, 'agent-a1.meta.json'),
   JSON.stringify({ agentType: 'core', description: 'Build core surface', toolUseId: 'toolu_A', spawnDepth: 1 }));
@@ -109,13 +117,14 @@ if (run.status !== 0) {
   process.exit(1);
 }
 const out = JSON.parse(run.stdout);
-const build = out.commands.find((c) => c.command === '/build');
+const build = out.commands.find((c) => c.command === '/cohorte-build');
 const chat = out.commands.find((c) => c.command === '(chat)');
-const review = out.commands.find((c) => c.command === '/review');
+const retired = out.commands.find((c) => c.command === '/build');
+const review = out.commands.find((c) => c.command === '/cohorte-review');
 
 console.log('test-metrics');
-check('the mid-command task-notification did not split the run', out.totals.runs, 5);
-check('/build is one run, not three', build.runs, 1);
+check('the mid-command task-notification did not split the run', out.totals.runs, 6);
+check('/cohorte-build is one run, not three', build.runs, 1);
 check('duplicate lines of one response are billed once', build.tokens.output, 1000 + 500 + 2000);
 check('the <synthetic> message contributed no tokens', build.tokens.output < 999999, true);
 check('cache-write tokens are kept on their own tier', build.tokens.cacheWrite5m, 1000);
@@ -128,6 +137,9 @@ check('the continued turn counts toward the command it continued', review.tokens
 check('a non-command slash token does not invent a command', chat.tokens.output, 40 + 10 + 20);
 check('a long prompt that discusses a command is not counted as running it',
   review.runs, 1);
+check('a retired unprefixed command stays attributed to itself, not (chat)',
+  retired && retired.runs, 1);
+check('…and keeps its own spend', retired && retired.tokens.output, 90);
 
 // opus-5 $5 in / $25 out per MTok; 5m cache write 1.25x input, cache read 0.1x input.
 //   m1  100*5 + 1000*25 + 1000*6.25 + 10000*0.5 = 36750
@@ -136,7 +148,7 @@ check('a long prompt that discusses a command is not counted as running it',
 check('cost sums the cache tiers at their own rates', Number(build.cost.total.toFixed(6)), 0.07925);
 check('the unpriced list stays empty for known models', build.unpriced, []);
 
-const detail = out.runs.find((r) => r.command === '/build');
+const detail = out.runs.find((r) => r.command === '/cohorte-build');
 check('per-run detail carries the subagent', detail.agents.map((a) => a.type), ['core']);
 
 fs.rmSync(tmp, { recursive: true, force: true });

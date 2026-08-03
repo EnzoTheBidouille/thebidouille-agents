@@ -24,7 +24,7 @@ dashboard/
 | --- | --- |
 | `index.js` | HTTP server, routing, static serving (SPA fallback), streamed actions, `--host`/bind |
 | `versions.js` | installed core vs npm latest (registry fetch → `npm view` fallback, 5-min cache) |
-| `doctor.js` | the `/doctor` checks reimplemented in JS → `/api/state` (profile, agents, gate, hooks, …) |
+| `doctor.js` | the `/cohorte-doctor` checks reimplemented in JS → `/api/state` (profile, agents, gate, hooks, …) |
 | `yaml.js` | minimal block-YAML subset parser (for the `pipeline-profile` block + the config) |
 | `fleet.js` | tracked-project registry (`~/.claude/cohorte-dashboard.json`) + folder browse |
 | `kanban.js` | linked Obsidian board → columns/cards; PR enrichment + ship-date sort via `gh` |
@@ -37,7 +37,7 @@ Read: `GET /api/versions`, `/api/state?project=`, `/api/fleet`, `/api/browse?dir
 `DELETE /api/projects` (remove);
 `POST /api/action` — `{action:'install'|'update', scope, project}` (spawns the CLI),
 `{action:'reset', project, purgeSpecs}` (backup+wipe+reinstall), or
-`{action:'claude', command:'/init-pipeline'|'/update-pipeline'|'/audit', project}` (headless
+`{action:'claude', command:'/cohorte-init-pipeline'|'/cohorte-update-pipeline'|'/cohorte-audit', project}` (headless
 `claude -p`).
 Action responses stream chunked plain text ending in `__EXIT__ <code>`; the client reads the
 `ReadableStream` (`app/src/api.js` `streamAction`).

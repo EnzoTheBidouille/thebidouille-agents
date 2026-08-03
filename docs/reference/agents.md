@@ -1,7 +1,7 @@
 # Agents
 
 Two kinds: **fixed agents** shipped as-is by the installers, and **rendered surface agents**
-generated per project by `/init-pipeline` from a template. All are stateless — every dispatch
+generated per project by `/cohorte-init-pipeline` from a template. All are stateless — every dispatch
 re-supplies everything they need as exact file paths.
 
 ## Fixed agents
@@ -9,7 +9,7 @@ re-supplies everything they need as exact file paths.
 | Agent | Model | Tools | Job |
 | --- | --- | --- | --- |
 | `review` | sonnet | Read, Grep, Glob, retrieval MCP | Read-only reviewer / auditor. |
-| `release` | haiku | Read, Grep, Glob, Bash | Commit / push / PR ritual at `/ship`. |
+| `release` | haiku | Read, Grep, Glob, Bash | Commit / push / PR ritual at `/cohorte-ship`. |
 | `profile-reader` | haiku | Read, Grep, Glob | `PIPELINE.md` machine block → JSON (workflow phase 0). |
 
 ### `review`
@@ -32,7 +32,7 @@ what is real but **out of this feature's scope** — pre-existing code the diff 
 carrying its own out-of-scope reason. Deferred items count in no severity row, move no verdict, and get
 routed to `specs/refactor-backlog.md` by the lead; anything the diff touched, any spec violation and any
 security issue on a path this feature adds or calls is **never** deferrable. In **audit mode**
-(dispatched by `/audit`
+(dispatched by `/cohorte-audit`
 with a path instead of a spec) it emits a prioritized refactor backlog grouped by domain
 instead of a verdict.
 
@@ -53,7 +53,7 @@ it's the mandatory phase 0 of all four workflow scripts.
 
 ## Rendered surface agents
 
-`/init-pipeline` (and `/build` §1.5 when a spec grows the surface list) renders one agent per
+`/cohorte-init-pipeline` (and `/cohorte-build` §1.5 when a spec grows the surface list) renders one agent per
 `surfaces[]` entry from `core/agents/implementer.template.md` into
 `.claude/agents/<agent>.md`, substituting:
 
@@ -71,7 +71,7 @@ The rendered implementer:
   are append-only.
 - **Reads only the machine block** of `PIPELINE.md` at runtime — its conventions are baked in.
   If the bake visibly contradicts the profile, it says so in its handoff (the profile wins; the
-  agent needs a re-render via `/update-pipeline`).
+  agent needs a re-render via `/cohorte-update-pipeline`).
 - **Works strict TDD**: (design pull first for `uses_design` surfaces) → failing tests from the
   contract → implement to green → refactor to conventions → lint + format. Runs **bridled
   commands** (its `*_quiet_cmd`s, or `cmd 2>&1 | tail -40`).
@@ -83,6 +83,6 @@ The rendered implementer:
   code excerpts.
 
 **Agent files are regenerable artifacts.** Hand-written rules belong in `PIPELINE.md`
-§Conventions (which reconcile never touches), never in the agent files — `/update-pipeline`
-re-renders them from the current template on every reconcile. `/doctor` enforces the no-orphan
+§Conventions (which reconcile never touches), never in the agent files — `/cohorte-update-pipeline`
+re-renders them from the current template on every reconcile. `/cohorte-doctor` enforces the no-orphan
 rule both ways: every surface has its agent file, every non-fixed agent file has its surface.

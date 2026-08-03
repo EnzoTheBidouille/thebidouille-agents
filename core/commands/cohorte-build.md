@@ -17,16 +17,16 @@ You are the **lead**. Build feature **$ARGUMENTS** from its frozen spec.
 
 - Check the spec front-matter FIRST — `grep '^status:' specs/$ARGUMENTS.md` (or Read with a ~15-line
   limit) — before any full read. Buildable statuses are `frozen`, `in-review` and `in-progress` (the
-  last one means a `/drive` is or was driving this spec — SCHEMA.md §Spec status). `blocked` means a
-  loop gave up here: say so, and route by the spec's `## Remediation` — open items ⇒ `/fix`, none ⇒
+  last one means a `/cohorte-loop` is or was driving this spec — SCHEMA.md §Spec status). `blocked` means a
+  loop gave up here: say so, and route by the spec's `## Remediation` — open items ⇒ `/cohorte-fix`, none ⇒
   continue this build. Anything else (`draft`, missing, `shipped`) ⇒ stop and tell the human to run
-  `/spec` first. Only then read the body, selectively: front-matter, §5 contract, the surface
+  `/cohorte-spec` first. Only then read the body, selectively: front-matter, §5 contract, the surface
   task sections, and `## Remediation` (fall back to a full read if the spec doesn't follow the
   template's headings).
 - **Route check** — if `## Remediation` has open `- [ ]` items and none requires a contract change,
-  stop and tell the human to run `/fix $ARGUMENTS` instead: it re-dispatches only the surfaces with
+  stop and tell the human to run `/cohorte-fix $ARGUMENTS` instead: it re-dispatches only the surfaces with
   findings. A full build with open items is only right when the contract change ripples into clean
-  surfaces (the case `/fix` §1 falls back here for).
+  surfaces (the case `/cohorte-fix` §1 falls back here for).
 - **Design gate** — only if `design.enabled` and the feature has UI (some surface `uses_design`): if the
   spec front-matter `design_files` is empty, ask the human for the feature's design **links** and store
   them in `design_files`, then continue. Each entry is a full self-contained link of the form
@@ -56,7 +56,7 @@ For each surface to add: infer its `key`, `path`, `label`, `agent`, `tools`, `mo
 SCHEMA.md §"Rendering / reconciling a surface agent" — write the `surfaces[]` entry + §Conventions/§Testing
 stanza into `PIPELINE.md`, render `.claude/agents/<agent>.md` from the implementer template, applying the
 shared-code rule (shared trees get a single-owner surface; cross-slice shapes go through the contract).
-This is the automatic path: you don't send the human back to `/init-pipeline`. If nothing new is needed,
+This is the automatic path: you don't send the human back to `/cohorte-init-pipeline`. If nothing new is needed,
 say so and continue. Dispatch (§3) then covers the reconciled surface list.
 
 **Adding or splitting a surface is an architectural decision** — append ONE line for it to
@@ -70,7 +70,7 @@ One `>>` in the Bash call you're already making. Nothing added ⇒ nothing to ap
 **Zero extra agents: you already hold the spec, the profile and the reconciled surface list.** The
 whole point is that a bancal spec costs one verdict here instead of N implementers discovering it in
 parallel. Judge the frozen contract on **implementability only** — never on whether the feature is a
-good idea (that was `/brainstorm`), never by re-reading files you don't already need:
+good idea (that was `/cohorte-brainstorm`), never by re-reading files you don't already need:
 
 1. **Contract completeness** (§5) — every endpoint/interface has method+path (or signature), auth,
    request fields with types + validation, the success shape, and its error cases. A missing
@@ -89,8 +89,8 @@ good idea (that was `/brainstorm`), never by re-reading files you don't already 
    (this is §1's gate restated as a verdict, so an automated driver sees the same fact).
 
 Write the machine-readable verdict to `specs/reports/$ARGUMENTS.readiness.json` (overwrite,
-`mkdir -p specs/reports` first — the same gitignored buffer dir `/review` stages into, which may not
-exist yet on a first build) — on **every** build, including `READY`. It is the only channel between this gate and a driver (`/drive`),
+`mkdir -p specs/reports` first — the same gitignored buffer dir `/cohorte-review` stages into, which may not
+exist yet on a first build) — on **every** build, including `READY`. It is the only channel between this gate and a driver (`/cohorte-loop`),
 which parses no prose:
 
 ```json
@@ -104,7 +104,7 @@ which parses no prose:
   surface key or dependency name (no `:line` — it shifts on every edit); `<what>` is the gap, not the
   fix. `READY` ⇒ `[]`.
 - **`NOT-READY` ⇒ STOP: author no contract and spawn NO agent.** Print the gaps and send the human to
-  `/spec $ARGUMENTS` to patch the contract, then re-run `/build`. This abort is the whole point of the
+  `/cohorte-spec $ARGUMENTS` to patch the contract, then re-run `/cohorte-build`. This abort is the whole point of the
   step — a spec that cannot be built does not get cheaper by being built N times in parallel.
 - **`RESERVATIONS` ⇒ continue.** It never blocks (a gate that stalls a sound build on a missing error
   case would cost more human round-trips than it saves): inline each gap verbatim into the dispatch of
@@ -188,12 +188,12 @@ Bash call, chain the opt-in usage ping — **the shared form every phase command
 `<core>/pipeline/scripts/telemetry-send.sh <phase> "$ARGUMENTS" <seconds> "<results>" || true`
 (`<core>` = `~/.claude` global / `.claude` bundled; here `<phase>` = `build`, `<results>` =
 `<ok,ok|error,…>`) — a silent no-op unless the human explicitly consented (SCHEMA.md §Telemetry);
-never ask about consent here. `/review` and `/fix` chain the same line with their own
+never ask about consent here. `/cohorte-review` and `/cohorte-fix` chain the same line with their own
 phase + results. The `|| true` swallows a **missing** script too, so a half-copied core goes
-silent rather than loud — `/doctor` check 1 is what catches that.
-Then tell the human: exercise the feature by hand if it's worth it, then run `/review $ARGUMENTS` —
-unless a surface is dead, in which case say so first and let them decide whether to re-run `/build`
-(a dead surface has no findings, so `/fix` has nothing to re-dispatch).
+silent rather than loud — `/cohorte-doctor` check 1 is what catches that.
+Then tell the human: exercise the feature by hand if it's worth it, then run `/cohorte-review $ARGUMENTS` —
+unless a surface is dead, in which case say so first and let them decide whether to re-run `/cohorte-build`
+(a dead surface has no findings, so `/cohorte-fix` has nothing to re-dispatch).
 Do not run the app or migrations yourself here — building is not running.
 **Recommend a `/clear` now** — the spec, contract and diff are all on
 disk, and the lead's history is re-sent at input price on every turn it survives.

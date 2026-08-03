@@ -53,7 +53,7 @@ export default function ResetModal({ project, onClose, onChanged }) {
             <p className="reset-note">
               Everything is first backed up to <code>.claude.bak-&lt;timestamp&gt;/</code> (reversible).
               The shared <code>~/.claude</code> global core is never touched. Afterwards, run
-              <code> /init-pipeline</code> in Claude Code to regenerate the profile.
+              <code> /cohorte-init-pipeline</code> in Claude Code to regenerate the profile.
             </p>
             <label className="reset-check">
               <input type="checkbox" checked={purgeSpecs} onChange={e => setPurgeSpecs(e.target.checked)} />

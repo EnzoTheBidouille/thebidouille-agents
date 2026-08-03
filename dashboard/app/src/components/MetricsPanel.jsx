@@ -43,7 +43,7 @@ export default function MetricsPanel({ data }) {
 
       {(!data.present || features.length === 0) ? (
         <p className="muted">
-          No metrics yet — <code>/build</code>, <code>/review</code> and <code>/fix</code>{' '}
+          No metrics yet — <code>/cohorte-build</code>, <code>/cohorte-review</code> and <code>/cohorte-fix</code>{' '}
           append them to <code>.claude/pipeline-metrics.jsonl</code>.
         </p>
       ) : (
