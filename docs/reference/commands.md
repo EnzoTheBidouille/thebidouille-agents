@@ -107,7 +107,9 @@ stops. **The loop does not run in your session** — each phase is a separate `c
 its own context, driven by [`loop.sh`](/reference/scripts); all their output lands in
 `specs/reports/<id>.loop.log`, which the command is **forbidden** to read back. You get one line
 per phase and a three-line summary. Child flags come from `CLAUDE_FLAGS` (default
-`--permission-mode acceptEdits`). `disable-model-invocation: true` — it only starts when you ask.
+`--permission-mode bypassPermissions` — an unattended child cannot answer a permission prompt, and
+the [gate hook](gate.md) hard-denies the dangerous commands in that mode instead of asking).
+`disable-model-invocation: true` — it only starts when you ask.
 
 **It also does not run in your session's *process tree*.** The driver is launched detached via
 [`loop-detach.sh`](/reference/scripts) into its own `screen` session, then polled in ~9-minute
