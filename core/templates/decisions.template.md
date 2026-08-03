@@ -5,7 +5,7 @@
 > built* (surfaces, commands, conventions); this file says *what was decided and why*.
 >
 > **Append-only. One line per decision. No prose blocks, no code.** The bound is the point: this file
-> is read by `/spec`, `/brainstorm` and `/audit` — the deciding stages — and by **nothing else**.
+> is read by `/cohorte-spec`, `/cohorte-brainstorm` and `/cohorte-audit` — the deciding stages — and by **nothing else**.
 > Implementers and reviewers never read it: they work from the frozen contract, which already tells
 > them what to do; handing them the rationale too would cost `surfaces × dispatches` tokens per
 > feature for a fact they cannot act on.

@@ -25,7 +25,7 @@ Detect the mode from the pasted content:
 ## Mode A — new spec (input is a brainstorm return, or empty)
 
 1. If empty, look for a staged brainstorm return first — `specs/reports/*-brainstorm.md` (where
-   `/brainstorm` stages its output); one match ⇒ read it and confirm, several ⇒ ask which. None ⇒
+   `/cohorte-brainstorm` stages its output); one match ⇒ read it and confirm, several ⇒ ask which. None ⇒
    ask the human to paste the return (or describe the feature) and wait.
 2. Derive a `feature_id` (kebab-case slug). Confirm it.
 2b. **Size budget — a spec is a contract, not a novel.** Target ≤ ~300 lines; hard-think at 500.
@@ -47,15 +47,15 @@ Detect the mode from the pasted content:
    non-design surfaces never re-read the full brief on every dispatch).
 4b. **New-surface heads-up.** If the feature clearly introduces an area no existing `surfaces[].path`
    owns (a new service/app/top-level module), note it in the spec (a line in the relevant task section:
-   `> needs new surface: <proposed key/path>`). Don't render agents here — `/build` §1.5 auto-reconciles
-   it. This is just so the human isn't surprised when `/build` proposes a new agent.
+   `> needs new surface: <proposed key/path>`). Don't render agents here — `/cohorte-build` §1.5 auto-reconciles
+   it. This is just so the human isn't surprised when `/cohorte-build` proposes a new agent.
 5. When the human validates, **freeze**: write `specs/<id>.md` (`status: frozen`, front-matter filled).
    Create the file — do not ask the human to. **Postcondition:** `grep -q '^status: frozen' specs/<id>.md`
-   — if it fails the freeze didn't land; fix it before pointing the human at `/build`. Chain the
-   opt-in usage ping onto the postcondition's Bash call (`/build` §4's shared form, `<phase>` =
+   — if it fails the freeze didn't land; fix it before pointing the human at `/cohorte-build`. Chain the
+   opt-in usage ping onto the postcondition's Bash call (`/cohorte-build` §4's shared form, `<phase>` =
    `spec`, `<seconds>` = `0` — interactive time, not pipeline wall-clock, `<results>` = `frozen`).
    Ping only on a **landed** freeze, so the funnel counts specs that exist, not attempts. Mode B does
-   not ping — it re-enters an already-counted spec, and `/fix` covers that loop. Silent no-op without
+   not ping — it re-enters an already-counted spec, and `/cohorte-fix` covers that loop. Silent no-op without
    consent; never ask about consent here.
 5b. **Record the transverse decisions — the journal, not a summary.** Walk what the interview settled
    and keep ONLY the decisions that **outlive this feature**: a rule the next spec would otherwise
@@ -67,7 +67,7 @@ Detect the mode from the pasted content:
    `- <YYYY-MM-DD> · <area> · <decision> — because <reason> · <feature_id>`
    - **Never** duplicate what §5, `PIPELINE.md` §Conventions or the code already states — the journal
      carries the *non-obvious rule*, not the feature's content. A line that restates a spec section is
-     a line every future `/spec` pays for and learns nothing from.
+     a line every future `/cohorte-spec` pays for and learns nothing from.
    - **Contradicting an existing line** is allowed but never silent: tell the human which line this
      feature overrides, get their go-ahead, then append the new line with
      `· supersedes <YYYY-MM-DD> <area>` and move the old one to `## Superseded`.
@@ -79,28 +79,28 @@ Detect the mode from the pasted content:
    - **Write it to `specs/design/<id>.md`** (the authored artifact, versioned with the spec; spec §8
      holds the summary + pointer). Create the file — do not ask the human to. Keep it in the
      `specs/design/` subfolder, **not** `specs/<id>....md`: the `specs/*.md` glob that drives the
-     kanban backfill and `/doctor` is non-recursive, so a brief in the subfolder never gets mistaken
+     kanban backfill and `/cohorte-doctor` is non-recursive, so a brief in the subfolder never gets mistaken
      for a spec (no phantom card, no bogus stage). Overwrite it on every freeze.
    - Print ONLY the path + a one-line summary — never echo the brief into chat (it would sit in this
      session's history; echo it only if the human asks). Tell the human: copy it from
      `specs/design/<id>.md` into the design tool (if any — typically a fresh design project for this
-     feature), then run `/build <id>` and hand its design gate the resulting page link(s) — a full
+     feature), then run `/cohorte-build <id>` and hand its design gate the resulting page link(s) — a full
      `https://claude.ai/design/p/<projectId>?file=<file>` link carries its own project + page, no
      profile change needed. (They can also paste the links into the spec's `design_files` themselves.)
-     **Recommend a `/clear` before `/build`** — the frozen spec + `specs/design/<id>.md` are the whole
+     **Recommend a `/clear` before `/cohorte-build`** — the frozen spec + `specs/design/<id>.md` are the whole
      handoff.
 
 ## Mode B — review return (input is a REVIEW REPORT)
 
 1. Read the report — pasted as input, or (whenever nothing is pasted) read from
-   `specs/reports/<id>.md`, where `/review` stages its last report. Identify `feature_id` from its
+   `specs/reports/<id>.md`, where `/cohorte-review` stages its last report. Identify `feature_id` from its
    header; open `specs/<id>.md`.
 2. Append each finding to the spec's **`## Remediation`**, one per line:
    `- [ ] <severity> · <file:line> · <spec-violation|quality|security> · <concrete fix>`
    (Keep prior items; add the new round under a dated/numbered subheading.)
 3. If a finding implies the **contract** must change, update §5 and flag it so the lead re-authors the
    contract file.
-4. Set `status: in-review`. Tell the human to run `/build <id>` to re-dispatch fresh agents.
-   **Recommend a `/clear` before `/build`** — the spec is the whole handoff.
+4. Set `status: in-review`. Tell the human to run `/cohorte-build <id>` to re-dispatch fresh agents.
+   **Recommend a `/clear` before `/cohorte-build`** — the spec is the whole handoff.
 
 In both modes the spec is the single source of truth; agents are stateless and read only it + the diff.

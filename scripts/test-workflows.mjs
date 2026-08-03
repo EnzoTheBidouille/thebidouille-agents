@@ -105,7 +105,7 @@ console.log("review.js");
   ]));
   check("clean run ⇒ SHIP", result.verdict === "SHIP", `got ${result.verdict}`);
   check("clean run ⇒ no unreviewed surfaces", (result.unreviewedSurfaces || []).length === 0);
-  check("clean run ⇒ next is /ship", String(result.next).startsWith("/ship"), result.next);
+  check("clean run ⇒ next is /cohorte-ship", String(result.next).startsWith("/cohorte-ship"), result.next);
 }
 {
   // THE regression: every reviewer dies ⇒ zero findings ⇒ must NOT read as SHIP.
@@ -132,19 +132,19 @@ console.log("review.js");
 }
 {
   // A SHIP carrying HIGH findings is a real verdict, but it is not "go ship it":
-  // the conversational /review routes any surviving HIGH to /fix.
+  // the conversational /cohorte-review routes any surviving HIGH to /cohorte-fix.
   const { result } = await run("review.js", replier([
     ["review:", { verdict: "SHIP", findings: [finding()] }], ...BASE_REVIEW,
   ]));
   check("SHIP + HIGH findings ⇒ verdict still SHIP", result.verdict === "SHIP");
-  check("SHIP + HIGH findings ⇒ next routes to /fix, not /ship",
-    String(result.next).startsWith("/fix"), result.next);
+  check("SHIP + HIGH findings ⇒ next routes to /cohorte-fix, not /cohorte-ship",
+    String(result.next).startsWith("/cohorte-fix"), result.next);
 }
 {
   const { result } = await run("review.js", replier([
     ["review:", { verdict: "SHIP", findings: [finding({ severity: "LOW" })] }], ...BASE_REVIEW,
   ]));
-  check("SHIP + only LOW ⇒ next is /ship", String(result.next).startsWith("/ship"), result.next);
+  check("SHIP + only LOW ⇒ next is /cohorte-ship", String(result.next).startsWith("/cohorte-ship"), result.next);
 }
 {
   // Deferred findings are real but out of the feature's scope: they must be
@@ -163,8 +163,8 @@ console.log("review.js");
     return replier(BASE_REVIEW)(prompt, opts);
   });
   check("deferred-only ⇒ verdict still SHIP", result.verdict === "SHIP", `got ${result.verdict}`);
-  check("deferred-only ⇒ next is /ship (not a fix loop)",
-    String(result.next).startsWith("/ship"), result.next);
+  check("deferred-only ⇒ next is /cohorte-ship (not a fix loop)",
+    String(result.next).startsWith("/cohorte-ship"), result.next);
   check("deferred are counted (both surfaces)", result.deferred === 2, `got ${result.deferred}`);
   check("deferred stay out of the severity counts",
     Object.values(result.counts).every(n => n === 0), JSON.stringify(result.counts));

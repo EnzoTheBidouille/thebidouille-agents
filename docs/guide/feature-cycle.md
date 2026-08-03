@@ -5,14 +5,14 @@ does, what lands on disk, and where the human decisions sit. (The autonomous alt
 middle of this loop is run command by command.)
 
 ```
-/brainstorm → /spec → /build → /review → (/fix → /review)* → /ship
+/cohorte-brainstorm → /cohorte-spec → /cohorte-build → /cohorte-review → (/cohorte-fix → /cohorte-review)* → /cohorte-ship
      ↑ human      ↑ human                          ↑ human
 ```
 
 Between every two commands: **`/clear`**. Every handoff is on disk; clearing sheds the lead's
 accumulated history, which is re-sent at input price on every turn it survives.
 
-## 1. `/brainstorm` — pressure-test the idea
+## 1. `/cohorte-brainstorm` — pressure-test the idea
 
 An interactive roundtable in the main thread. The panel comes from `PIPELINE.md` §Personas (PM,
 skeptical senior engineer, UX designer, security… one voice per RBAC role when `rbac.enabled`),
@@ -25,10 +25,10 @@ When you're satisfied, it stages the **brainstorm return** to
 join key used by every later stage and the kanban card). With a board configured, the card moves
 to **Brainstorm**.
 
-If you start `/brainstorm` with no idea, it lists the cards in your kanban **Ideas** column (with
+If you start `/cohorte-brainstorm` with no idea, it lists the cards in your kanban **Ideas** column (with
 their notes as seed context) and lets you pick one.
 
-## 2. `/spec` — freeze the source of truth
+## 2. `/cohorte-spec` — freeze the source of truth
 
 Interactive, section by section over `specs/_template.md`. The critical section is **§5 CONTRACT**:
 every endpoint/interface — method, path, auth/role, request fields with types and validation,
@@ -40,12 +40,12 @@ Discipline built in:
 
 - **Size budget** — target ≤ ~300 lines. Every implementer re-reads the spec on every first
   build, so each extra line is paid `surfaces × dispatches` times. A spec that genuinely needs
-  more is two features — `/spec` proposes the split.
-- **Decision journal** — before the interview `/spec` reads `specs/_decisions.md` (one line per
+  more is two features — `/cohorte-spec` proposes the split.
+- **Decision journal** — before the interview `/cohorte-spec` reads `specs/_decisions.md` (one line per
   standing decision) so the new spec doesn't silently contradict settled ground; at freeze it
   appends the decisions that **outlive this feature** — typically 0–3 lines, and zero is normal.
   That file is the project's transverse memory: `PIPELINE.md` says how the repo is built, the
-  journal says what was decided and why. Read by `/brainstorm`, `/spec` and `/audit` only —
+  journal says what was decided and why. Read by `/cohorte-brainstorm`, `/cohorte-spec` and `/cohorte-audit` only —
   implementers and reviewers never load it (they have the contract; the rationale would cost
   `surfaces × dispatches` tokens for a fact they can't act on).
 - **Design brief** (UI features only) — authored to `specs/design/<id>.md`; spec §8 keeps only a
@@ -54,12 +54,12 @@ Discipline built in:
   `design_files` — each link carries its own project + page, so a design-system rebuild never
   invalidates the profile.
 - **New-surface heads-up** — if the feature introduces a tree no surface owns, the spec notes it;
-  `/build` auto-reconciles (renders the new agent) later.
+  `/cohorte-build` auto-reconciles (renders the new agent) later.
 
 On your validation it **freezes**: `status: frozen` in the front-matter. Kanban → **Ready to
 build**.
 
-`/spec` has a second mode: paste (or let it read) a REVIEW REPORT and it applies the findings to
+`/cohorte-spec` has a second mode: paste (or let it read) a REVIEW REPORT and it applies the findings to
 the spec's `## Remediation` instead — the re-entry path for review returns that change the
 contract.
 
@@ -69,19 +69,19 @@ role matrices, design links pinned down here = fix rounds and deferred questions
 later.
 :::
 
-## 3. `/build` — contract first, then parallel implementers
+## 3. `/cohorte-build` — contract first, then parallel implementers
 
-1. **Checks** the spec is frozen; routes you to `/fix` instead if only open remediation items
+1. **Checks** the spec is frozen; routes you to `/cohorte-fix` instead if only open remediation items
    remain (cheaper). For UI features, the **design gate** collects the `design_files` links if
    missing.
 2. **Reconciles surfaces** — if the spec touches an unowned tree, or one surface carries a
-   cleanly-separable bottleneck, `/build` proposes a new/split surface, renders its agent on
-   your go-ahead, and continues. You never go back to `/init-pipeline` for this.
-3. **Scores readiness** — before authoring anything, `/build` judges the frozen spec on
+   cleanly-separable bottleneck, `/cohorte-build` proposes a new/split surface, renders its agent on
+   your go-ahead, and continues. You never go back to `/cohorte-init-pipeline` for this.
+3. **Scores readiness** — before authoring anything, `/cohorte-build` judges the frozen spec on
    *implementability* (contract shapes complete · every area owned · named dependencies actually
    exist · no ambiguity a surface would have to guess at · design links present) and writes
    `specs/reports/<id>.readiness.json`. **`NOT-READY` aborts with zero agents spawned** and sends you
-   to `/spec`; `RESERVATIONS` never blocks — each gap is inlined into the affected surface's dispatch
+   to `/cohorte-spec`; `RESERVATIONS` never blocks — each gap is inlined into the affected surface's dispatch
    as an assumption the implementer must apply *and* flag. This costs no extra agent (the lead already
    holds the spec), which is the point: a bancal spec costs one verdict instead of N implementers
    discovering it in parallel.
@@ -109,11 +109,11 @@ report". So before integrating, the lead accounts for **every** dispatch: a sile
 recovery costs one agent, not a rebuild). Silent twice ⇒ the surface is `dead`: the lead stops speaking
 for it and checks the tree instead (that surface's own quiet commands, output redirected), reports it
 `DEAD — unverified`, records `"<key>":"dead"` in the metrics line and in
-`specs/reports/<id>.build.json`. The batch is never reported as ok. Same rule in `/review` (a dead
-reviewer lands in the verdict's `unreviewed[]` and forbids `SHIP`) and in `/fix` (a dead agent ticks no
+`specs/reports/<id>.build.json`. The batch is never reported as ok. Same rule in `/cohorte-review` (a dead
+reviewer lands in the verdict's `unreviewed[]` and forbids `SHIP`) and in `/cohorte-fix` (a dead agent ticks no
 checkbox). See [§Dead agents](/reference/profile).
 
-## 4. `/review` — audit the diff against the spec
+## 4. `/cohorte-review` — audit the diff against the spec
 
 Nothing in the pipeline *runs* the app: the preflight gate (**typecheck + lint + tests via
 `preflight.sh`; red aborts with the raw failure, zero agents spawned**) is the mechanical proof,
@@ -136,8 +136,8 @@ this feature's scope** — pre-existing code the diff never touched, adjacent de
 to fix. They sit in their own `## Deferred` section with an out-of-scope reason each, count in no
 severity row, move no verdict, and are never cross-checked. On **every** verdict the lead routes them
 into `specs/refactor-backlog.md` under the owning surface's `## <domain>` heading, tagged
-`deferred:<id>` — so `/refactor <domain>` picks them up, and `/review` feeds `/audit`'s backlog for
-free instead of dropping everything non-blocking. Never into `## Remediation`, which is what `/fix`
+`deferred:<id>` — so `/cohorte-refactor <domain>` picks them up, and `/cohorte-review` feeds `/cohorte-audit`'s backlog for
+free instead of dropping everything non-blocking. Never into `## Remediation`, which is what `/cohorte-fix`
 re-dispatches. What is *not* deferrable: anything the diff touched, any spec violation, any security
 issue on a path this feature adds or calls.
 
@@ -148,21 +148,21 @@ front-matter. Leftover LOW/MEDIUM nits take the same backlog route instead of fo
 Small re-reviews (≤ 2 files, ~40 lines, no contract/security) take a fast path: the lead verifies
 the hunks itself against the open remediation items instead of dispatching.
 
-## 5. `/fix` — the scoped loop
+## 5. `/cohorte-fix` — the scoped loop
 
 Reads the staged report (pasted, from this session, or from `specs/reports/<id>.md` after a
 `/clear`), appends findings to the spec's `## Remediation` as `- [ ]` items, then re-dispatches
 **only the surfaces owning open items** — each agent gets its items verbatim, reads only the
 files they name. If a finding implies the **contract** must change, the lead re-authors it itself
-(and falls back to a full `/build` only when the change ripples into clean surfaces).
+(and falls back to a full `/cohorte-build` only when the change ripples into clean surfaces).
 
 When agents return, the lead ticks `- [x]` what each handoff reports fixed, collapses fully-fixed
-rounds to one summary line (the spec stays bounded), and sends you back to `/review` for the
+rounds to one summary line (the spec stays bounded), and sends you back to `/cohorte-review` for the
 re-verdict. Kanban → **Fix**, then back to **Review**.
 
-### Or let it run itself — `/drive <id>`
+### Or let it run itself — `/cohorte-loop <id>`
 
-`/drive feat-x` runs steps 3–5 for you (`--no-build` starts at the review, on an already-built
+`/cohorte-loop feat-x` runs steps 3–5 for you (`--no-build` starts at the review, on an already-built
 feature) until a review returns **zero blocking findings** — CRITICAL or security only, so a LOW
 nit never costs a pass. It also stops at the `--max` ceiling (default 5) and, crucially, as soon
 as two consecutive reviews return the *same* blocking findings: the fix is treading water and
@@ -173,25 +173,25 @@ Each phase is a **separate `claude -p` child session**, so your session never ac
 diff, the N reports or the N contracts; it sees one line per phase and a three-line summary. The
 child transcripts go to `specs/reports/<id>.loop.log`, which the command is forbidden to read
 back — that log is for you, in an editor, for free. See
-[`/drive`](/reference/commands) for the exit codes.
+[`/cohorte-loop`](/reference/commands) for the exit codes.
 
 **It survives being interrupted.** Before every phase the driver stamps `status: in-progress` plus
 `loop_pass` and `loop_phase` into the spec's front-matter (deterministic `awk`, zero tokens), and on
-exit a terminal status — `in-review` when clean, `blocked` otherwise. So `/drive feat-x --resume`
+exit a terminal status — `in-review` when clean, `blocked` otherwise. So `/cohorte-loop feat-x --resume`
 continues at the pass it reached instead of re-paying the ones it already made, whether the session
 died, the ceiling hit, or the fix stopped converging. The spec *is* the state: the dashboard's specs
-board shows `↻ pass 3 · /review` on the card, and `/doctor` names any spec left mid-loop.
+board shows `↻ pass 3 · /cohorte-review` on the card, and `/cohorte-doctor` names any spec left mid-loop.
 
-## 6. `/ship` — the human gate
+## 6. `/cohorte-ship` — the human gate
 
 - Confirms the last verdict was **SHIP**; recomputes the freshness digest — **if the source
-  changed since the review verdict, it refuses** and sends you back to `/review`.
+  changed since the review verdict, it refuses** and sends you back to `/cohorte-review`.
 - Verifies the DoD checkboxes; open items require your explicit "ship anyway".
 - Asks you to confirm. Then: spec `status: shipped` (before dispatch, so it ships in the same
   commit), and the `release` agent writes conventional commits, pushes (never force), opens the
   PR (`gh` when available, otherwise compare URL + drafted body from the template). It never
   edits source and refuses staged secrets.
-- Watches CI (`gh pr checks --watch`); red ⇒ back to `/fix`. After the merge, proposes the
+- Watches CI (`gh pr checks --watch`); red ⇒ back to `/cohorte-fix`. After the merge, proposes the
   worktree teardown (`scripts/remove-feature.sh <id>`). Kanban → **Shipped**, with the PR number
   written on the card.
 
@@ -199,16 +199,16 @@ board shows `↻ pass 3 · /review` on the card, and `/doctor` names any spec le
 
 | Path | Written by | Read by |
 | --- | --- | --- |
-| `specs/<id>.md` | `/spec` (+ `/fix` remediation, `/review` DoD + freshness stamp) | everyone |
-| `specs/design/<id>.md` | `/spec` | design surfaces, design tools |
-| `<contract.path>/<id>.<ext>` | the lead (`/build`, `/fix`) | implementers (read-only), reviewers |
-| `specs/reports/<id>.md` | `/review` (gitignored buffer) | `/fix` after a `/clear` |
-| `specs/reports/<id>.<surface>.diff` | `/review` §1 | the per-surface reviewers |
+| `specs/<id>.md` | `/cohorte-spec` (+ `/cohorte-fix` remediation, `/cohorte-review` DoD + freshness stamp) | everyone |
+| `specs/design/<id>.md` | `/cohorte-spec` | design surfaces, design tools |
+| `<contract.path>/<id>.<ext>` | the lead (`/cohorte-build`, `/cohorte-fix`) | implementers (read-only), reviewers |
+| `specs/reports/<id>.md` | `/cohorte-review` (gitignored buffer) | `/cohorte-fix` after a `/clear` |
+| `specs/reports/<id>.<surface>.diff` | `/cohorte-review` §1 | the per-surface reviewers |
 | `specs/reports/<id>.preflight.txt` | `preflight.sh` | you, on abort |
-| `specs/reports/<id>.verdict.json` | `/review` §3, every run | `/drive` — the only machine contract |
-| `specs/reports/<id>.readiness.json` | `/build` §1.6, every build | `/drive` (exit 4), you on a `NOT-READY` |
-| `specs/reports/<id>.build.json` | `/build` §4, every batch | `/drive` (exit 2 on a dead implementer) |
+| `specs/reports/<id>.verdict.json` | `/cohorte-review` §3, every run | `/cohorte-loop` — the only machine contract |
+| `specs/reports/<id>.readiness.json` | `/cohorte-build` §1.6, every build | `/cohorte-loop` (exit 4), you on a `NOT-READY` |
+| `specs/reports/<id>.build.json` | `/cohorte-build` §4, every batch | `/cohorte-loop` (exit 2 on a dead implementer) |
 | `specs/reports/<id>.loop.log` · `.built` | `loop.sh` | you, in an editor — **never** an agent |
-| `.claude/pipeline-metrics.jsonl` | `/build` `/review` `/fix` (gitignored) | surface-split decisions, dashboard |
-| `specs/refactor-backlog.md` | `/audit` + `/review`'s deferred findings | `/refactor` |
-| `specs/_decisions.md` | `/spec` at freeze, `/build` on a surface split | `/brainstorm` `/spec` `/audit` only |
+| `.claude/pipeline-metrics.jsonl` | `/cohorte-build` `/cohorte-review` `/cohorte-fix` (gitignored) | surface-split decisions, dashboard |
+| `specs/refactor-backlog.md` | `/cohorte-audit` + `/cohorte-review`'s deferred findings | `/cohorte-refactor` |
+| `specs/_decisions.md` | `/cohorte-spec` at freeze, `/cohorte-build` on a surface split | `/cohorte-brainstorm` `/cohorte-spec` `/cohorte-audit` only |

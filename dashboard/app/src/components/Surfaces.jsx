@@ -6,7 +6,7 @@ export default function Surfaces({ profile }) {
     return (
       <section className="panel">
         <h2>Surfaces</h2>
-        <p className="muted">No PIPELINE.md profile — run <code>/init-pipeline</code>.</p>
+        <p className="muted">No PIPELINE.md profile — run <code>/cohorte-init-pipeline</code>.</p>
       </section>
     );
   }

@@ -41,12 +41,12 @@ const IDLE_GAP_S = 120;
 
 // A prompt this short with no command in it ("continue", "go", "ok next") is the human
 // steering a run that is already going, not starting a new one. Without this, a single
-// /review driven by three "continue"s reports as one /review plus three anonymous chat
+// /cohorte-review driven by three "continue"s reports as one /cohorte-review plus three anonymous chat
 // runs, and three quarters of its cost lands under (chat).
 const CONTINUATION_MAX_CHARS = 40;
 
 // Commands are recognised two ways. `<command-name>` is emitted only when the whole prompt
-// IS the slash command; in practice people write "move on branding-ramp and /review", which
+// IS the slash command; in practice people write "move on branding-ramp and /cohorte-review", which
 // the harness records as ordinary prose. So we also look for an inline mention, checked
 // against the real command list rather than any /token — otherwise a file path like
 // /usr/bin or a URL fragment would invent commands that were never run.
@@ -60,20 +60,29 @@ function knownCommands() {
   }
   // Fallback for a collector run outside the package (e.g. copied into a repo on its own).
   if (!names.size) {
-    for (const n of ['brainstorm', 'spec', 'build', 'review', 'fix', 'ship',
-                     'audit', 'refactor', 'align-ds', 'doctor', 'init-pipeline', 'update-pipeline']) names.add(n);
+    for (const n of ['cohorte-brainstorm', 'cohorte-spec', 'cohorte-build', 'cohorte-review',
+                     'cohorte-fix', 'cohorte-ship', 'cohorte-audit', 'cohorte-refactor',
+                     'cohorte-align-ds', 'cohorte-doctor', 'cohorte-loop',
+                     'cohorte-init-pipeline', 'cohorte-update-pipeline']) names.add(n);
   }
   // Retired commands. The list above is read from the shipped core, so a command that is
   // removed stops being recognised — and every run of it already in the transcripts silently
   // reclassifies as (chat), rewriting history and inflating the catch-all bucket. Keep the
   // names here so past runs stay attributed to what actually ran.
-  for (const n of ['cycle', 'smoke']) names.add(n);
+  //
+  // 2.0.0 prefixed every command with `cohorte-`, which retires all 13 bare names at once:
+  // months of transcripts say `/build`, and without these they would all reclassify to (chat)
+  // — the largest instance of exactly the bug this list exists to prevent. `drive`/`loop` are
+  // both here because the driver was `/loop` → `/drive` (1.6.0) → `/cohorte-loop` (2.0.0).
+  for (const n of ['cycle', 'smoke', 'drive', 'loop', 'brainstorm', 'spec', 'build', 'review',
+                   'fix', 'ship', 'audit', 'refactor', 'align-ds', 'doctor',
+                   'init-pipeline', 'update-pipeline']) names.add(n);
   return names;
 }
 const COMMANDS = knownCommands();
 
 // An invocation is a short instruction that is mostly the command ("move on branding-ramp
-// and /review"). A long prompt that happens to name one is someone TALKING ABOUT the
+// and /cohorte-review"). A long prompt that happens to name one is someone TALKING ABOUT the
 // command — a bug report, a design discussion, a pasted transcript. Counting those as runs
 // inflates a command's run count and cost with conversation that never invoked it, which is
 // exactly what happened in cohorte's own repo while this pipeline was being discussed.
@@ -84,7 +93,7 @@ function commandIn(text) {
   const explicit = /<command-name>\s*(\/?[\w:-]+)\s*<\/command-name>/.exec(text);
   if (explicit) return explicit[1].replace(/^\//, '');
   if (text.trim().length > MENTION_MAX_CHARS) return null;
-  // Last mention wins: "finish /build then /review" ends on the one being asked for.
+  // Last mention wins: "finish /cohorte-build then /cohorte-review" ends on the one being asked for.
   let found = null;
   for (const m of text.matchAll(/(?:^|\s)\/([a-z][a-z0-9-]{2,})\b/g)) {
     if (COMMANDS.has(m[1])) found = m[1];
@@ -250,7 +259,7 @@ function parseSession(file) {
       // Not every user-role turn is the human starting something. The harness injects
       // turns mid-run — a local-command echo, and (critically for cohorte) a
       // <task-notification> when a background agent finishes. Those arrive DURING a
-      // a /build; treating them as boundaries chops one command into several
+      // a /cohorte-build; treating them as boundaries chops one command into several
       // cheap-looking fragments and strands the agent spend in the wrong segment.
       if (!cmd && /<(local-command-(stdout|stderr)|task-notification|system-reminder)>/.test(text)) continue;
       // A short steer with no command keeps the current run open rather than opening a new

@@ -1,8 +1,8 @@
-// cohorte — /review as a deterministic workflow (opt-in; the conversational
-// /review command remains the default path and the fallback).
+// cohorte — /cohorte-review as a deterministic workflow (opt-in; the conversational
+// /cohorte-review command remains the default path and the fallback).
 //
 // Invoke with args = {feature: "<feature_id>"} (or the bare feature id string).
-// Requires Claude Code >= 2.1.154 with workflows enabled — /doctor reports this.
+// Requires Claude Code >= 2.1.154 with workflows enabled — /cohorte-doctor reports this.
 //
 // Shape (SCHEMA.md §Workflows): phase 0 reads the profile through the
 // profile-reader agent (scripts have no filesystem or shell), the deterministic
@@ -134,7 +134,7 @@ const FINDING = {
 // A DEFERRED finding is real but out of this feature's scope (pre-existing code the
 // diff never touched). It carries its own out-of-scope reason, counts in no severity
 // row, is never cross-checked, and can never move the verdict — it is routed to
-// specs/refactor-backlog.md so /refactor owns it. See core/agents/review.md §Deferred.
+// specs/refactor-backlog.md so /cohorte-refactor owns it. See core/agents/review.md §Deferred.
 const DEFERRED = {
   type: 'object', required: ['severity', 'file', 'line', 'kind', 'problem', 'fix', 'outOfScope'],
   additionalProperties: false,
@@ -183,7 +183,7 @@ const surfaces = Array.isArray(profile.surfaces) ? profile.surfaces : []
 // guard compares against `surfaces` — an empty list makes them all vacuously
 // pass. Fail loudly here instead of finishing with nothing done.
 if (!surfaces.length) {
-  return { verdict: 'ABORTED', reason: 'profile has no surfaces — nothing would be reviewed. the `yaml pipeline-profile` block in PIPELINE.md is empty or unparseable, or the profile-reader mis-returned; run /doctor' }
+  return { verdict: 'ABORTED', reason: 'profile has no surfaces — nothing would be reviewed. the `yaml pipeline-profile` block in PIPELINE.md is empty or unparseable, or the profile-reader mis-returned; run /cohorte-doctor' }
 }
 const quiet = (q, full) => (q && !String(q).startsWith('<') ? q : full ? `${full} 2>&1 | tail -40` : '')
 const checks = [cmds.typecheck, quiet(cmds.lint_quiet, cmds.lint), quiet(cmds.test_quiet, cmds.test)]
@@ -203,7 +203,7 @@ const pre = await agent(
 if (!pre || !pre.pass) {
   return {
     verdict: 'ABORTED',
-    reason: 'preflight red — fix the mechanical failures (or run /fix) before any review; no reviewer was spawned',
+    reason: 'preflight red — fix the mechanical failures (or run /cohorte-fix) before any review; no reviewer was spawned',
     failures: (pre && pre.tail) || 'preflight agent returned nothing',
   }
 }
@@ -226,7 +226,7 @@ if (!staged) {
   return {
     verdict: 'ABORTED',
     reason: 'the diff-staging agent died — no reviewer was spawned and nothing was reviewed',
-    next: `re-run the review workflow, or /review ${feature} conversationally`,
+    next: `re-run the review workflow, or /cohorte-review ${feature} conversationally`,
   }
 }
 const touched = staged.surfaces || []
@@ -283,7 +283,7 @@ if (unreviewed.length) log(`Reviewer died on: ${unreviewed.join(', ')} — those
 const kept = results.flatMap(r => r.kept.map(f => ({ ...f, surface: r.key })))
 const refuted = results.flatMap(r => r.refuted.map(f => ({ ...f, surface: r.key })))
 // Deferred findings are deliberately kept OUT of `counts`, out of `verdict` and out
-// of `clean`: they belong to /refactor, not to this feature's fix loop.
+// of `clean`: they belong to /cohorte-refactor, not to this feature's fix loop.
 const deferredAll = results.flatMap(r => (r.deferred || []).map(f => ({ ...f, surface: r.key })))
 const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }
 for (const f of kept) counts[f.severity] = (counts[f.severity] || 0) + 1
@@ -295,8 +295,8 @@ const verdict = kept.some(f => f.kind === 'security') ? 'BLOCK'
   : kept.some(f => f.severity === 'CRITICAL') ? 'REVISE'
     : unreviewed.length ? 'REVISE' : 'SHIP'
 // Only a SHIP whose leftovers are all LOW is a clean bill of health. The
-// conversational /review routes any surviving CRITICAL/HIGH/security to /fix, so
-// this path must not answer "/ship" on a SHIP that still carries HIGH findings.
+// conversational /cohorte-review routes any surviving CRITICAL/HIGH/security to /cohorte-fix, so
+// this path must not answer "/cohorte-ship" on a SHIP that still carries HIGH findings.
 const clean = verdict === 'SHIP' && kept.every(f => f.severity === 'LOW')
 
 // ── Phase 5 — stage the merged report; only the verdict leaves the workflow ──
@@ -314,7 +314,7 @@ const reportBody = [
     ? deferredAll.map(f => `${findingLine(f)} · out of scope: ${f.outOfScope} · deferred:${feature}`).join('\n')
     : 'None.',
   ...(unreviewed.length ? ['', '## NOT reviewed (reviewer died — no verdict on these)', '',
-    unreviewed.map(k => `- \`${k}\` — re-run /review ${feature} (or the review workflow)`).join('\n')] : []),
+    unreviewed.map(k => `- \`${k}\` — re-run /cohorte-review ${feature} (or the review workflow)`).join('\n')] : []),
   ...(refuted.length ? ['', '## Refuted by cross-check (no action needed)', '',
     refuted.map(f => `- ${f.file}:${f.line} · ${f.problem} — refuted: ${f.reason}`).join('\n')] : []),
 ].join('\n')
@@ -331,18 +331,18 @@ const staging = await agent(
     ? `3b. Route the deferred findings to specs/refactor-backlog.md (create it if absent): for each line below, ` +
       `append it under the \`## <domain>\` heading named in its prefix (create that heading if absent) — with \`>>\`, ` +
       `never by rewriting the file, and skip any whose file path + first words already appear there (grep -F first, ` +
-      `they may be left from a prior round or an /audit):\n` +
+      `they may be left from a prior round or an /cohorte-audit):\n` +
       deferredAll.map(f =>
         `${f.surface}||- [ ] ${f.severity} · ${f.file}:${f.line} · ${f.kind} · ${f.fix} · deferred:${feature}`).join('\n') +
       '\n'
     : '') +
-  // Stamp + tick only when nothing above LOW survived: the conversational /review
+  // Stamp + tick only when nothing above LOW survived: the conversational /cohorte-review
   // keeps the stamp only for LOW findings, and a SHIP verdict here can still carry
-  // HIGH/MEDIUM ones — certifying those for /ship would ship known defects. A dead
+  // HIGH/MEDIUM ones — certifying those for /cohorte-ship would ship known defects. A dead
   // reviewer already forced the verdict off SHIP, so `clean` covers that too.
   (clean
-    ? `4. Stamp the freshness gate in specs/${feature}.md's front-matter, exactly as the conversational /review §3 does ` +
-      `(so /ship can prove the reviewed code is what ships): BASE=$(git merge-base ${base} HEAD); set reviewed_base: $BASE and ` +
+    ? `4. Stamp the freshness gate in specs/${feature}.md's front-matter, exactly as the conversational /cohorte-review §3 does ` +
+      `(so /cohorte-ship can prove the reviewed code is what ships): BASE=$(git merge-base ${base} HEAD); set reviewed_base: $BASE and ` +
       `reviewed_digest: $(git diff $BASE -- . ':(exclude)specs/' | sha256sum | cut -c1-16). ` +
       '5. Tick the spec DoD boxes this run verified (spec conformance + copy language — review SHIP; tests/lint/typecheck — green preflight); leave the rest unticked.\n'
     : '') +
@@ -352,14 +352,14 @@ const staging = await agent(
 
 // The staging agent writes the report, the metrics line, and (when clean) the
 // freshness stamp + DoD ticks. If it died, none of that is on disk — returning
-// `report: <path>` and "/ship" would point the human at a file that does not
+// `report: <path>` and "/cohorte-ship" would point the human at a file that does not
 // exist and certify a stamp that was never written.
 const staged_ok = staging != null && /done/i.test(String(staging))
 
 return {
   verdict,
   counts,
-  deferred: deferredAll.length,     // parked in the backlog for /refactor — never blocking
+  deferred: deferredAll.length,     // parked in the backlog for /cohorte-refactor — never blocking
   refutedByCrossCheck: refuted.length,
   reportStaged: staged_ok,
   unreviewedSurfaces: unreviewed,   // reviewers that died — these carry NO verdict
@@ -367,12 +367,12 @@ return {
     .map(f => `[${f.surface}] ${f.file}:${f.line} — ${f.problem}`),
   report: staged_ok ? `specs/reports/${feature}.md` : '(NOT written — the staging agent died)',
   next: !staged_ok
-    ? `the report/metrics/freshness stamp were NEVER written (staging agent died) — the verdict above is real, but nothing is on disk: re-run the review workflow, or /review ${feature}`
+    ? `the report/metrics/freshness stamp were NEVER written (staging agent died) — the verdict above is real, but nothing is on disk: re-run the review workflow, or /cohorte-review ${feature}`
     : unreviewed.length
       ? `re-run the review — no reviewer completed on: ${unreviewed.join(', ')}`
       : clean
-        ? `/ship ${feature} (DoD ticked + freshness stamped)`
+        ? `/cohorte-ship ${feature} (DoD ticked + freshness stamped)`
         : verdict === 'SHIP'
-        ? `/fix ${feature} — SHIP verdict, but ${kept.length} finding(s) above LOW survived; park them in specs/refactor-backlog.md instead if you deliberately defer them`
-        : `/fix ${feature}`,
+        ? `/cohorte-fix ${feature} — SHIP verdict, but ${kept.length} finding(s) above LOW survived; park them in specs/refactor-backlog.md instead if you deliberately defer them`
+        : `/cohorte-fix ${feature}`,
 }

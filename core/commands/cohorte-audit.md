@@ -5,7 +5,7 @@ argument-hint: [path or domain, default = whole repo]
 ---
 
 You are the **lead**. Audit **$ARGUMENTS** (default: whole repo) to drive it to a clean base. Read +
-analyze only — no fixes (those go through `/refactor`).
+analyze only — no fixes (those go through `/cohorte-refactor`).
 
 > Read `PIPELINE.md` §`commands` (the mechanical gates), `surfaces`, and §Conventions — plus
 > `specs/_decisions.md` §Live if it exists (SCHEMA.md §Decisions): those standing decisions are part
@@ -44,8 +44,8 @@ Merge mechanical + convention findings into one prioritized backlog and **write
 
 **Carry over the deferred items** before overwriting: `grep -n 'deferred:' specs/refactor-backlog.md`
 and re-emit every **open** (`- [ ]`) match verbatim under its domain, tag included. Those lines were
-put there by `/review` §3.5 — a real finding a feature deliberately did not own — and an audit that
+put there by `/cohorte-review` §3.5 — a real finding a feature deliberately did not own — and an audit that
 blindly overwrites the file is the one way they silently disappear. Already-ticked (`- [x]`) ones are
 done: drop them.
 Print a short summary (counts per domain + top items). Tell the human: refactor a domain with
-`/refactor <domain>`.
+`/cohorte-refactor <domain>`.

@@ -15,15 +15,15 @@ You are the **lead**. Ship feature **$ARGUMENTS**. This is the outward-facing ga
 
 ## 1. Pre-flight (confirm before doing anything irreversible)
 
-- Confirm the latest `/review` returned **SHIP** (no CRITICAL, no security). If not reviewed, or the
+- Confirm the latest `/cohorte-review` returned **SHIP** (no CRITICAL, no security). If not reviewed, or the
   verdict was REVISE/BLOCK, stop and say so.
 - **Freshness gate** — the reviewed code must be exactly what ships. If the spec front-matter carries
   `reviewed_base` + `reviewed_digest`, recompute
   `git diff <reviewed_base> -- . ':(exclude)specs/' | sha256sum | cut -c1-16` and compare to
   `reviewed_digest`. **Match** ⇒ source unchanged since the SHIP verdict, proceed. **Mismatch** ⇒ source
   (or the contract) was edited after review — the verdict is **stale**: stop and tell the human to re-run
-  `/review $ARGUMENTS` before shipping. Missing fields (spec predates the gate) ⇒ skip, don't block.
-- **DoD gate (verify, don't tick — `/review` owns the ticking).** Read `specs/$ARGUMENTS.md`
+  `/cohorte-review $ARGUMENTS` before shipping. Missing fields (spec predates the gate) ⇒ skip, don't block.
+- **DoD gate (verify, don't tick — `/cohorte-review` owns the ticking).** Read `specs/$ARGUMENTS.md`
   §`Acceptance criteria / DoD`; if any item is still `- [ ]`, list the open ones and ask the human to
   confirm shipping anyway (they may be deferred on purpose — e.g. a UI item on a backend-only feature).
   All `- [x]` ⇒ proceed silently.
@@ -61,7 +61,7 @@ or an offset-limited Read around the match): exactly one card, under the `shippe
 re-read the whole board into context. No board ⇒ skip silently.
 
 **Telemetry — the usage ping that closes the funnel.** Chain it onto the verify call above
-(`/build` §4's shared form, `<phase>` = `ship`, `<seconds>` = `0` — the release agent's duration is
+(`/cohorte-build` §4's shared form, `<phase>` = `ship`, `<seconds>` = `0` — the release agent's duration is
 not the pipeline's, `<results>` = `pr` when a PR was created / `compare` when only a compare URL was
 emitted). Fire it **after** the release agent reports success, never on an aborted ship — a `ship`
 event must mean the feature actually left the pipeline. No board ⇒ still ping, in its own `|| true`
@@ -70,7 +70,7 @@ call. Silent no-op without consent; never ask about consent here.
 ## 5. After the PR — CI gate + teardown
 
 - If `host: github` and `gh` is available, watch the PR's checks (`gh pr checks <url> --watch`) and
-  report the result — the human merges only on green. A red check ⇒ back to `/fix $ARGUMENTS`.
+  report the result — the human merges only on green. A red check ⇒ back to `/cohorte-fix $ARGUMENTS`.
 - Once the human confirms the PR is **merged**: if `isolation.enabled`, propose the teardown —
   `scripts/remove-feature.sh $ARGUMENTS` (add `--drop-db` to also drop the feature db; kept by
   default). It removes the worktree, deletes the merged branch, frees the slot. Never run it before

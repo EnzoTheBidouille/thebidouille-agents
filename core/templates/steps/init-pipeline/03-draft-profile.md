@@ -1,4 +1,4 @@
-# /init-pipeline · 03 Draft the profile
+# /cohorte-init-pipeline · 03 Draft the profile
 
 ### Phase 3 — Draft the profile (show, don't write yet)
 

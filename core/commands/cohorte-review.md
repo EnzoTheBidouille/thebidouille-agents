@@ -13,7 +13,7 @@ You are the **lead**. Dispatch the review for feature **$ARGUMENTS**.
 >
 > **Workflow variant** (opt-in — SCHEMA.md §Workflows): on Claude Code ≥ 2.1.154 with workflows
 > enabled, the human can ask to "run the review workflow" (`<core>/workflows/review.js`) instead.
-> This conversational path stays the default and the fallback; `/doctor` shows which is available.
+> This conversational path stays the default and the fallback; `/cohorte-doctor` shows which is available.
 
 ## 0. Deterministic pre-flight — no agents while red
 
@@ -27,7 +27,7 @@ with `test -x`); note the epoch (`date +%s`) in the same call — §3's metrics 
 ```
 
 - **Non-zero exit** ⇒ the script already printed the raw last-40 lines. **STOP: relay them verbatim
-  and spawn NO agent** — a compiler/test failure needs `/fix` (or the human), not a review that
+  and spawn NO agent** — a compiler/test failure needs `/cohorte-fix` (or the human), not a review that
   rediscovers it at agent prices. This abort is the whole point of the step. Before stopping, write
   the **aborted verdict** (§3's contract, degraded form) so an automated driver gets a diagnosis
   rather than silence:
@@ -58,7 +58,7 @@ with `test -x`); note the epoch (`date +%s`) in the same call — §3's metrics 
 ## 2. Dispatch review agents — one per touched surface, IN PARALLEL
 
 Spawn ONE `review` agent per surface that has changed files, in a **single message** (one Task call
-each, like `/build`) so they run concurrently — NEVER serially: review wall-clock must be the
+each, like `/cohorte-build`) so they run concurrently — NEVER serially: review wall-clock must be the
 slowest surface, not the sum. A diff touching a single surface ⇒ a single reviewer.
 
 **Small-diff fast path (re-reviews only):** if a surface's staged diff is tiny (≤2 files and ≤~40
@@ -97,23 +97,24 @@ from no evidence at all (SCHEMA.md §Dead agents). So:
 - **Silent twice ⇒ that surface is `unreviewed`.** Name it in the report under
   `## NOT reviewed (no verdict on these)`, list it in the verdict JSON's `unreviewed`, and **refuse to
   score `SHIP`** — the merged verdict is at least `REVISE`. Absence of evidence is not evidence of
-  absence, and it must never reach `/ship` or tick a DoD box.
+  absence, and it must never reach `/cohorte-ship` or tick a DoD box.
 - **Never re-review the other surfaces** to compensate: their reports are valid and already on disk.
 
 Then merge the returned reports into **one** REVIEW REPORT (same template): findings concatenated and
 re-ordered by severity, counts summed, duplicates collapsed, verdict = the worst returned
 (`BLOCK` > `REVISE` > `SHIP`). The `## Deferred` sections merge the same way (dedupe by
 `file` + problem) and stay **out of the severity table and out of the verdict** — see §3.5, which
-routes them. Append ONE metrics line for the batch to `pipeline-metrics.jsonl`
-(main-checkout path + rules in `/build` §4): `{"ts":"<ISO>","feature":"$ARGUMENTS","phase":"review","seconds":<wall-clock>,"surfaces":{"<key>":"<verdict>:<finding count>",…}}`.
-In the same Bash call, chain the opt-in usage ping (`/build` §4, `phase: "review"`, results = the
+routes them. Append ONE metrics line for the batch to the **main checkout's**
+`$(dirname "$(git rev-parse --git-common-dir)")/.claude/pipeline-metrics.jsonl` (rules in
+`/cohorte-build` §4; never a bare relative path — from a worktree that strands the lines): `{"ts":"<ISO>","feature":"$ARGUMENTS","phase":"review","seconds":<wall-clock>,"surfaces":{"<key>":"<verdict>:<finding count>",…}}`.
+In the same Bash call, chain the opt-in usage ping (`/cohorte-build` §4, `phase: "review"`, results = the
 merged verdict + total finding count, e.g. `"REVISE:3"`).
 **Stage the full report to `specs/reports/$ARGUMENTS.md`** (overwrite) — a gitignored buffer so a
-`/fix` after a `/clear` can still read the findings; the `specs/reports/` subfolder is skipped by the
+`/cohorte-fix` after a `/clear` can still read the findings; the `specs/reports/` subfolder is skipped by the
 non-recursive `specs/*.md` glob, so it's never mistaken for a spec (no phantom card, no bogus stage).
 **Write the machine-readable verdict** to `specs/reports/$ARGUMENTS.verdict.json` (overwrite) — on
 **every** run, including the small-diff fast path of §2 and a `SHIP`. This file is the ONLY contract
-between the pipeline and an automated driver (`/drive`), which parses no prose:
+between the pipeline and an automated driver (`/cohorte-loop`), which parses no prose:
 
 ```json
 { "id": "$ARGUMENTS", "phase": "review", "ts": "<ISO>", "verdict": "REVISE",
@@ -151,17 +152,17 @@ Do this on **every** run, before the verdict branch below, and whatever the verd
 finding that is only routed on a `SHIP` is a deferred finding lost on every other verdict, which is
 exactly the leak this step closes. Append each merged `## Deferred` item to
 **`specs/refactor-backlog.md`**, under the `## <domain>` heading of the surface that owns its
-`file:line` (create the file and/or heading if absent — same grouping `/audit` writes, so
-`/refactor <domain>` picks them up with no extra plumbing):
+`file:line` (create the file and/or heading if absent — same grouping `/cohorte-audit` writes, so
+`/cohorte-refactor <domain>` picks them up with no extra plumbing):
 
 ```
 - [ ] <SEVERITY> · <file:line> · <quality|security|rule> · <concrete fix> · deferred:$ARGUMENTS
 ```
 
-- **Never into the spec's `## Remediation`** — that list is what `/fix` re-dispatches and what `/drive`
+- **Never into the spec's `## Remediation`** — that list is what `/cohorte-fix` re-dispatches and what `/cohorte-loop`
   waits on, so a deferred item there would re-trigger the very loop it was deferred out of.
 - **Dedupe before appending:** `grep -F` the backlog for the item's `<file>` + the first words of its
-  problem; already there (from a prior round or an `/audit`) ⇒ skip it, don't stack duplicates round
+  problem; already there (from a prior round or an `/cohorte-audit`) ⇒ skip it, don't stack duplicates round
   after round.
 - Append with `>>` in ONE Bash call; never read the whole backlog into context to rewrite it (it grows
   with every audit the repo has ever run).
@@ -175,27 +176,27 @@ would sit in this session's history, re-sent every turn). Then:
   verdict *is* the pipeline's statement that the feature meets its Definition of
   Done, so **tick the DoD**: in `specs/$ARGUMENTS.md` §`Acceptance criteria / DoD`, flip each `- [ ]`
   → `- [x]` for the criteria the pipeline has actually verified — spec conformance + `ui_language`
-  copy (this review), tests · lint · typecheck (a green `/build`), mobile-first as far as the code
+  copy (this review), tests · lint · typecheck (a green `/cohorte-build`), mobile-first as far as the code
   shows it (this review). **Leave `- [ ]` (and say which) any item no stage actually verified** —
   nothing in the pipeline *runs* the feature, so any criterion that needs the app up (runtime flows,
   a visual check against the design) stays open unless the human says they exercised it by hand and
   it held. Ticking is the lead's job
-  (the reviewer is read-only). **Then stamp the freshness gate** so `/ship` can refuse to ship code
+  (the reviewer is read-only). **Then stamp the freshness gate** so `/cohorte-ship` can refuse to ship code
   edited after this verdict: compute `BASE=$(git merge-base <default_branch> HEAD)` and write into the
   spec front-matter `reviewed_base: $BASE` plus
   `reviewed_digest: $(git diff $BASE -- . ':(exclude)specs/' | sha256sum | cut -c1-16)` — the fingerprint
   of exactly the source you just reviewed (specs excluded, so DoD ticks + the ship status flip don't
-  trip it). Then tell the human they can `/ship` — **recommend a `/clear` first**, the handoff is
+  trip it). Then tell the human they can `/cohorte-ship` — **recommend a `/clear` first**, the handoff is
   fully on disk. **SHIP with leftover LOW findings** (or LOW+MEDIUM at the human's call) does NOT
   force a fix cycle for nits: park them through §3.5's exact route (the backlog, under their surface's
   domain heading, tagged `deferred:$ARGUMENTS` — never as open `## Remediation` items, which would
   re-trigger the fix loop), keep the SHIP verdict and the freshness stamp, and let the human ship.
 - **REVISE / BLOCK**, or any CRITICAL/HIGH/security finding → tell the human to run
-  **`/fix $ARGUMENTS`** — it appends the report to the spec's `## Remediation` and re-dispatches ONLY
+  **`/cohorte-fix $ARGUMENTS`** — it appends the report to the spec's `## Remediation` and re-dispatches ONLY
   the surfaces with findings. (If they'd rather automate the rounds, the autonomous driver is
   `disable-model-invocation: true` on purpose: **you cannot start it, they must type it**. Name the
   exact line for them to type rather than attempting it — an attempt that silently fails reads as a
-  loop that is running when nothing is.) The full path (`/spec` Mode B then `/build`) remains for findings that
+  loop that is running when nothing is.) The full path (`/cohorte-spec` Mode B then `/cohorte-build`) remains for findings that
   change the contract in ways that ripple into clean surfaces. _The report is staged to
-  `specs/reports/$ARGUMENTS.md`, so you can `/clear` before `/fix` — it reads the findings back from
+  `specs/reports/$ARGUMENTS.md`, so you can `/clear` before `/cohorte-fix` — it reads the findings back from
   disk._

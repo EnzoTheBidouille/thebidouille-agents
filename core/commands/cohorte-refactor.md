@@ -4,7 +4,7 @@ description: Apply the refactor backlog for one or more domains via the surface 
 argument-hint: <domain…> (one or more surface keys, "shared", or "all")
 ---
 
-You are the **lead**. Refactor domain **$ARGUMENTS** to match `PIPELINE.md`, using the `/audit` backlog.
+You are the **lead**. Refactor domain **$ARGUMENTS** to match `PIPELINE.md`, using the `/cohorte-audit` backlog.
 
 > Read `PIPELINE.md` §`surfaces` (map the domain → a surface + its agent + commands) and §`contract`.
 >
@@ -50,7 +50,7 @@ slices import it, so refactor it alone, first.
 After each agent returns: its surface's `test_quiet_cmd`/`lint_quiet_cmd` (else the `tail -40`
 fallback — SCHEMA.md §Output discipline), `commands.typecheck`, `commands.format --check` (redirect
 output to a file and grep it — don't print gate output into your context). Then verify each backlog item cleared by checking its `file:line` directly — do NOT re-run
-`/audit` per round (that repeats the repo-wide gates + a review dispatch you don't need); one optional
-final `/audit` once ALL dispatched domains are clean is enough. Check cleared items off in
+`/cohorte-audit` per round (that repeats the repo-wide gates + a review dispatch you don't need); one optional
+final `/cohorte-audit` once ALL dispatched domains are clean is enough. Check cleared items off in
 `specs/refactor-backlog.md`. Loop until each dispatched domain is clean. Verification is per-domain
 even when the dispatch was parallel — one failing surface loops alone, the others don't redo work.

@@ -4,7 +4,7 @@ Two distinct kinds of parallelism, and the invariants that keep both safe.
 
 ## Within a feature: parallel surfaces
 
-`/build` dispatches **one implementer per surface in a single message** — build
+`/cohorte-build` dispatches **one implementer per surface in a single message** — build
 wall-clock is the slowest surface, not the sum. This is safe because of two invariants the whole
 pipeline enforces:
 
@@ -22,7 +22,7 @@ surface into specialized sub-surfaces (e.g. `web-checkout`, `web-billing`) only 
 hold: it dominates build time, **and** the boundary is clean (feature modules, route groups,
 independent services). The evidence lives in `.claude/pipeline-metrics.jsonl` — one line per
 phase batch — read it before splitting; split what actually dominates wall-clock, not what feels
-big. `/build` §1.5 proposes and renders the split automatically when a spec warrants it.
+big. `/cohorte-build` §1.5 proposes and renders the split automatically when a spec warrants it.
 
 ## Across features: worktree isolation
 
@@ -48,20 +48,20 @@ scripts/remove-feature.sh <feature_id>          # worktree + branch + slot
 scripts/remove-feature.sh <feature_id> --drop-db   # also drop the feature DB
 ```
 
-Both scripts are rendered from templates by `/init-pipeline` with your project's slug, DB
-pattern, port bases, and compose file substituted in. `/ship` proposes the teardown once you
+Both scripts are rendered from templates by `/cohorte-init-pipeline` with your project's slug, DB
+pattern, port bases, and compose file substituted in. `/cohorte-ship` proposes the teardown once you
 confirm the merge — never before.
 
 ## The real multiplier: one session per feature
 
-While feature A's `/build` runs its agents (minutes of wall-clock you'd otherwise spend
-waiting), a second Claude Code session can `/spec` or `/review` feature B:
+While feature A's `/cohorte-build` runs its agents (minutes of wall-clock you'd otherwise spend
+waiting), a second Claude Code session can `/cohorte-spec` or `/cohorte-review` feature B:
 
 ```
-session 1:   /spec feat-a → /build feat-a   (agents run…)
-session 2:   /spec feat-b → /build feat-b   (agents run…)
-session 1:   /review feat-a → /ship feat-a
-session 2:   /review feat-b → …
+session 1:   /cohorte-spec feat-a → /cohorte-build feat-a   (agents run…)
+session 2:   /cohorte-spec feat-b → /cohorte-build feat-b   (agents run…)
+session 1:   /cohorte-review feat-a → /cohorte-ship feat-a
+session 2:   /cohorte-review feat-b → …
 ```
 
 Rules that keep it safe:
@@ -72,10 +72,10 @@ Rules that keep it safe:
 - **The contract package is the one shared tree** across features — but each feature edits only
   its own `<id>.<ext>` file, so no conflicts. Merge order matters only when a later feature
   *imports* an earlier one's contract: ship the dependency first.
-- **`/ship` one at a time.** It commits from the feature's branch, and the freshness gate keeps a
+- **`/cohorte-ship` one at a time.** It commits from the feature's branch, and the freshness gate keeps a
   stale verdict from shipping. After each merge, rebase the other live worktrees
   (`git rebase main`) so their eventual reviews diff against reality.
-- **`/doctor` check 6** prints the live slot table (feature · worktree · ports · db · branch
+- **`/cohorte-doctor` check 6** prints the live slot table (feature · worktree · ports · db · branch
   behind main by N commits) when you lose track — a worktree far behind main means its next
   review diffs against stale code.
 
@@ -84,4 +84,4 @@ Rules that keep it safe:
 `pipeline-metrics.jsonl` always belongs to the **main checkout** — never the worktree, which
 dies at teardown while metrics must accumulate across features. Every command resolves it from
 anywhere via `$(dirname "$(git rev-parse --git-common-dir)")/.claude/pipeline-metrics.jsonl`;
-`/doctor` flags a stray copy inside a worktree.
+`/cohorte-doctor` flags a stray copy inside a worktree.

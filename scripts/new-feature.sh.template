@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
 # new-feature.sh — spin up an ISOLATED git worktree for one feature so features
-# can be built fully in parallel. Rendered from a template by /init-pipeline;
+# can be built fully in parallel. Rendered from a template by /cohorte-init-pipeline;
 # the double-underscore tokens below are substituted from PIPELINE.md §isolation.
-# (This comment deliberately avoids spelling the token pattern: /doctor flags any
+# (This comment deliberately avoids spelling the token pattern: /cohorte-doctor flags any
 # leftover double-underscore-caps token in the RENDERED script as unrendered.)
 #
 # Usage:  scripts/new-feature.sh <feature_id>
@@ -85,7 +85,7 @@ Fully isolated — run its dev + migrations alongside other worktrees:
   cd $worktree_dir
   __MIGRATE_CMD__
   cd $worktree_dir && __DEV_CMD__
-  /brainstorm → /spec → (design) → /build $id → test → /review → /ship
+  /cohorte-brainstorm → /cohorte-spec → (design) → /cohorte-build $id → test → /cohorte-review → /cohorte-ship
 
 Tear down when merged:  scripts/remove-feature.sh $id
 EOF

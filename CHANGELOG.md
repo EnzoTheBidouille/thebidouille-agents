@@ -1,7 +1,89 @@
 # Changelog
 
-Entries are shown by `/update-pipeline` ("What's new") after a core refresh. Keep them short,
-user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
+Entries are shown by `/cohorte-update-pipeline` ("What's new") after a core refresh. Keep them
+short, user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` section per release.
+
+> Sections below 2.0.0 name commands **as they were at the time** (`/build`, `/drive`, `/loop`).
+> They are history and are deliberately not rewritten — every command gained a `cohorte-` prefix
+> in 2.0.0.
+
+## 2.0.0 — 2026-08-03
+
+> **Breaking: every command is renamed.** `/build` → `/cohorte-build`, `/review` →
+> `/cohorte-review`, and so on for all 13. The driver, `/loop` → `/drive` in 1.6.0, is now
+> **`/cohorte-loop`**. Re-run `npx cohorte@latest update --global` (or `update`): the update
+> **deletes** the 13 unprefixed command files from your install rather than leaving them as
+> decoys. Nothing inside your repo needs editing — `/build` in a spec or PIPELINE.md is prose,
+> not a call site. Muscle memory is the only migration cost.
+
+- **Every command now carries a `cohorte-` prefix, ending command shadowing for good.** A command
+  whose name collides with a Claude Code built-in is not overridden, it is **shadowed**: the
+  built-in answers the slash, our file is never read, and the session confidently reports on a run
+  that never happened. `/loop` did exactly that and went unnoticed until a user found the driver had
+  never started; `/doctor` was sitting on a watchlist waiting to do the same. 1.6.0 renamed one
+  name; this replaces the whole approach. `validate-core` now enforces the prefix structurally
+  instead of maintaining a blocklist that could only ever forbid the collisions we already knew
+  about. Telemetry **phase** names (`build`, `review`, `fix`, …) stay unprefixed — they are a wire
+  contract with the collector, and the retired bare command names are kept in the metrics
+  collector's retired list so months of existing transcripts stay attributed instead of silently
+  reclassifying to `(chat)`.
+
+- **`/cohorte-loop` can now run for hours.** It previously ran the driver as one foreground Bash
+  call, which cannot work: a single call is capped at **600 s** and a build is 25–40 min, so it was
+  killed mid-`/cohorte-build`. Backgrounding it was worse — a backgrounded Bash call is **not
+  detached**, so the driver stayed in the calling session's process group and every Claude Code
+  restart, crash or laptop sleep took `loop.sh` and its `claude -p` children down with it, mid-write.
+  Observed on a real run: four teardowns in 45 minutes, each aborting both surface implementers and
+  leaving a half-built tree that read as `dead`. New `loop-detach.sh` puts the driver in its own
+  `screen` session so it outlives the launching process entirely, and `/cohorte-loop` polls a small
+  status file in ~9-minute waits. The driver's exit code — which the report table is keyed on —
+  survives as `__EXIT__ <code>` in that file.
+
+- **`loop.sh` holds the machine awake for its whole run.** It re-execs itself under
+  `caffeinate -ims` on macOS, `systemd-inhibit` on Linux, because system sleep aborts every
+  in-flight `claude -p` request and the abort is byte-identical to "the agent returned nothing" —
+  the `dead` family the driver exists to catch. The inhibitor is **probed before the `exec`**, since
+  `exec` replaces the shell: one that exists but is refused (`systemd-inhibit` answers `Failed to
+  inhibit: Access denied` in a container, in CI, or in any seatless session) would otherwise make its
+  own failure the driver's exit code and the run would never start — GitHub's Linux runners turned
+  all 24 loop tests red exactly that way. Absent or refused both fall through to a no-op; an unheld
+  power assertion is a degraded run, not a failed one, and `test-loop.mjs` now pins both directions.
+  **This cannot prevent lid-close sleep** — no userspace assertion can on any platform; keep the
+  lid open or use clamshell mode.
+
+- **Platform tiers, stated rather than assumed.** Detaching uses `screen` (macOS + Linux), else
+  `setsid` (Linux) — both escape the caller's process group, which is what actually matters. Git
+  Bash on Windows has neither, so it falls back to `nohup`, which ignores `SIGHUP` but does **not**
+  survive a teardown; `loop-detach.sh` prints that warning rather than degrading silently, and
+  points at running `loop.sh` from your own terminal instead. See the platform table in
+  `docs/reference/scripts.md`.
+
+- **Fixed — the preflight stamp is keyed on the code, not on HEAD, and is never versioned.** The
+  stamp recorded the HEAD sha, which is the wrong key in both directions: the reviewed tree is
+  normally *dirty*, so committing the very code the preflight verified made the gate ask on a clean
+  tree, while an implementer editing files between preflight and dispatch invalidated nothing. Worse,
+  `.claude/preflight.ok` was never gitignored — once a release agent staged `.claude/`, the stamp
+  went into git describing the tree *before* its own commit, so it could never match again: every
+  review dispatch in that repo asked "HEAD moved" forever, and every new clone or worktree inherited
+  a green it never earned. The stamp is now `<epoch> <sha> <tree digest>`, where the digest is the
+  git tree id of the working tree (`.claude` and `specs` excluded, so the pipeline's own report,
+  metrics and DoD writes don't invalidate it), computed in a throwaway index that never touches
+  yours. Pre-2.0.0 two-field stamps still fall back to the HEAD comparison. `/cohorte-doctor` check 3
+  now fails hard on a tracked stamp, `/cohorte-update-pipeline` untracks it and fixes `.gitignore`
+  (§Reconcile step 8), and `test-gate.mjs` pins all of it — including "commit the verified code ⇒
+  still green" and "one edit ⇒ red".
+
+- **`/cohorte-review` and `/cohorte-fix` now spell out the metrics path instead of delegating it.**
+  Both said "append a line to `pipeline-metrics.jsonl`" and pointed at `/cohorte-build` §4 for where
+  that file lives — a lead running from a feature worktree resolves the bare name against its own
+  cwd and strands the batch in a sink that dies at teardown. Both now carry the resolved
+  `$(dirname "$(git rev-parse --git-common-dir)")` form inline.
+
+- **Fixed — the dashboard's command allowlist had drifted from its own error message.** The
+  server accepted the bare `/audit`/`/init-pipeline`/`/update-pipeline` while the UI sent (and the
+  error text advertised) the prefixed names, so the run button would have 400'd on the only
+  commands that exist. The test suite checked *rejection* only, which is why it passed; it now pins
+  both directions.
 
 ## 1.6.0 — 2026-08-01
 

@@ -4,10 +4,10 @@ title: <Feature title>
 status: draft # draft → frozen → in-progress → in-review → shipped · blocked (see SCHEMA.md §Spec status)
 branch: <feature_branch_prefix><slug>
 created: <YYYY-MM-DD>
-loop_pass: 0 # /drive bookkeeping — the review pass it is on; 0 = no loop running. Written by the driver, not by hand
-loop_phase: # /drive bookkeeping — build | review | fix | done. With loop_pass, this is what `--resume` reads back
-reviewed_base: # merge-base sha at the last SHIP verdict — freshness-gate anchor (written by /review)
-reviewed_digest: # sha256 (16 hex) of the reviewed source diff vs reviewed_base, specs excluded — /ship re-checks
+loop_pass: 0 # /cohorte-loop bookkeeping — the review pass it is on; 0 = no loop running. Written by the driver, not by hand
+loop_phase: # /cohorte-loop bookkeeping — build | review | fix | done. With loop_pass, this is what `--resume` reads back
+reviewed_base: # merge-base sha at the last SHIP verdict — freshness-gate anchor (written by /cohorte-review)
+reviewed_digest: # sha256 (16 hex) of the reviewed source diff vs reviewed_base, specs excluded — /cohorte-ship re-checks
 design_files: [] # design page links — full URLs of the form https://claude.ai/design/p/<projectId>?file=<file> (each carries its own project + page); blank until designed; omit if no UI
 ---
 
@@ -47,7 +47,7 @@ design_files: [] # design page links — full URLs of the form https://claude.ai
 
 <repeat per endpoint/interface>
 
-### Contract types — lead authors `<contract.path>/<slug>.<ext>` before /build
+### Contract types — lead authors `<contract.path>/<slug>.<ext>` before /cohorte-build
 
 - `<slug>...Request` / `<slug>...Response` / `<slug>Base` … (sketch the schemas here)
 
@@ -55,7 +55,7 @@ design_files: [] # design page links — full URLs of the form https://claude.ai
 
 > One `###` subsection per surface in `PIPELINE.md` §surfaces (e.g. backend, frontend), each TDD.
 > Surfaces are subsections of §6, never top-level sections — §8 and §9 are referenced by number
-> across the whole pipeline (`/build` implements "§8 flows", `/review` checks "§9 acceptance"), so a
+> across the whole pipeline (`/cohorte-build` implements "§8 flows", `/cohorte-review` checks "§9 acceptance"), so a
 > third surface must not become a §8 of its own.
 
 ### <surface.key>
@@ -85,5 +85,5 @@ design_files: [] # design page links — full URLs of the form https://claude.ai
 
 ## Remediation
 
-> Filled by `/spec` in review-return mode; empty otherwise. Each item:
+> Filled by `/cohorte-spec` in review-return mode; empty otherwise. Each item:
 > `[ ] <SEVERITY> · <file:line> · <spec-violation|quality|security> · <concrete fix>`

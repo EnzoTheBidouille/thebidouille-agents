@@ -16,7 +16,7 @@ npx cohorte dashboard --port=4400 --open   # custom port, open the browser
 - **Per-project drill-down**:
   - **Freshness** — installed core (global and/or bundled) vs the npm registry, pointer
     coherence.
-  - **Health** — the `/doctor` checks reimplemented in JS as a live ✅/⚠️/❌ checklist, each
+  - **Health** — the `/cohorte-doctor` checks reimplemented in JS as a live ✅/⚠️/❌ checklist, each
     failure with its fix: core & pointer, profile parse, surfaces ↔ agents (orphans), gate
     config drift, hook registration, retrieval, design paths, isolation scripts, **workflows**
     (scripts + `profile-reader` present, which execution path applies), specs hygiene. Checks
@@ -26,8 +26,8 @@ npx cohorte dashboard --port=4400 --open   # custom port, open the browser
   - **One board** — the linked Obsidian **kanban** (cards, clickable PR links, live PR status
     via `gh`, ship-date-sorted Shipped column) or, when no board is linked, a **specs board**
     grouped by `draft · frozen · in-progress · in-review · shipped · blocked`. A card driven by a
-    `/drive` shows the pass and phase it reached (`↻ pass 3 · /review`), so an interrupted autonomous
-    run is visible — resume it with `/drive <id> --resume`.
+    `/cohorte-loop` shows the pass and phase it reached (`↻ pass 3 · /cohorte-review`), so an interrupted autonomous
+    run is visible — resume it with `/cohorte-loop <id> --resume`.
   - **Metrics** — the `pipeline-metrics.jsonl` batches (phase durations per feature).
 - **Actions** (output streamed live into the modal):
   - **Install / Update core** — global or bundled, runs the real CLI.
@@ -51,7 +51,7 @@ Binds **`127.0.0.1` by default** — the action endpoints **execute code**
 (install/update/reset/headless-claude), so the dashboard must not be reachable from the network.
 `--host=0.0.0.0` opts out (it prints a security warning); only do that on a trusted network,
 because anyone who reaches the port can run the actions. The headless-claude runner whitelists
-the commands (`/init-pipeline`, `/update-pipeline`, `/audit`) — no arbitrary injection into
+the commands (`/cohorte-init-pipeline`, `/cohorte-update-pipeline`, `/cohorte-audit`) — no arbitrary injection into
 `claude -p`.
 
 **Loopback binding alone is not a boundary against a browser**, so the API adds two checks:
@@ -80,7 +80,7 @@ dashboard/
 
 The server exposes a small JSON API (`/api/versions`, `/api/state`, `/api/fleet`,
 `/api/kanban`, `/api/metrics`, `/api/browse`, `/api/projects`) plus `/api/action`, whose
-responses stream chunked plain text ending in `__EXIT__ <code>`. The `/doctor` checks are
+responses stream chunked plain text ending in `__EXIT__ <code>`. The `/cohorte-doctor` checks are
 reimplemented in `server/doctor.js` so the dashboard needs **no Claude session** to compute
 state; `server/yaml.js` is a minimal block-YAML parser for the profile's machine block.
 

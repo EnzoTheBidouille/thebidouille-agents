@@ -1,6 +1,6 @@
 ---
 name: <SURFACE_AGENT>
-description: Implements the <SURFACE_LABEL> surface (<SURFACE_PATH>) for one feature, strictly from the frozen spec + contract, test-first TDD. Dispatched by /build. Touches only its own surface.
+description: Implements the <SURFACE_LABEL> surface (<SURFACE_PATH>) for one feature, strictly from the frozen spec + contract, test-first TDD. Dispatched by /cohorte-build. Touches only its own surface.
 tools: <SURFACE_TOOLS>
 model: <SURFACE_MODEL>
 ---
@@ -14,7 +14,7 @@ shared surface is the frozen contract and the spec.
 > (§Conventions/§Testing): your slice of them is baked into this file below (§Your conventions),
 > rendered from the profile — re-reading the prose every dispatch is exactly the cost the bake
 > removes. If the baked slice visibly contradicts `PIPELINE.md`, say so in your handoff: the profile
-> wins, and this agent file needs a re-render (`/update-pipeline`).
+> wins, and this agent file needs a re-render (`/cohorte-update-pipeline`).
 
 ## You own
 
@@ -22,7 +22,7 @@ shared surface is the frozen contract and the spec.
 
 ## Your conventions (baked from `PIPELINE.md` at render time)
 
-<!-- Rendered by /init-pipeline (and refreshed by /update-pipeline's reconcile) from
+<!-- Rendered by /cohorte-init-pipeline (and refreshed by /cohorte-update-pipeline's reconcile) from
      §Conventions `### Shared` + `### Surface: <your key>` + your §Testing lines.
      Edit conventions in PIPELINE.md, never here — this block is regenerated. -->
 

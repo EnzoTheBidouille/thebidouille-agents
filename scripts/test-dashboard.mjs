@@ -2,8 +2,8 @@
 // Tests for the dashboard's server modules (dashboard/server/*.js).
 //
 // These are shipped runtime code with real logic and zero coverage until now:
-// a hand-rolled YAML parser that every /doctor check is derived from, a metrics
-// aggregator, the JS port of /doctor, an Obsidian board parser, the fleet
+// a hand-rolled YAML parser that every /cohorte-doctor check is derived from, a metrics
+// aggregator, the JS port of /cohorte-doctor, an Obsidian board parser, the fleet
 // registry, and an HTTP layer whose guards are the dashboard's only defence
 // against a web page driving the local agent.
 //
@@ -127,7 +127,7 @@ console.log("usage.js — the collector bridge");
 }
 
 // ── doctor.js ────────────────────────────────────────────────────────────────
-console.log("doctor.js — the /doctor port");
+console.log("doctor.js — the /cohorte-doctor port");
 {
   const spec = (fm) => `---\n${fm}\n---\n\n# x\n`;
   const d = scratch();
@@ -136,13 +136,13 @@ console.log("doctor.js — the /doctor port");
   writeFileSync(join(d, "specs", "b.md"), spec("feature_id: b\nstatus: shipped   # done"));
   writeFileSync(join(d, "specs", "c.md"), "no front-matter at all");
   writeFileSync(join(d, "specs", "_template.md"), spec("status: draft"));
-  // /audit writes this file by design and it has no front-matter. Scanning it as a
-  // spec made /doctor warn about a file cohorte itself had just created — it fired in
-  // every project that had ever run /audit.
+  // /cohorte-audit writes this file by design and it has no front-matter. Scanning it as a
+  // spec made /cohorte-doctor warn about a file cohorte itself had just created — it fired in
+  // every project that had ever run /cohorte-audit.
   writeFileSync(join(d, "specs", "refactor-backlog.md"), "# Refactor Backlog\n\n## backend\n- [ ] x\n");
   const specs = scanSpecs(d);
   eq("_template.md is excluded", specs.length, 3);
-  eq("the /audit backlog is not scanned as a spec",
+  eq("the /cohorte-audit backlog is not scanned as a spec",
     specs.some(s => s.file === "refactor-backlog.md"), false);
   eq("front-matter fields are read", specs.find(s => s.id === "a").title, "A");
   eq("a trailing comment is stripped from status", specs.find(s => s.id === "b").status, "shipped");
@@ -200,6 +200,21 @@ console.log("doctor.js — the /doctor port");
   eq("Windows-quoted hook command is recognised", by(s.checks, "hooks").status, "ok");
   eq("retrieval wired in .mcp.json ⇒ ok", by(s.checks, "retrieval").status, "ok");
   eq("workflows + profile-reader ⇒ ok", by(s.checks, "workflows").status, "ok");
+
+  // Local artifacts: a versioned preflight stamp is what made the phase gate ask on
+  // every review dispatch forever, so its absence from .gitignore is a hard failure.
+  check("no .gitignore ⇒ local artifacts flagged bad (the stamp is the breaking one)",
+    by(s.checks, "artifacts").status === "bad"
+      && /preflight\.ok/.test(by(s.checks, "artifacts").detail),
+    by(s.checks, "artifacts").detail);
+  writeFileSync(join(d, ".gitignore"),
+    "node_modules/\n.claude/preflight.ok\n.claude/pipeline-metrics.jsonl\nspecs/reports/\n");
+  s = await state({ projectRoot: d, globalDir: g, cliVersion: "9.9.9" });
+  eq("all local artifacts gitignored ⇒ ok", by(s.checks, "artifacts").status, "ok");
+  writeFileSync(join(d, ".gitignore"), "node_modules/\n.claude/\nspecs/reports/\n");
+  s = await state({ projectRoot: d, globalDir: g, cliVersion: "9.9.9" });
+  eq("a `.claude/` directory rule covers the files inside it",
+    by(s.checks, "artifacts").status, "ok");
 
   // …and each check must actually FAIL when its precondition breaks.
   writeFileSync(join(d, ".claude", "gate-config.json"),
@@ -367,6 +382,18 @@ console.log("index.js — HTTP guards");
 
   const badCmd = await post({ action: "claude", command: "/evil", project: proj });
   eq("a non-whitelisted slash command is rejected", badCmd.status, 400);
+
+  // Both directions, because testing only the rejection missed a real bug: 2.0.0 prefixed
+  // every command, the error message was updated to say `/cohorte-audit`, but the allowlist
+  // regex still matched the bare names — so the server accepted the one command that no
+  // longer exists and rejected the only one the UI can send. A rejection-only test is blind
+  // to an allowlist that drifts away from the client.
+  const staleCmd = await post({ action: "claude", command: "/audit", project: proj });
+  eq("the pre-2.0.0 unprefixed command is rejected", staleCmd.status, 400);
+
+  const goodCmd = await post({ action: "claude", command: "/cohorte-audit", project: proj });
+  check("a prefixed whitelisted command passes the allowlist",
+    goodCmd.status !== 400 || !/unsupported command/.test((await goodCmd.json()).error || ""));
 
   eq("a missing hashed asset 404s (never index.html)",
     (await fetch(`${base}/assets/index-DEADBEEF.js`)).status, 404);

@@ -22,7 +22,7 @@ kanban:
       board: "MyProject/Tasks.md"
 ```
 
-Wired for you by `/init-pipeline` (opt-in question) or `/update-pipeline` — including creating
+Wired for you by `/cohorte-init-pipeline` (opt-in question) or `/cohorte-update-pipeline` — including creating
 the board file with the right front-matter, one heading per column, and the plugin settings
 block. Don't hand-edit the config; the `# cfg:` anchors in it are what the installer prompts
 write to.
@@ -37,7 +37,7 @@ A card is a list item under a `## <column>` heading:
 
 The `#<feature_id>` tag is the **join key** between the card and `specs/<feature_id>.md` — it's
 how every stage finds *its* card. Free-text sub-bullets under an **Ideas** card are seed context
-`/brainstorm` picks up. Once shipped, `/ship` appends the PR number — which the dashboard renders
+`/cohorte-brainstorm` picks up. Once shipped, `/cohorte-ship` appends the PR number — which the dashboard renders
 as a clickable link with live open/merged/closed status.
 
 ## Stage → column
@@ -45,15 +45,15 @@ as a clickable link with live open/merged/closed status.
 | Pipeline moment | Column |
 | --- | --- |
 | human drops a raw idea | `ideas` |
-| `/brainstorm` picks it up | `brainstorm` |
-| `/spec` opens (draft) | `spec` |
-| `/spec` freezes | `ready` |
-| `/build` | `building` |
-| `/review` | `review` |
-| `/fix` | `fix` |
-| a `/drive` is driving it (`in-progress`) | the current phase's column |
-| a `/drive` gave up (`blocked`) | `fix` |
-| `/ship` starts | `ship` |
+| `/cohorte-brainstorm` picks it up | `brainstorm` |
+| `/cohorte-spec` opens (draft) | `spec` |
+| `/cohorte-spec` freezes | `ready` |
+| `/cohorte-build` | `building` |
+| `/cohorte-review` | `review` |
+| `/cohorte-fix` | `fix` |
+| a `/cohorte-loop` is driving it (`in-progress`) | the current phase's column |
+| a `/cohorte-loop` gave up (`blocked`) | `fix` |
+| `/cohorte-ship` starts | `ship` |
 | PR opened | `shipped` (+ `PR #<num>`) |
 
 ## The move script
@@ -67,11 +67,11 @@ context (find, dedupe, sub-notes carried along, settings block preserved):
 
 It creates the card in the target column when none exists, keeps the first and drops duplicates.
 Every call site chains `|| true`, so a missing board — or a missing script — is silent;
-`/doctor` is what catches a half-copied core.
+`/cohorte-doctor` is what catches a half-copied core.
 
 ## Backfill / sync
 
-`specs/*.md` is the source of truth. The reconcile (run by `/update-pipeline`, and at board
+`specs/*.md` is the source of truth. The reconcile (run by `/cohorte-update-pipeline`, and at board
 creation) maps each spec's `status` to a column (`frozen`→ready, `in-review`→review,
 `shipped`→shipped, else spec) and **fully syncs**: missing cards are added, existing cards are
 *moved* to the right column — the board always reflects the specs, even where a human dragged

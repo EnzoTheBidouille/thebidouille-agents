@@ -1,6 +1,6 @@
 ---
 model: sonnet
-description: Refresh the pipeline core (global ~/.claude, or a repo's bundled .claude) to the latest published cohorte version, then reconcile this repo's generated files to it — /init-pipeline stays one-time.
+description: Refresh the pipeline core (global ~/.claude, or a repo's bundled .claude) to the latest published cohorte version, then reconcile this repo's generated files to it — /cohorte-init-pipeline stays one-time.
 argument-hint: [path-to-local-checkout]
 ---
 
@@ -8,7 +8,7 @@ You are the **pipeline updater**. Refresh the installed pipeline core to the lat
 repo. The installer's `--update` mode never touches generated files: `PIPELINE.md`, rendered surface agents,
 `gate-config.json`, `settings.json`, and the filled `~/.claude/cohorte.config.yaml` are all preserved.
 YOU then bring those generated files up to the new core yourself (§3.5) — additively, never clobbering
-the human's choices — so `/init-pipeline` never needs re-running for an upgrade.
+the human's choices — so `/cohorte-init-pipeline` never needs re-running for an upgrade.
 
 ## 1. Detect the install scope + current version
 
@@ -57,7 +57,7 @@ differs from the core you just installed, rewrite that one field (leave every ot
 and tell the human to commit it. In **bundled** mode the installer already did it; in **global** mode
 **nothing does** — the installer refreshes one shared core and cannot know which repos point at it,
 so before 1.2.5 the field simply drifted forever (a repo on a current core still claiming `1.0.0`).
-`/doctor` check 1 requires the pointer to be coherent with the VERSION file, so a drifted field reads
+`/cohorte-doctor` check 1 requires the pointer to be coherent with the VERSION file, so a drifted field reads
 as a broken install when nothing is broken.
 
 Then print **What's new**: read the installed `<core>/pipeline/CHANGELOG.md` and show the entries
@@ -82,9 +82,14 @@ health check** (SCHEMA.md §Code retrieval: CLI resolvable from PATH, `.mcp.json
 upgrading a bare `serena` entry to the PATH-proof launcher form, `.serena/` gitignored, server
 actually connected) and repair whatever fails — wiring that worked at
 init can rot (PATH changes, uninstalls, hand-edits). Report what was reconciled; if nothing was
-missing, say so. This is why `/init-pipeline` never needs re-running for a core upgrade.
+missing, say so. This is why `/cohorte-init-pipeline` never needs re-running for a core upgrade.
 
-Three of the §Reconcile steps matter specifically here:
+Four of the §Reconcile steps matter specifically here:
+
+- **Local-artifact hygiene** (§Reconcile step 8): gitignore + untrack the pipeline's runtime files
+  (`.claude/preflight.ok`, `.claude/pipeline-metrics.jsonl`, `specs/reports/`). A tracked
+  `preflight.ok` — what every pre-2.0.0 install ends up with once a release agent stages `.claude/` —
+  makes the phase gate ask on every single review dispatch, so fix it here and say so.
 
 - **Spec-template top-up** (§Reconcile step 7): `specs/_template.md` was seeded at install and never
   refreshed since, so add the front-matter fields the current `templates/spec.template.md` has and the
@@ -111,7 +116,7 @@ Three of the §Reconcile steps matter specifically here:
 - **Restart / reload the Claude Code session** so it picks up updated commands, agents, and any
   newly-registered MCP server.
 - **Other repos using the global core:** their core is already fresh, but reconcile is per-repo — run
-  `/update-pipeline` inside each (it will skip the already-done core update and just reconcile).
+  `/cohorte-update-pipeline` inside each (it will skip the already-done core update and just reconcile).
 - **Commit** the reconciled files (`PIPELINE.md`, `.claude/`, `.mcp.json` if added) so teammates get them.
 - The kanban config is global and user-scoped
   (`~/.claude/cohorte.config.yaml`) — never committed. The core update never touches it; only the

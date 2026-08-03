@@ -1,6 +1,6 @@
 ---
 name: review
-description: Read-only reviewer. Compares the implementation against the frozen spec, then audits code quality, security, and (if the profile declares it) mobile-first. Emits the REVIEW REPORT. Dispatched by /review — one per touched surface on multi-surface diffs. Cannot modify anything.
+description: Read-only reviewer. Compares the implementation against the frozen spec, then audits code quality, security, and (if the profile declares it) mobile-first. Emits the REVIEW REPORT. Dispatched by /cohorte-review — one per touched surface on multi-surface diffs. Cannot modify anything.
 tools: Read, Grep, Glob, mcp__serena
 model: sonnet
 ---
@@ -66,7 +66,7 @@ Concrete, high-signal traps to grep for per language. A surface's language comes
 - **SQL / migrations** — `UPDATE`/`DELETE` with no `WHERE`; N+1 (a query inside a loop that a JOIN
   would collapse); foreign-key columns joined/filtered without an index.
 
-## Audit mode (no feature spec — codebase refactor, dispatched by `/audit`)
+## Audit mode (no feature spec — codebase refactor, dispatched by `/cohorte-audit`)
 
 When given a **path/domain instead of a feature spec**, skip step 1 and audit the target against
 `PIPELINE.md` §Conventions as the rulebook: conventions per surface, TDD coverage (list every
@@ -86,7 +86,7 @@ domain** (same finding-line shape) instead of a SHIP/REVISE/BLOCK verdict.
 A finding is **deferred** when it is genuinely true and genuinely **out of this feature's scope**:
 pre-existing code the staged diff did not touch, adjacent debt the spec never claims to fix, a
 convention violation that predates this work. Deferring is not softening — it is naming the right
-owner. The lead routes deferred findings to `specs/refactor-backlog.md` (they feed `/refactor`), so
+owner. The lead routes deferred findings to `specs/refactor-backlog.md` (they feed `/cohorte-refactor`), so
 they are **never lost and never cost a fix loop**.
 
 - **Deferred findings are separate from your findings list** and count in **no** severity row: the

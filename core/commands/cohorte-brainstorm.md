@@ -15,7 +15,7 @@ at Finish, when a board is configured.
 > decision. The panel argues about the idea, not about settled ground: a persona that proposes
 > something a live line already decided must be told so by another persona, and an idea that genuinely
 > needs to overturn one must say which line, out loud, so the human decides it here rather than
-> discovering the contradiction at `/spec`.
+> discovering the contradiction at `/cohorte-spec`.
 >
 > Template paths below (`.claude/templates/…`) resolve to `~/.claude/templates/…` when the core is
 > installed globally — read whichever exists.
@@ -47,8 +47,8 @@ screens, risks, and what's explicitly out.
 
 When the human is satisfied, produce the **brainstorm return** by filling
 `.claude/templates/brainstorm-return.md` and **staging it to
-`specs/reports/<feature_id>-brainstorm.md`** (the gitignored buffer dir — `/spec` reads it from there
-when invoked with no paste). In chat print only a 3-line summary + the path. Tell them to run `/spec`
+`specs/reports/<feature_id>-brainstorm.md`** (the gitignored buffer dir — `/cohorte-spec` reads it from there
+when invoked with no paste). In chat print only a 3-line summary + the path. Tell them to run `/cohorte-spec`
 — **recommend a `/clear` first**, the return is staged on disk (pasting it remains a fallback).
 
 **Kanban:** settle the `feature_id` (kebab-case slug) the return carries — it is the card's join key
@@ -56,7 +56,7 @@ downstream. If a board is configured, **move** the card into the **Brainstorm** 
 `#<feature_id>` (per §Kanban): the picked Ideas card if the human chose one, else a new card. No-op if
 no board.
 
-**Telemetry:** chain the opt-in usage ping onto that same Bash call — `/build` §4's shared form,
+**Telemetry:** chain the opt-in usage ping onto that same Bash call — `/cohorte-build` §4's shared form,
 `<phase>` = `brainstorm`, `<seconds>` = `0` (this phase is human thinking time, not pipeline
 wall-clock — the funnel signal is the event, not its duration), `<results>` = `""`. No board ⇒ still
 ping, in its own `|| true` call. Silent no-op without consent; never ask about consent here.

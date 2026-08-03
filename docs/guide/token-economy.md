@@ -7,7 +7,7 @@ habits that make them pay.
 
 ## The deterministic preflight — zero agents on red code
 
-`/review` (and the workflow variants) starts with
+`/cohorte-review` (and the workflow variants) starts with
 `pipeline/scripts/preflight.sh` — a plain shell script, **not an agent** — that runs the
 profile's mechanical checks in order (typecheck → lint → tests, quiet variants), all output
 redirected to `specs/reports/<id>.preflight.txt`:
@@ -15,9 +15,9 @@ redirected to `specs/reports/<id>.preflight.txt`:
 - **Any check red** ⇒ it prints the raw last-40 lines and exits 1. The command **stops there:
   zero agents are spawned.** A reviewer dispatched onto code that doesn't compile burns its whole
   run rediscovering what `tsc` printed for free.
-- **All green** ⇒ it stamps `.claude/preflight.ok` (`<epoch> <HEAD sha>`), which the gate hook
-  enforces as a **phase gate**: a `review` dispatch with a missing or stale stamp (older
-  than `gate.preflight.max_age_minutes`, or HEAD moved) gets a confirmation prompt. A lead can't
+- **All green** ⇒ it stamps `.claude/preflight.ok` (`<epoch> <HEAD sha> <tree digest>`), which the
+  gate hook enforces as a **phase gate**: a `review` dispatch with a missing or stale stamp (older
+  than `gate.preflight.max_age_minutes`, or the code changed since) gets a confirmation prompt. A lead can't
   accidentally skip the gate; a human can consciously override it.
 
 ## Quiet commands — runners bridled at the profile level
@@ -34,12 +34,12 @@ in its context. The profile therefore stores **two forms of each noisy command**
 
 Rules for every consumer: run the quiet variant when set; when it's empty (older profile), run
 `<full cmd> 2>&1 | tail -40` — never the bare command into context; need the full log? redirect
-to a file and grep it. `/init-pipeline` **asks** for these variants (detected defaults offered
-first) instead of silently storing a bare `pnpm test`; `/update-pipeline` tops up older profiles.
+to a file and grep it. `/cohorte-init-pipeline` **asks** for these variants (detected defaults offered
+first) instead of silently storing a bare `pnpm test`; `/cohorte-update-pipeline` tops up older profiles.
 
 ## The diff is computed once and staged
 
-`/review` runs **one** `git diff --stat`, groups changed paths by surface, and stages a full
+`/cohorte-review` runs **one** `git diff --stat`, groups changed paths by surface, and stages a full
 patch **only for the touched surfaces** to `specs/reports/<id>.<surface>.diff`. Reviewers (which
 have no Bash) read the artifact — hunks plus immediate context, opening a full source file only
 when a finding demands it — instead of N agents each re-running git and re-reading whole files.
@@ -49,8 +49,8 @@ when a finding demands it — instead of N agents each re-running git and re-rea
 Rendered surface agents carry their slice of `PIPELINE.md` §Conventions (`### Shared` + their own
 `### Surface:` stanza + their §Testing lines) **baked into the agent file** at render. At runtime
 an implementer reads only the profile's fenced machine block — never the prose. The trade: edit
-conventions in `PIPELINE.md`, then let `/update-pipeline` re-render (hand-editing the prose
-without re-rendering leaves the baked copy stale — `/doctor` and the agents themselves flag the
+conventions in `PIPELINE.md`, then let `/cohorte-update-pipeline` re-render (hand-editing the prose
+without re-rendering leaves the baked copy stale — `/cohorte-doctor` and the agents themselves flag the
 contradiction).
 
 ## Capped, excerpt-free reports
@@ -81,8 +81,8 @@ always safe** — each command's closing line tells you when. Corollaries the co
 themselves: never paste a diff into a dispatch (agents compute their own, scoped), never echo a
 staged report into chat, redirect bulky output to a file and grep it.
 
-**`/drive` is the same rule taken to its conclusion.** A slash command cannot `/clear` itself, so an
-autonomous `/review ⇄ /fix` loop running *inside* your session would pile the diff plus N review
+**`/cohorte-loop` is the same rule taken to its conclusion.** A slash command cannot `/clear` itself, so an
+autonomous `/cohorte-review ⇄ /cohorte-fix` loop running *inside* your session would pile the diff plus N review
 reports plus N contracts into a history re-sent at input price on every turn — it would cost more
 than the automation saves. Instead each phase runs as a separate `claude -p` child with its own
 fresh context, and the parent reads back only two things: one line per phase, and
@@ -93,8 +93,8 @@ would undo the entire design.
 ## Model routing — pay for judgment, not mechanics
 
 - Mechanical **commands** pin `model: sonnet` in their frontmatter, so the lead's orchestration
-  turns never bill at the session model (often Opus). Interactive commands (`/brainstorm`,
-  `/spec`, `/init-pipeline`) deliberately inherit.
+  turns never bill at the session model (often Opus). Interactive commands (`/cohorte-brainstorm`,
+  `/cohorte-spec`, `/cohorte-init-pipeline`) deliberately inherit.
 - **Surface agents** pin their profile tier: `sonnet` by default (implementers mostly apply a
   frozen contract), `haiku` for purely mechanical surfaces, `inherit` only when a surface makes
   real design decisions worth the lead's model.
@@ -102,7 +102,7 @@ would undo the entire design.
 - **Workflows** route every mechanical phase (profile read, preflight, staging, verify, report
   writing) to haiku explicitly.
 
-`/doctor` flags every missing or drifted pin — an unpinned agent silently falls back to the
+`/cohorte-doctor` flags every missing or drifted pin — an unpinned agent silently falls back to the
 session model on every dispatch.
 
 ## Retrieval instead of grep-and-read
@@ -111,7 +111,7 @@ With `retrieval.provider: serena` (default), agents get live LSP symbol navigati
 locate code by symbol, read only the definitions needed, trace references before changing a
 shared shape — instead of Grep/Glob + whole-file reads. `graphify` (persistent knowledge graph)
 suits very large or mixed code+docs repos; `none` falls back to grep. Wiring is a committed
-`.mcp.json` entry with a PATH-proof launcher; `/doctor` runs the health check.
+`.mcp.json` entry with a PATH-proof launcher; `/cohorte-doctor` runs the health check.
 
 ## Measuring: what's slow vs what's expensive
 

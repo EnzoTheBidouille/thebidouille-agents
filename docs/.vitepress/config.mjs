@@ -5,7 +5,7 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: 'Cohorte',
   description:
-    'Portable, stack-agnostic multi-agent development pipeline for Claude Code — install the core, run /init-pipeline, and it adapts to your project.',
+    'Portable, stack-agnostic multi-agent development pipeline for Claude Code — install the core, run /cohorte-init-pipeline, and it adapts to your project.',
   base: '/cohorte/',
   lastUpdated: true,
   head: [['link', { rel: 'icon', type: 'image/png', href: '/cohorte/favicon-32.png' }]],

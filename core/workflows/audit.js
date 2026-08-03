@@ -1,5 +1,5 @@
-// cohorte — /audit as a deterministic workflow (opt-in; the conversational
-// /audit command remains the default path and the fallback).
+// cohorte — /cohorte-audit as a deterministic workflow (opt-in; the conversational
+// /cohorte-audit command remains the default path and the fallback).
 //
 // Invoke with args = {target: "<path or domain>"} (optional — default whole repo).
 //
@@ -135,7 +135,7 @@ const surfaces = Array.isArray(profile.surfaces) ? profile.surfaces : []
 // guard compares against `surfaces` — an empty list makes them all vacuously
 // pass. Fail loudly here instead of finishing with nothing done.
 if (!surfaces.length) {
-  return { error: 'profile has no surfaces — nothing would be audited. the `yaml pipeline-profile` block in PIPELINE.md is empty or unparseable, or the profile-reader mis-returned; run /doctor' }
+  return { error: 'profile has no surfaces — nothing would be audited. the `yaml pipeline-profile` block in PIPELINE.md is empty or unparseable, or the profile-reader mis-returned; run /cohorte-doctor' }
 }
 const quiet = (q, full) => (q && !String(q).startsWith('<') ? q : full ? `${full} 2>&1 | tail -40` : '')
 const scope = target || 'the whole repo'
@@ -204,7 +204,7 @@ const written = await agent(
   `Write EXACTLY this content to specs/refactor-backlog.md (overwrite), then return the single word done:\n<<<BACKLOG\n${body.join('\n')}\nBACKLOG`,
   { model: 'haiku', label: 'write-backlog', effort: 'low' },
 )
-// Returning `backlog: <path>` when the writer died points /refactor at a file
+// Returning `backlog: <path>` when the writer died points /cohorte-refactor at a file
 // that does not exist (or, worse, at the PREVIOUS run's stale backlog).
 const backlogOk = written != null && /done/i.test(String(written))
 
@@ -220,6 +220,6 @@ return {
   next: !backlogOk
     ? 'the backlog was NEVER written (writer died) — the counts above are real but nothing is on disk; re-run the audit'
     : deadDomains.length
-      ? `re-audit ${deadDomains.join(', ')} (auditor died — not covered), then /refactor <domain>`
-      : 'refactor a domain with /refactor <domain> (or the refactor workflow for big domains)',
+      ? `re-audit ${deadDomains.join(', ')} (auditor died — not covered), then /cohorte-refactor <domain>`
+      : 'refactor a domain with /cohorte-refactor <domain> (or the refactor workflow for big domains)',
 }

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
 # remove-feature.sh — tear down a feature's isolated worktree. Rendered from a
-# template by /init-pipeline (double-underscore tokens from PIPELINE.md §isolation —
-# spelled out here so /doctor's unrendered-token check never trips on this comment).
+# template by /cohorte-init-pipeline (double-underscore tokens from PIPELINE.md §isolation —
+# spelled out here so /cohorte-doctor's unrendered-token check never trips on this comment).
 #
 # Usage:  scripts/remove-feature.sh <feature_id> [--drop-db]
 #

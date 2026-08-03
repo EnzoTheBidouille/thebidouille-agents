@@ -1,8 +1,8 @@
-// cohorte — /refactor as a deterministic workflow (opt-in; the conversational
-// /refactor command remains the default path and the fallback).
+// cohorte — /cohorte-refactor as a deterministic workflow (opt-in; the conversational
+// /cohorte-refactor command remains the default path and the fallback).
 //
 // BIG domains only: a domain with just a handful of open backlog items is
-// cheaper through the conversational /refactor — this script skips it and says
+// cheaper through the conversational /cohorte-refactor — this script skips it and says
 // so. Invoke with args = {domains: ["backend", …]} or {domains: "all"}.
 //
 // Shape (SCHEMA.md §Workflows): profile via profile-reader (phase 0), the open
@@ -13,7 +13,7 @@
 
 export const meta = {
   name: 'cohorte-refactor',
-  description: 'Apply the /audit refactor backlog for big domains: shared first, then parallel surface implementers, per-domain verify + one retry',
+  description: 'Apply the /cohorte-audit refactor backlog for big domains: shared first, then parallel surface implementers, per-domain verify + one retry',
   whenToUse: 'Only when the human explicitly asks for the refactor workflow on big domains. args = {domains: ["<surface key>", …] | "all"}.',
   phases: [
     { title: 'Profile', detail: 'PIPELINE.md → JSON via profile-reader', model: 'haiku' },
@@ -26,7 +26,7 @@ export const meta = {
 }
 
 // A domain below this many open items is not "big" — the conversational
-// /refactor handles it with less overhead than a workflow run.
+// /cohorte-refactor handles it with less overhead than a workflow run.
 const MIN_ITEMS = 5
 
 // The Workflow runtime hands `args` to a script verbatim, so a caller that passes a
@@ -136,7 +136,7 @@ const surfaces = Array.isArray(profile.surfaces) ? profile.surfaces : []
 // guard compares against `surfaces` — an empty list makes them all vacuously
 // pass. Fail loudly here instead of finishing with nothing done.
 if (!surfaces.length) {
-  return { error: 'profile has no surfaces — nothing would be refactored. the `yaml pipeline-profile` block in PIPELINE.md is empty or unparseable, or the profile-reader mis-returned; run /doctor' }
+  return { error: 'profile has no surfaces — nothing would be refactored. the `yaml pipeline-profile` block in PIPELINE.md is empty or unparseable, or the profile-reader mis-returned; run /cohorte-doctor' }
 }
 const byKey = Object.fromEntries(surfaces.map(s => [s.key, s]))
 const contractPath = (profile.contract && profile.contract.path) || ''
@@ -153,15 +153,15 @@ const backlog = await agent(
   { model: 'haiku', label: 'read-backlog', schema: OPEN, effort: 'low' },
 )
 // A dead reader is not "the backlog is empty" — reporting it as such sends the
-// human to re-run /audit on a backlog that is already there.
+// human to re-run /cohorte-audit on a backlog that is already there.
 if (!backlog) return { error: 'the backlog-reading agent died — nothing was read; re-run the refactor workflow' }
 const open = (backlog.domains || []).filter(d => d.items.length)
-if (!open.length) return { error: 'no open backlog items for the requested domains — run /audit (or the audit workflow) first' }
+if (!open.length) return { error: 'no open backlog items for the requested domains — run /cohorte-audit (or the audit workflow) first' }
 
 const big = open.filter(d => d.items.length >= MIN_ITEMS)
 const small = open.filter(d => d.items.length < MIN_ITEMS)
-for (const d of small) log(`Skipping ${d.key} (${d.items.length} open item(s) < ${MIN_ITEMS}) — use the conversational /refactor ${d.key}, it's cheaper`)
-if (!big.length) return { skipped: Object.fromEntries(small.map(d => [d.key, d.items.length])), reason: `every requested domain is below the ${MIN_ITEMS}-item workflow threshold — use /refactor` }
+for (const d of small) log(`Skipping ${d.key} (${d.items.length} open item(s) < ${MIN_ITEMS}) — use the conversational /cohorte-refactor ${d.key}, it's cheaper`)
+if (!big.length) return { skipped: Object.fromEntries(small.map(d => [d.key, d.items.length])), reason: `every requested domain is below the ${MIN_ITEMS}-item workflow threshold — use /cohorte-refactor` }
 
 const implementPrompt = d =>
   'Refactor pass on your surface (no feature spec). Read PIPELINE.md first. Add the missing tests ' +
@@ -243,7 +243,7 @@ if (clearedAll.length) {
     { model: 'haiku', label: 'tick-backlog', effort: 'low' },
   )
   // Reporting items as cleared while the backlog still shows them open means the
-  // next /refactor re-dispatches work that is already done.
+  // next /cohorte-refactor re-dispatches work that is already done.
   tickedOk = ticked != null && /done/i.test(String(ticked))
 }
 
@@ -256,8 +256,8 @@ return {
   backlogTicked: tickedOk,
   next: !tickedOk
     ? `${clearedAll.length} item(s) were cleared in code but NOT ticked off specs/refactor-backlog.md ` +
-      '(the ticking agent died) — tick them by hand, or the next /refactor re-dispatches finished work'
+      '(the ticking agent died) — tick them by hand, or the next /cohorte-refactor re-dispatches finished work'
     : results.some(r => r.remaining.length || !r.gatesGreen)
-      ? 'items remain — finish them with the conversational /refactor <domain>'
-      : 'all dispatched domains clean — optionally close with one final /audit',
+      ? 'items remain — finish them with the conversational /cohorte-refactor <domain>'
+      : 'all dispatched domains clean — optionally close with one final /cohorte-audit',
 }

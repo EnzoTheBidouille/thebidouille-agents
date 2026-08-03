@@ -16,7 +16,7 @@
 #     sh install.sh --update --global
 #
 # Per-project install copies the core into <target>/.claude; global install copies it once
-# into ~/.claude and registers the gate hook there. Either way you then run `/init-pipeline`
+# into ~/.claude and registers the gate hook there. Either way you then run `/cohorte-init-pipeline`
 # in each repo to generate PIPELINE.md + render the surface agents. Update refreshes ONLY the
 # stack-agnostic files; generated profiles, rendered agents, gate-config.json and any project
 # settings.json are left untouched.
@@ -108,8 +108,10 @@ copy_core() {
   cp "$src/scripts/telemetry-send.sh"    "$dest/pipeline/scripts/"
   cp "$src/scripts/preflight.sh"         "$dest/pipeline/scripts/"
   cp "$src/scripts/loop.sh"              "$dest/pipeline/scripts/"
+  cp "$src/scripts/loop-detach.sh"       "$dest/pipeline/scripts/"
   chmod +x "$dest/pipeline/scripts/kanban-move.sh" "$dest/pipeline/scripts/telemetry-send.sh" \
-           "$dest/pipeline/scripts/preflight.sh" "$dest/pipeline/scripts/loop.sh" 2>/dev/null || true
+           "$dest/pipeline/scripts/preflight.sh" "$dest/pipeline/scripts/loop.sh" \
+           "$dest/pipeline/scripts/loop-detach.sh" 2>/dev/null || true
   cp "$src/core/agents/implementer.template.md" "$dest/pipeline/"
   [ -f "$src/CHANGELOG.md" ] && cp "$src/CHANGELOG.md" "$dest/pipeline/"
   printf '%s\n' "$ver" > "$dest/pipeline/VERSION"
@@ -161,6 +163,14 @@ copy_fixed_agents() {
   # 1.6.0 renamed /loop → /drive: Claude Code's own built-in /loop shadowed ours, so a leftover
   # commands/loop.md is a command the user can never reach — scrub it rather than leave a decoy.
   rm -f "$dest/commands/loop.md"
+  # 2.0.0 prefixed every command with `cohorte-`, which ends the shadowing problem for good.
+  # Copy-over never deletes, so all 13 bare names would survive an upgrade as decoys — and a
+  # stale /build is the worst kind: it still dispatches implementers, from a 1.x command file
+  # that knows nothing of this core's contract. /drive goes too (it became /cohorte-loop).
+  for c in align-ds audit brainstorm build doctor drive fix init-pipeline \
+           refactor review ship spec update-pipeline; do
+    rm -f "$dest/commands/$c.md"
+  done
   # 0.1.19 split the bi-mode questionnaire-researcher into research-agent + questionnaire-architect;
   # copy-over never deletes, so scrub the retired agent lest a dead subagent_type linger.
   rm -f "$dest/agents/questionnaire-researcher.md"
@@ -186,7 +196,7 @@ scrub_research_questionnaire() {
 # pipeline capability config is USER-level (vault, Notion DB, kanban boards) — it lives in
 # ~/.claude regardless of install scope. Seed it only if neither the consolidated nor the
 # legacy copy exists. This piped installer is non-interactive: it seeds disabled defaults;
-# /init-pipeline + /update-pipeline wire it (npx's installer offers a quick interview instead).
+# /cohorte-init-pipeline + /cohorte-update-pipeline wire it (npx's installer offers a quick interview instead).
 seed_config() {
   base="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
   cfg="$base/cohorte.config.yaml"
@@ -198,11 +208,11 @@ seed_config() {
     echo "  · kept your existing $cfg"
   elif [ -n "$legacy" ]; then
     echo "  · found legacy $legacy — kept as-is (read as a fallback)."
-    echo "    Run /update-pipeline to migrate it into cohorte.config.yaml + wire the kanban."
+    echo "    Run /cohorte-update-pipeline to migrate it into cohorte.config.yaml + wire the kanban."
   else
     mkdir -p "$base"
     cp "$src/profile/cohorte.config.template.yaml" "$cfg"
-    echo "  · seeded $cfg (disabled defaults — enable via /init-pipeline or /update-pipeline)"
+    echo "  · seeded $cfg (disabled defaults — enable via /cohorte-init-pipeline or /cohorte-update-pipeline)"
   fi
 }
 
@@ -290,24 +300,24 @@ if [ "$scope" = "global" ]; then
 ✓ pipeline core installed globally into $dest  (version $ver)
   gate hook: $hook_state  (reads each repo's .claude/gate-config.json; silent where absent)
 
-The commands (/init-pipeline, /brainstorm, /build …) and the review/release agents are now
+The commands (/cohorte-init-pipeline, /cohorte-brainstorm, /cohorte-build …) and the review/release agents are now
 available in EVERY project on this machine — nothing is copied per repo.
 
 Per repo:
   1. Open the project in Claude Code.
-  2. Run  /init-pipeline  — it generates PIPELINE.md, renders the surface agents, writes
+  2. Run  /cohorte-init-pipeline  — it generates PIPELINE.md, renders the surface agents, writes
      .claude/gate-config.json, and drops a committed .claude/pipeline.json pointer so
      teammates know to install the global core ($REPO_URL).
-  3. Commit PIPELINE.md + .claude/, then  /brainstorm  to start a feature.
+  3. Commit PIPELINE.md + .claude/, then  /cohorte-brainstorm  to start a feature.
 
-Code retrieval (Serena — the default provider /init-pipeline wires per repo):
+Code retrieval (Serena — the default provider /cohorte-init-pipeline wires per repo):
   uv tool install -p 3.13 serena-agent   # once per machine
   Make sure ~/.local/bin is on PATH (uv tool update-shell) — otherwise the
   registered MCP server silently fails to start.
 
 Global kanban config, user-scoped — optional:
   · One consolidated file: ~/.claude/cohorte.config.yaml (don't hand-edit it).
-  · /init-pipeline (new project) and /update-pipeline (existing) wire it for you: creating +
+  · /cohorte-init-pipeline (new project) and /cohorte-update-pipeline (existing) wire it for you: creating +
     syncing an Obsidian kanban board of the pipeline in your shared vault.
 EOF
   exit 0
@@ -326,11 +336,11 @@ if [ "$mode" = "install" ]; then
 
 Next:
   1. Open the project in Claude Code.
-  2. Run  /init-pipeline   — it detects your stack, asks the gaps, and generates
+  2. Run  /cohorte-init-pipeline   — it detects your stack, asks the gaps, and generates
      PIPELINE.md + renders one implementer agent per surface.
-  3. Commit PIPELINE.md, then  /brainstorm  to start a feature.
+  3. Commit PIPELINE.md, then  /cohorte-brainstorm  to start a feature.
 
-Code retrieval (Serena — the default provider /init-pipeline wires per repo):
+Code retrieval (Serena — the default provider /cohorte-init-pipeline wires per repo):
   uv tool install -p 3.13 serena-agent   # once per machine
   Make sure ~/.local/bin is on PATH (uv tool update-shell) — otherwise the
   registered MCP server silently fails to start.
@@ -346,6 +356,6 @@ else
   cat <<EOF
 
 ✓ core refreshed to $ver. Your PIPELINE.md, rendered surface agents, gate-config.json and
-  settings.json were left as-is. Re-run /init-pipeline if your stack changed.
+  settings.json were left as-is. Re-run /cohorte-init-pipeline if your stack changed.
 EOF
 fi

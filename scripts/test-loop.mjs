@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// Behavioural tests for scripts/loop.sh — the autonomous /review ⇄ /fix driver.
+// Behavioural tests for scripts/loop.sh — the autonomous /cohorte-review ⇄ /cohorte-fix driver.
 //
 // The driver is pure shell around two JSON files it does not write, so it is
 // testable end-to-end by putting a FAKE `claude` on PATH that produces those files
 // per phase. What is pinned here cannot be seen by any structural check:
 //
-//   · exit 4 — /build's readiness gate said NOT-READY, so no pass count helps
+//   · exit 4 — /cohorte-build's readiness gate said NOT-READY, so no pass count helps
 //   · exit 0/3 leave the right TERMINAL status in the spec's front-matter, which is
 //     what makes an interrupted loop resumable (SCHEMA.md §Spec status)
 //   · the front-matter stamps are written with awk on every platform — a `sed -i`
@@ -50,7 +50,15 @@ prompt=""
 while [ $# -gt 0 ]; do
   case "$1" in -p) prompt="$2"; shift 2 ;; *) shift ;; esac
 done
-cmd="\${prompt%% *}"; cmd="\${cmd#/}"
+cmd="\${prompt%% *}"
+# The driver must dispatch the PREFIXED command (2.0.0) — an unprefixed /build would be
+# shadowed by Claude Code's own built-in and never reach the pipeline, so fail loudly
+# rather than let a regression pass by being lenient here.
+case "$cmd" in
+  /cohorte-*) ;;
+  *) echo "fake claude: expected a /cohorte-* command, got '$cmd'" >&2; exit 9 ;;
+esac
+cmd="\${cmd#/cohorte-}"          # scenarios are keyed on the PHASE, which stays unprefixed
 n=0; [ -f "$SCEN_DIR/count" ] && n=$(cat "$SCEN_DIR/count")
 n=$((n + 1)); echo "$n" >"$SCEN_DIR/count"
 step=$(sed -n "\${n}p" "$SCEN_DIR/phases")
@@ -133,7 +141,7 @@ console.log("loop.sh — readiness gate");
   check("NOT-READY ⇒ exit 4, not 2", r.code === 4, `got ${r.code}: ${r.out.trim().split("\n").pop()}`);
   check("NOT-READY ⇒ says the spec is not implementable",
     /not implementable/i.test(r.out), r.out.trim().split("\n").pop());
-  check("NOT-READY ⇒ points at /spec", /\/spec feat-x/.test(r.out));
+  check("NOT-READY ⇒ points at /cohorte-spec", /\/cohorte-spec feat-x/.test(r.out));
   check("NOT-READY ⇒ spec left blocked", r.fm("status") === "blocked", r.fm("status"));
   check("NOT-READY ⇒ no review ran (the gate is the point)", !/phase=review/.test(r.out));
   check("NOT-READY ⇒ the build stamp is NOT written",
@@ -145,7 +153,7 @@ console.log("loop.sh — clean run");
   const s = scenario(["build:ready", "review:clean"]);
   const r = runLoop(s, ["feat-x"]);
   check("clean ⇒ exit 0", r.code === 0, `got ${r.code}: ${r.out}`);
-  check("clean ⇒ status in-review (ready to /ship)", r.fm("status") === "in-review", r.fm("status"));
+  check("clean ⇒ status in-review (ready to /cohorte-ship)", r.fm("status") === "in-review", r.fm("status"));
   check("clean ⇒ loop state cleared", r.fm("loop_pass") === "0" && r.fm("loop_phase") === "done",
     `${r.fm("loop_pass")}/${r.fm("loop_phase")}`);
   check("clean ⇒ the deferred count is named, not dropped",
@@ -156,7 +164,7 @@ console.log("loop.sh — clean run");
 
 console.log("loop.sh — a dead subagent is never a clean result");
 {
-  // A dead implementer: /build finishes fine having built one surface of two. Reviewing
+  // A dead implementer: /cohorte-build finishes fine having built one surface of two. Reviewing
   // that would spend N reviewers auditing a half-built feature and report its holes as
   // findings to fix — the wrong diagnosis at the wrong price.
   const s = scenario(["build:deadimplementer"]);
@@ -170,7 +178,7 @@ console.log("loop.sh — a dead subagent is never a clean result");
 {
   // THE dangerous one: blocking == 0 because the only reviewer that could have found
   // something never answered. Exiting 0 here would report "clean" about unread code and
-  // send the human to /ship.
+  // send the human to /cohorte-ship.
   const s = scenario(["build:ready", "review:deadreviewer"]);
   const r = runLoop(s, ["feat-x"]);
   check("dead reviewer + blocking 0 ⇒ NOT exit 0", r.code !== 0, `got ${r.code}: ${r.out}`);
@@ -221,6 +229,40 @@ console.log("loop.sh — a spec with no front-matter still runs");
     r.spec === "# Feat X\n\nno front-matter\n", JSON.stringify(r.spec));
   check("no front-matter ⇒ no stray temp file",
     !existsSync(join(s.dir, "specs/feat-x.md.loop.tmp")));
+}
+
+// ── the sleep inhibitor must never be able to fail the run ───────────────────
+// loop.sh re-execs itself under caffeinate/systemd-inhibit to hold a power assertion.
+// `exec` replaces the shell, so an inhibitor that EXISTS but is refused makes its own
+// failure the driver's exit code and the run never starts. CI found this the hard way:
+// GitHub's Linux runners ship systemd-inhibit and answer "Failed to inhibit: Access
+// denied", which turned all 24 loop tests red at once.
+console.log("loop.sh — the sleep inhibitor is best-effort, never fatal");
+{
+  const s = scenario(["build:ready", "review:clean"]);
+  // Both inhibitors present on PATH and both failing — the CI shape.
+  writeFileSync(join(s.bin, "systemd-inhibit"),
+    '#!/bin/sh\necho "Failed to inhibit: Access denied" >&2\nexit 1\n');
+  chmodSync(join(s.bin, "systemd-inhibit"), 0o755);
+  writeFileSync(join(s.bin, "caffeinate"), "#!/bin/sh\nexit 127\n");
+  chmodSync(join(s.bin, "caffeinate"), 0o755);
+  const r = runLoop(s, ["feat-x"]);
+  check("a refused inhibitor ⇒ the run still completes clean", r.code === 0,
+    `got ${r.code}: ${r.out.trim().split("\n").pop()}`);
+  check("a refused inhibitor ⇒ its error never reaches the driver's output",
+    !/Access denied/.test(r.out), r.out.trim().split("\n").pop());
+
+  // A WORKING inhibitor must still be used (or the probe would have disabled the feature).
+  const s2 = scenario(["build:ready", "review:clean"]);
+  writeFileSync(join(s2.bin, "systemd-inhibit"),
+    '#!/bin/sh\nwhile [ $# -gt 0 ]; do case "$1" in --*) shift ;; *) break ;; esac; done\n'
+    + 'echo "INHIBIT-HELD" >&2\nexec "$@"\n');
+  chmodSync(join(s2.bin, "systemd-inhibit"), 0o755);
+  writeFileSync(join(s2.bin, "caffeinate"), "#!/bin/sh\nexit 127\n");
+  chmodSync(join(s2.bin, "caffeinate"), 0o755);
+  const r2 = runLoop(s2, ["feat-x"]);
+  check("a usable inhibitor is still exec'd (the probe didn't kill the feature)",
+    /INHIBIT-HELD/.test(r2.out) && r2.code === 0, `${r2.code}: ${r2.out.trim().split("\n").pop()}`);
 }
 
 if (failures) { console.error(`\ntest-loop: ${failures} failure(s)`); process.exit(1); }

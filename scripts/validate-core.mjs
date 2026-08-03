@@ -22,27 +22,28 @@ const frontmatter = (text) => {
 // Mechanical commands must pin model: sonnet (otherwise the lead's
 // orchestration turn silently bills at the session model — Opus/Fable).
 // Interactive commands must stay unpinned (they inherit on purpose).
-const PINNED = ["build", "review", "fix", "ship", "audit",
-  "refactor", "doctor", "align-ds", "update-pipeline", "drive"];
-const UNPINNED = ["brainstorm", "spec", "init-pipeline"];
+const PINNED = ["cohorte-build", "cohorte-review", "cohorte-fix", "cohorte-ship",
+  "cohorte-audit", "cohorte-refactor", "cohorte-doctor", "cohorte-align-ds",
+  "cohorte-update-pipeline", "cohorte-loop"];
+const UNPINNED = ["cohorte-brainstorm", "cohorte-spec", "cohorte-init-pipeline"];
 
-// Names Claude Code itself claims. A core command that collides is not overridden —
-// it is SHADOWED: the built-in answers the slash, our command file is never read, and
-// the session confidently reports on a run that never happened. That is what `/loop`
-// did (Claude Code's own `/loop` runs a prompt on an interval), invisible until a user
-// noticed the driver had never started. `/loop` is here so the 1.6.0 rename to
-// `/drive` can never be quietly reverted.
-// Watchlist, not yet enforced because the collision is unproven: `doctor` (Claude Code
-// has its own `/doctor`) — if a typed `/doctor` ever stops reaching the pipeline's, add
-// it here and rename.
-const RESERVED = ["loop", "clear", "compact", "cost", "help", "config",
-  "init", "run", "schedule", "simplify", "review-pr"];
+// Every command must carry the `cohorte-` prefix. This replaces the old RESERVED
+// blocklist, which chased collisions one name at a time and always lagged: a command
+// that collides with a Claude Code built-in is not overridden, it is SHADOWED — the
+// built-in answers the slash, our file is never read, and the session confidently
+// reports on a run that never happened. `/loop` did exactly that (Claude Code's own
+// `/loop` runs a prompt on an interval) and went unnoticed until a user found the
+// driver had never started; `/doctor` sat on a watchlist waiting to do the same.
+// A blocklist can only forbid the collisions we already know about. The prefix makes
+// the whole class unreachable, so this check is structural, not a list to maintain.
+const PREFIX = "cohorte-";
 
 for (const f of readdirSync(join(root, "core/commands"))) {
   const path = `core/commands/${f}`;
-  if (RESERVED.includes(f.replace(/\.md$/, "")))
-    fail(path, `command name collides with a Claude Code built-in — it would be SHADOWED ` +
-      `(the built-in answers the slash and this file is never read); rename it`);
+  if (!f.startsWith(PREFIX))
+    fail(path, `command name lacks the \`${PREFIX}\` prefix — an unprefixed command can be ` +
+      `SHADOWED by a Claude Code built-in of the same name (the built-in answers the slash ` +
+      `and this file is never read); rename it to ${PREFIX}${f}`);
   const fm = frontmatter(read(path));
   if (!fm) { fail(path, "missing or malformed YAML frontmatter"); continue; }
   if (!/^description:\s*\S/m.test(fm)) fail(path, "frontmatter lacks a description");
@@ -130,16 +131,20 @@ if (!existsSync(steps) || readdirSync(steps).length === 0)
 
 // ── telemetry coverage ──────────────────────────────────────────────────────
 // The funnel is only readable if every one of its stages pings — a single missing
-// one silently truncates it (that is how /review and /fix went unreported
+// one silently truncates it (that is how /cohorte-review and /cohorte-fix went unreported
 // until 1.2.3). The phase list here must match SCHEMA.md §Telemetry's table.
+// These are telemetry PHASE names, not command names — they stay unprefixed even though
+// the commands that emit them are now `/cohorte-*`. The phase is a wire field allowlisted
+// in telemetry-send.sh and keyed on by the collector's existing dataset; prefixing it would
+// orphan every ping ever sent. Command file = PREFIX + phase.
 const FUNNEL = ["brainstorm", "spec", "build", "review", "fix", "ship"];
 for (const c of FUNNEL)
-  if (!/usage ping/i.test(read(`core/commands/${c}.md`)))
-    fail(`core/commands/${c}.md`, "funnel command with no usage ping — breaks the telemetry funnel");
+  if (!/usage ping/i.test(read(`core/commands/${PREFIX}${c}.md`)))
+    fail(`core/commands/${PREFIX}${c}.md`, "funnel command with no usage ping — breaks the telemetry funnel");
 // …and nothing outside the funnel may ping (consent text scopes it to the funnel).
 for (const f of readdirSync(join(root, "core/commands"))) {
-  const c = f.replace(/\.md$/, "");
-  // `telemetry-send.sh` + an argument = a call site; the bare filename (e.g. /doctor
+  const c = f.replace(/\.md$/, "").replace(new RegExp(`^${PREFIX}`), "");
+  // `telemetry-send.sh` + an argument = a call site; the bare filename (e.g. /cohorte-doctor
   // listing the scripts it checks for) is a mention, not a ping.
   if (!FUNNEL.includes(c) && /telemetry-send\.sh +\S|usage ping/i.test(read(`core/commands/${f}`)))
     fail(`core/commands/${f}`, "non-funnel command pings telemetry — outside the consented scope");
@@ -154,7 +159,7 @@ for (const f of readdirSync(join(root, "core/commands"))) {
 // scratch HOME and asserts the same postconditions instead. Both are needed: this
 // check catches a forgotten name, that one catches a drifted rule.
 // A `<name>.sh` with a `<name>.sh.template` sibling is a locally-rendered artifact
-// (this repo dogfoods its own /init-pipeline), not a core asset — skip those.
+// (this repo dogfoods its own /cohorte-init-pipeline), not a core asset — skip those.
 const installers = { "install.sh": read("install.sh"), "install.ps1": read("install.ps1") };
 const shipped = readdirSync(join(root, "scripts"));
 for (const f of shipped.filter((f) => f.endsWith(".sh") && !shipped.includes(`${f}.template`)))

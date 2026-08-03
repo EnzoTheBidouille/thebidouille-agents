@@ -1,4 +1,4 @@
-# /init-pipeline · 01 Detect the stack
+# /cohorte-init-pipeline · 01 Detect the stack
 
 ### Phase 1 — Detect the stack (read-only, no questions yet)
 

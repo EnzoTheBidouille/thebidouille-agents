@@ -14,13 +14,13 @@
 </div>
 
 A **portable, stack-agnostic multi-agent pipeline** for Claude Code. Install it once globally,
-then one command per project (`/init-pipeline`) adapts it to that project's stack.
+then one command per project (`/cohorte-init-pipeline`) adapts it to that project's stack.
 
 - **The dev pipeline** — a human **lead** drives feature work through gated commands, dispatching
   **stateless agents** that only communicate through a frozen contract:
 
   ```
-  /brainstorm → /spec → (design) → /build <id> → /review → (/fix) → /ship
+  /cohorte-brainstorm → /cohorte-spec → (design) → /cohorte-build <id> → /cohorte-review → (/cohorte-fix) → /cohorte-ship
   ```
 
 ## How it works — three layers
@@ -28,7 +28,7 @@ then one command per project (`/init-pipeline`) adapts it to that project's stac
 | Layer | What it holds | Lives in | Scope |
 | --- | --- | --- | --- |
 | **Generic core** | the workflow doctrine: commands, fixed agents, templates, hooks — zero project facts | `~/.claude` (global) — or vendored in a repo's `.claude/` (bundled) | identical everywhere, installed once |
-| **Project profile** | stack, surfaces, commands, conventions, gates | `PIPELINE.md` + rendered surface agents + `gate-config.json`, **committed in each repo** | generated per project by `/init-pipeline` |
+| **Project profile** | stack, surfaces, commands, conventions, gates | `PIPELINE.md` + rendered surface agents + `gate-config.json`, **committed in each repo** | generated per project by `/cohorte-init-pipeline` |
 | **User config** | kanban board links + shared Obsidian vault path | `~/.claude/cohorte.config.yaml` | personal, project-independent |
 
 The core never hardcodes stack facts. Two mechanisms keep it generic:
@@ -37,7 +37,7 @@ The core never hardcodes stack facts. Two mechanisms keep it generic:
    `~/.claude/cohorte.config.yaml` (kanban board links + shared vault) at run time — an agent's
    _first action_ is to read its config.
 2. **Render-at-init** — things that must be in agent frontmatter (name, `tools:`, surface ownership)
-   are rendered per **surface** by `/init-pipeline` from `implementer.template.md`.
+   are rendered per **surface** by `/cohorte-init-pipeline` from `implementer.template.md`.
 
 ## Prerequisites
 
@@ -48,10 +48,10 @@ Only one hard requirement — the rest is optional and independent:
   provider. Install it separately (`uv tool install -p 3.13 serena-agent && uv tool update-shell`); the
   `npx` install neither needs nor touches it, so the order between the two is irrelevant. Without Serena
   the pipeline still runs — agents just fall back to Grep/Read. Having it installed **before**
-  `/init-pipeline` lets init wire it in one pass (otherwise `/update-pipeline` wires it later).
+  `/cohorte-init-pipeline` lets init wire it in one pass (otherwise `/cohorte-update-pipeline` wires it later).
 - **On a new machine cloning a repo that's already pipeline-ised:** the Serena registration is committed
   in the repo's `.mcp.json` (project scope, portable) — you don't re-wire. Just install the Serena CLI,
-  restart the session, and run `/doctor` to confirm it connects.
+  restart the session, and run `/cohorte-doctor` to confirm it connects.
 
 ## Install
 
@@ -66,11 +66,11 @@ own `gate-config.json`:
 npx cohorte install --global
 ```
 
-The per-project part is NOT the core — it's the **profile** `/init-pipeline` generates and you
+The per-project part is NOT the core — it's the **profile** `/cohorte-init-pipeline` generates and you
 commit: `PIPELINE.md`, the rendered surface agents, `gate-config.json`, `settings.json`, `specs/`.
 **That's what makes team work possible in global mode**: everything project-specific travels with the
 repo; each teammate just runs the same global one-liner once, guided by the committed
-`.claude/pipeline.json` pointer (core version + install command) that `/init-pipeline` writes.
+`.claude/pipeline.json` pointer (core version + install command) that `/cohorte-init-pipeline` writes.
 
 <details>
 <summary><strong>Alternative: per-project (bundled)</strong> — vendor the core into the repo itself.</summary>
@@ -109,13 +109,13 @@ published semver. Both land in `.claude/pipeline/VERSION` and the `pipeline.json
 </details>
 
 > **After installing (or updating): restart Claude Code / start a new session.** Slash commands and
-> agents are scanned at session start — in an already-open session the new `/init-pipeline`,
-> `/build`, etc. won't appear until you reload. This is the #1 "the install didn't work" trap.
+> agents are scanned at session start — in an already-open session the new `/cohorte-init-pipeline`,
+> `/cohorte-build`, etc. won't appear until you reload. This is the #1 "the install didn't work" trap.
 
 Then, in Claude Code (from any repo, once the core is installed either way):
 
 ```
-/init-pipeline
+/cohorte-init-pipeline
 ```
 
 It **detects** your stack (package manager, workspaces, frameworks, test runners, linters, git remote,
@@ -132,9 +132,9 @@ design system), **interviews** you for the gaps, and **generates**:
   profile's `retrieval.provider`)
 - `scripts/new-feature.sh` + `remove-feature.sh` — parallel worktree isolation (if you enable it)
 - `specs/_template.md` (and, on first decision, `specs/_decisions.md` — the project's one-line-per-decision
-  journal, read by `/brainstorm`, `/spec` and `/audit` so features stop re-litigating settled ground)
+  journal, read by `/cohorte-brainstorm`, `/cohorte-spec` and `/cohorte-audit` so features stop re-litigating settled ground)
 
-Sanity-check `PIPELINE.md`, commit it, and run `/brainstorm`.
+Sanity-check `PIPELINE.md`, commit it, and run `/cohorte-brainstorm`.
 
 ## Update
 
@@ -149,12 +149,12 @@ The installer refreshes the generic core (commands, hook, templates) **without**
 `PIPELINE.md`, rendered agents, `gate-config.json`, `settings.json`, or your filled
 `~/.claude/cohorte.config.yaml`.
 
-From inside Claude Code, prefer **`/update-pipeline`**: it runs the right update invocation for your
+From inside Claude Code, prefer **`/cohorte-update-pipeline`**: it runs the right update invocation for your
 install scope, reports `old → new` — and then **reconciles the repo's generated files to the new
 core**: new profile fields are added at their defaults (you're only asked for genuinely new
 decisions), surface agents are re-rendered, settings are patched additively, new capabilities get
-wired. **`/init-pipeline` is one-time per project** — after init, `/update-pipeline` is the only
-maintenance command you ever run (`/build` auto-grows surfaces as specs need them).
+wired. **`/cohorte-init-pipeline` is one-time per project** — after init, `/cohorte-update-pipeline` is the only
+maintenance command you ever run (`/cohorte-build` auto-grows surfaces as specs need them).
 
 ## Dashboard — a local web cockpit
 
@@ -167,7 +167,7 @@ npx cohorte dashboard --port=4400 --open   # custom port, open the browser
 ```
 
 **Bound to `127.0.0.1` by default** — the dashboard's actions execute code (install/update/reset,
-and `/init-pipeline`·`/update-pipeline`·`/audit` via headless Claude), so it must stay on loopback. Each user
+and `/cohorte-init-pipeline`·`/cohorte-update-pipeline`·`/cohorte-audit` via headless Claude), so it must stay on loopback. Each user
 runs their own agent and drives only their own machine. `--host=0.0.0.0` exposes it to the network
 (it prints a security warning) — only on a trusted network, since anyone who reaches the port can run
 those actions.
@@ -175,7 +175,7 @@ those actions.
 - **Fleet overview** — the global core version vs npm latest, plus every tracked project's freshness
   and health at a glance. Add a project by absolute path or with the **folder picker** (Browse…); the
   set is remembered in `~/.claude/cohorte-dashboard.json`.
-- **Per-project drill-down** — Freshness (installed core vs npm), `/doctor` rendered as a live
+- **Per-project drill-down** — Freshness (installed core vs npm), `/cohorte-doctor` rendered as a live
   ✅/⚠️/❌ checklist (each failure with its fix), the **Surfaces ↔ agents** map from `PIPELINE.md`,
   and one board: a **Kanban** if the project has a linked Obsidian board (columns + cards from the
   vault, with clickable PR links + live open/merged/closed status and a ship-date-sorted Shipped
@@ -191,7 +191,7 @@ those actions.
   **workflows** state (scripts + profile-reader installed, which path a session will take).
 
 Runtime is **dependency-free** — node's built-in `http` server serves a prebuilt React app (the app
-source lives in `dashboard/app/`, built to `dashboard/dist/` at publish time). The `/doctor` checks
+source lives in `dashboard/app/`, built to `dashboard/dist/` at publish time). The `/cohorte-doctor` checks
 are reimplemented in JS, so the dashboard needs no Claude session to compute state. See
 [`dashboard/README.md`](dashboard/README.md) for the architecture.
 
@@ -214,29 +214,29 @@ it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.
 
 | Command              | Role                                                                                  |
 | -------------------- | ------------------------------------------------------------------------------------- |
-| `/init-pipeline`     | Detect stack → interview → generate the profile + agents. Run once per project.       |
-| `/brainstorm`        | Interactive persona panel that pressure-tests a feature idea.                         |
-| `/spec`              | Freeze the feature spec + contract into `specs/<id>.md` (UI features also get a standalone design brief at `specs/design/<id>.md`). Also applies review returns. |
-| `/build <id>`        | Readiness gate on the frozen spec, then the lead authors the contract and dispatches one implementer per surface in parallel. |
-| `/review <id>`       | Read-only review agents (one per touched surface, parallel) audit the diff vs the spec; out-of-scope findings go to the refactor backlog. |
-| `/fix <id>`          | Apply a review report: remediation into the spec, re-dispatch only the surfaces with findings. |
-| `/drive <id>`         | Autonomous `/build → /review → /fix → /review …` until no blocking finding is left (see below). |
-| `/ship <id>`         | Release agent commits, pushes, opens the PR; watches CI; proposes worktree teardown.  |
-| `/audit [path]`      | Prioritized refactor backlog for existing code.                                       |
-| `/refactor <domain>` | Apply the backlog for one surface, TDD-first.                                         |
-| `/align-ds`          | Align the code UI kit to the design system (no-op if none configured).                |
-| `/update-pipeline`   | Refresh the installed core (global or bundled) to the latest published version.       |
-| `/doctor`            | Diagnose the installation (core, agents↔surfaces, hooks, gate, retrieval, worktrees). |
+| `/cohorte-init-pipeline`     | Detect stack → interview → generate the profile + agents. Run once per project.       |
+| `/cohorte-brainstorm`        | Interactive persona panel that pressure-tests a feature idea.                         |
+| `/cohorte-spec`              | Freeze the feature spec + contract into `specs/<id>.md` (UI features also get a standalone design brief at `specs/design/<id>.md`). Also applies review returns. |
+| `/cohorte-build <id>`        | Readiness gate on the frozen spec, then the lead authors the contract and dispatches one implementer per surface in parallel. |
+| `/cohorte-review <id>`       | Read-only review agents (one per touched surface, parallel) audit the diff vs the spec; out-of-scope findings go to the refactor backlog. |
+| `/cohorte-fix <id>`          | Apply a review report: remediation into the spec, re-dispatch only the surfaces with findings. |
+| `/cohorte-loop <id>`         | Autonomous `/cohorte-build → /cohorte-review → /cohorte-fix → /cohorte-review …` until no blocking finding is left (see below). |
+| `/cohorte-ship <id>`         | Release agent commits, pushes, opens the PR; watches CI; proposes worktree teardown.  |
+| `/cohorte-audit [path]`      | Prioritized refactor backlog for existing code.                                       |
+| `/cohorte-refactor <domain>` | Apply the backlog for one surface, TDD-first.                                         |
+| `/cohorte-align-ds`          | Align the code UI kit to the design system (no-op if none configured).                |
+| `/cohorte-update-pipeline`   | Refresh the installed core (global or bundled) to the latest published version.       |
+| `/cohorte-doctor`            | Diagnose the installation (core, agents↔surfaces, hooks, gate, retrieval, worktrees). |
 
 ### Run the loop cheaply — `/clear` between stages
 
 Every command reloads all the state it needs **from disk** — the frozen spec, the contract, the diff, the
-Remediation checkboxes, the freshness stamp, and the last `/review` report (staged to a gitignored
+Remediation checkboxes, the freshness stamp, and the last `/cohorte-review` report (staged to a gitignored
 `specs/reports/<id>.md`). Nothing essential lives in the conversation. So the loop is **`/clear`-safe at
 every boundary**:
 
 ```
-/spec → /clear → /build → /clear → /review → /clear → /fix → /clear → /review → /ship
+/cohorte-spec → /clear → /cohorte-build → /clear → /cohorte-review → /clear → /cohorte-fix → /clear → /cohorte-review → /cohorte-ship
 ```
 
 `/clear`-ing between stages sheds the accumulated main-thread context, which is the single biggest token
@@ -244,26 +244,26 @@ lever: long sessions (>150k) are expensive even when cached. Each command tells 
 safe to clear. If you'd rather stay in one session, `/compact` mid-task does the lighter version. (Claude
 can't fire `/clear` itself — it's a client-side command; the pipeline just makes it always safe to type.)
 
-### Let it run itself — `/drive`
+### Let it run itself — `/cohorte-loop`
 
 ```
-/drive feat-x              # /build, then /review ⇄ /fix until clean (max 5 passes)
-/drive feat-x --no-build   # already built — just re-run the /review ⇄ /fix loop
-/drive feat-x --max=8
-/drive feat-x --resume     # continue a run that died / hit the ceiling, at the pass it reached
+/cohorte-loop feat-x              # /cohorte-build, then /cohorte-review ⇄ /cohorte-fix until clean (max 5 passes)
+/cohorte-loop feat-x --no-build   # already built — just re-run the /cohorte-review ⇄ /cohorte-fix loop
+/cohorte-loop feat-x --max=8
+/cohorte-loop feat-x --resume     # continue a run that died / hit the ceiling, at the pass it reached
 ```
 
-It stops when `/review` reports **zero blocking findings** (a CRITICAL or a security issue — a LOW
+It stops when `/cohorte-review` reports **zero blocking findings** (a CRITICAL or a security issue — a LOW
 nit never costs a pass), at the pass ceiling, as soon as two consecutive reviews return the same
-blocking findings (the fix is treading water and more passes won't help), or immediately if `/build`'s
-readiness gate says the frozen spec **cannot be built** — that one needs `/spec`, not passes. **Each
+blocking findings (the fix is treading water and more passes won't help), or immediately if `/cohorte-build`'s
+readiness gate says the frozen spec **cannot be built** — that one needs `/cohorte-spec`, not passes. **Each
 fix pass is committed** (`loop(<id>): fix pass <i>`) — that's your way back after N autonomous passes —
 and **no fix runs on the last pass**, since fixing without a review behind it leaves unaudited code.
 
 **It's resumable.** Before each phase the driver stamps `status: in-progress` + `loop_pass` +
 `loop_phase` into the spec's front-matter (plain `awk`, zero tokens), and a terminal `in-review` or
 `blocked` on exit. So `--resume` continues at pass 3 instead of re-paying passes 1 and 2 — and the spec
-itself tells you, `/doctor` and the dashboard where the loop got to.
+itself tells you, `/cohorte-doctor` and the dashboard where the loop got to.
 
 **The loop does not run in your session.** Each phase is a separate `claude -p` child with its own
 fresh context, driven by `pipeline/scripts/loop.sh`; all of their output goes to
@@ -271,7 +271,7 @@ fresh context, driven by `pipeline/scripts/loop.sh`; all of their output goes to
 line per phase and a three-line summary. That's the whole design: a slash command can't `/clear`
 itself, so a conversational loop would pile the diff plus N review reports plus N contracts into a
 history that is re-sent at input price every turn — it would cost more than the loop saves. The
-machine contract is `specs/reports/<id>.verdict.json`, which `/review` now writes on every run; no
+machine contract is `specs/reports/<id>.verdict.json`, which `/cohorte-review` now writes on every run; no
 prose is ever parsed.
 
 ### Run features in parallel — one session per feature
@@ -279,16 +279,16 @@ prose is ever parsed.
 With `isolation.enabled`, every feature already gets its own worktree, ports, and database
 (`scripts/new-feature.sh <id>` — slots tracked in `.worktrees/slots.tsv`). That isolation is exactly
 what makes **parallel features** safe, and it's the real throughput multiplier when you're rate-limited:
-while feature A's `/build` runs its agents (minutes of wall-clock you'd otherwise spend waiting), a
-second Claude Code session can `/spec` or `/review` feature B.
+while feature A's `/cohorte-build` runs its agents (minutes of wall-clock you'd otherwise spend waiting), a
+second Claude Code session can `/cohorte-spec` or `/cohorte-review` feature B.
 
 The pattern:
 
 ```
-session 1 (main checkout):   /spec feat-a → /build feat-a  (agents run…)
-session 2 (main checkout):   /spec feat-b → /build feat-b  (agents run…)
-session 1:                   /review feat-a → /ship feat-a
-session 2:                   /review feat-b → …
+session 1 (main checkout):   /cohorte-spec feat-a → /cohorte-build feat-a  (agents run…)
+session 2 (main checkout):   /cohorte-spec feat-b → /cohorte-build feat-b  (agents run…)
+session 1:                   /cohorte-review feat-a → /cohorte-ship feat-a
+session 2:                   /cohorte-review feat-b → …
 ```
 
 Rules that make it safe:
@@ -301,10 +301,10 @@ Rules that make it safe:
 - **The contract package is the one shared tree.** Two features editing
   `<contract.path>/<their-own-id>.<ext>` never conflict (one file per feature); merge order only
   matters if a later feature *imports* an earlier one's contract — ship the dependency first.
-- `/ship` one at a time: it commits from the feature's branch and the freshness gate keeps a stale
+- `/cohorte-ship` one at a time: it commits from the feature's branch and the freshness gate keeps a stale
   verdict from shipping; after each merge, rebase the other live worktrees (`git rebase main`) so
   their eventual reviews diff against reality.
-- `/doctor` check 6 shows the live slot table (feature ↔ worktree ↔ ports) when you lose track.
+- `/cohorte-doctor` check 6 shows the live slot table (feature ↔ worktree ↔ ports) when you lose track.
 
 ### Workflows — deterministic multi-agent runs (opt-in)
 
@@ -323,7 +323,7 @@ The essentials:
 - **The conversational commands stay the default path** — and the fallback when workflows are
   disabled or the client is too old. A workflow runs only when you explicitly ask for it
   ("run the review workflow").
-- **Prerequisite: Claude Code ≥ 2.1.154** with workflows enabled. `/doctor` (check 8) tells you
+- **Prerequisite: Claude Code ≥ 2.1.154** with workflows enabled. `/cohorte-doctor` (check 8) tells you
   which path your session will take and why.
 - **No input mid-run — questions at the edges.** A workflow runs to completion without asking
   anything: whatever would have been a mid-run question lands in the result at the end. The
@@ -339,9 +339,9 @@ Details: `profile/SCHEMA.md` §Workflows.
 
 Cohorte can send **anonymous** usage pings (core version, OS, phase name, duration, per-surface
 result counts, and a *hash* of the feature id — never repo names, paths, code, or IPs). It is
-**strictly opt-in**: `/init-pipeline` asks once per machine, the default is No, and both answers are
+**strictly opt-in**: `/cohorte-init-pipeline` asks once per machine, the default is No, and both answers are
 recorded so you're never re-asked. Withdraw anytime (`telemetry.enabled: false` in
-`~/.claude/cohorte.config.yaml`); erase your history anytime (`/doctor` prints your `install_id`,
+`~/.claude/cohorte.config.yaml`); erase your history anytime (`/cohorte-doctor` prints your `install_id`,
 the collector's `DELETE /v1/install/<id>` drops it). Full spec + GDPR details:
 `profile/SCHEMA.md` §Telemetry (including the collector API contract).
 
@@ -363,12 +363,12 @@ install.sh              # script installer (fresh + --update) for no-Node enviro
 install.ps1             # same installer for Windows PowerShell (fresh + -Update)
 core/                   # copied verbatim into ~/.claude (global) or <project>/.claude (bundled)
   agents/               # implementer.template.md (rendered per surface) + review / release / profile-reader
-  commands/             # init-pipeline + the pipeline commands + /update-pipeline
+  commands/             # init-pipeline + the pipeline commands + /cohorte-update-pipeline
   hooks/                # gate.py (destructive-command gate; branch-aware; preflight phase gate)
   templates/            # handoff / brainstorm-return / design-brief / review-feedback / pr-body / spec
   workflows/            # opt-in Workflow-runtime scripts: review.js / audit.js / refactor.js
 profile/
-  PIPELINE.template.md  # the profile skeleton /init-pipeline fills
+  PIPELINE.template.md  # the profile skeleton /cohorte-init-pipeline fills
   SCHEMA.md             # field reference
   cohorte.config.template.yaml   # seeds ~/.claude/cohorte.config.yaml (kanban)
 scripts/                # worktree-isolation templates + shipped preflight/kanban/telemetry scripts

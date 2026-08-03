@@ -6,7 +6,7 @@ disclosure.
 
 ## Consent
 
-Nothing is ever sent without explicit consent. `/init-pipeline` (and `/update-pipeline` on
+Nothing is ever sent without explicit consent. `/cohorte-init-pipeline` (and `/cohorte-update-pipeline` on
 pre-telemetry installs) ask **one question, once per machine**, default **No**, and record the
 answer — either way — in `~/.claude/cohorte.config.yaml` (`telemetry.enabled`, `install_id`,
 `consent_date`), so you're never re-asked. The sender (`pipeline/scripts/telemetry-send.sh`) is
@@ -29,8 +29,8 @@ One event per pipeline phase, for the **feature funnel only** — the seven stag
 The [workflow variants](/guide/workflows) fire the same phases with `seconds: 0` — they don't
 measure wall-clock.
 
-Setup and maintenance commands (`/doctor`, `/init-pipeline`, `/update-pipeline`, `/audit`,
-`/refactor`, `/align-ds`) **never** ping — CI enforces this so the collected set can't silently
+Setup and maintenance commands (`/cohorte-doctor`, `/cohorte-init-pipeline`, `/cohorte-update-pipeline`, `/cohorte-audit`,
+`/cohorte-refactor`, `/cohorte-align-ds`) **never** ping — CI enforces this so the collected set can't silently
 grow past what the consent text describes. The sender also allowlists the phase name
 client-side.
 
@@ -50,7 +50,7 @@ counts work without revealing what is being built.
 
 - **Withdrawal** — set `telemetry.enabled: false` in `~/.claude/cohorte.config.yaml`; effective
   on the next phase, no restart.
-- **Erasure** — `/doctor` prints your `install_id`; send
+- **Erasure** — `/cohorte-doctor` prints your `install_id`; send
   `curl -X DELETE <endpoint-origin>/v1/install/<install_id>` and the collector drops every event
   for that id (the deployed collector implements this and stores no IPs).
 - **Access / portability** — events are keyed by your `install_id`; ask the operator for an
@@ -66,5 +66,5 @@ access logs for the ingest vhost.
 
 The ping is fire-and-forget: 2-second timeout, all errors swallowed, exit 0 always, chained
 with `|| true` by every caller. Telemetry can never block, slow, or fail the pipeline — and a
-*missing* sender script is equally silent, which is why `/doctor` check 1 verifies the shipped
+*missing* sender script is equally silent, which is why `/cohorte-doctor` check 1 verifies the shipped
 scripts exist.

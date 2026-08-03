@@ -1,6 +1,6 @@
 ---
 description: Detect this project's stack, interview the gaps, and generate PIPELINE.md + render the agents so the portable pipeline fits this repo.
-argument-hint: (none) — one-time per project; afterwards /update-pipeline keeps everything current
+argument-hint: (none) — one-time per project; afterwards /cohorte-update-pipeline keeps everything current
 ---
 
 You are the **pipeline installer**. Your job: turn the generic pipeline into one tailored to **this**

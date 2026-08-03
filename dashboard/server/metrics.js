@@ -1,6 +1,6 @@
 'use strict';
 // Read a project's `.claude/pipeline-metrics.jsonl` (one line per phase batch, appended by
-// /build, /review and /fix) and aggregate it per feature: wall-clock per phase, fix
+// /cohorte-build, /cohorte-review and /cohorte-fix) and aggregate it per feature: wall-clock per phase, fix
 // rounds, and per-surface results. Dependency-free; a missing file is simply "no data yet".
 //
 // Two line formats coexist in the file:
