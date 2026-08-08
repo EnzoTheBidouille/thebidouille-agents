@@ -9,7 +9,11 @@ You are the **lead**. Dispatch the review for feature **$ARGUMENTS**.
 > Read `PIPELINE.md` §`vcs.default_branch` (diff base) and the `surfaces`/`contract`/`commands` fields.
 > _Skip the re-read if it's already in your context this session and unmodified since._
 >
-> **Kanban** (SCHEMA.md §Kanban): move card `#$ARGUMENTS` → **Review**. No-op silently if no board.
+> **Kanban** (SCHEMA.md §Kanban): run
+> `<core>/pipeline/scripts/kanban-move.sh auto $ARGUMENTS review` (`<core>` = `.claude` bundled /
+> `~/.claude` global — probe with `test -x`). `auto` resolves the board from the config itself and
+> exits 0 with a `kanban: <reason>` line when there is none — so **never decide "no board is
+> configured" without running it**.
 >
 > **Workflow variant** (opt-in — SCHEMA.md §Workflows): on Claude Code ≥ 2.1.154 with workflows
 > enabled, the human can ask to "run the review workflow" (`<core>/workflows/review.js`) instead.

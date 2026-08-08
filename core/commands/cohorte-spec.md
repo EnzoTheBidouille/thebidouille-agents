@@ -17,8 +17,12 @@ You run the **spec** step in the main thread — interactive, with the human. Pa
 > line per standing decision, so it is cheap. It is the ONLY place the project's transverse rules
 > live; a spec that contradicts one silently un-decides it. Absent ⇒ nothing to honour yet.
 >
-> **Kanban** (SCHEMA.md §Kanban): when the spec opens, move card `#<feature_id>` → **Spec**; on freeze
-> (`status: frozen`, Mode A) → **Ready to build**. No-op silently if no board is configured.
+> **Kanban** (SCHEMA.md §Kanban): when the spec opens, run
+> `<core>/pipeline/scripts/kanban-move.sh auto <feature_id> spec --title "<human title>"`; on freeze
+> (`status: frozen`, Mode A), the same call with `ready`. `<core>` = `.claude` bundled / `~/.claude`
+> global — probe with `test -x`. `auto` resolves the board from the config itself and exits 0 with a
+> `kanban: <reason>` line when there is none — so **never decide "no board is configured" without
+> running it**.
 
 Detect the mode from the pasted content:
 

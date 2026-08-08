@@ -150,6 +150,27 @@ for (const f of readdirSync(join(root, "core/commands"))) {
     fail(`core/commands/${f}`, "non-funnel command pings telemetry — outside the consented scope");
 }
 
+// ── kanban call sites ───────────────────────────────────────────────────────
+// Every pipeline stage moves a card, and a stage that only *describes* the move
+// ("move card #<id> → Building, no-op silently if no board") leaves the agent to
+// decide whether a board exists — which it does by not looking. That is not
+// hypothetical: a /cohorte-ship session declared "no kanban board configured",
+// having opened neither the config nor PIPELINE.md, and a merged feature's card
+// stayed in "Ready to build". `kanban-move.sh auto` moved resolution into the
+// script; this keeps it there. Prose is not a call site — the literal invocation is.
+const KANBAN_STAGES = ["brainstorm", "spec", "build", "review", "fix", "ship"];
+for (const c of KANBAN_STAGES) {
+  const path = `core/commands/${PREFIX}${c}.md`;
+  const text = read(path);
+  if (!/kanban-move\.sh\s+auto\s+\S/.test(text))
+    fail(path, "moves a kanban card without a literal `kanban-move.sh auto …` call — the agent is left to infer whether a board exists");
+  // The one sentence that turns an unread config into a reported no-op. Match on
+  // unwrapped text: these live in `>` blockquotes and wrap mid-sentence.
+  const flat = text.replace(/\n>?\s*/g, " ");
+  if (!/without\s+running\s+it/i.test(flat))
+    fail(path, "no instruction to run the resolver before concluding there is no board");
+}
+
 // ── shipped scripts ─────────────────────────────────────────────────────────
 // Every scripts/*.sh must be copied by BOTH shell installers. Callers chain these
 // with `|| true`, so one an installer forgets is a silent no-op forever — no kanban

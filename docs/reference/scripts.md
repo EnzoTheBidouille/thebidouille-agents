@@ -130,13 +130,28 @@ Lid-close sleep cannot be prevented on **any** platform by any userspace asserti
 ## `kanban-move.sh` — board updates outside agent context
 
 ```sh
+kanban-move.sh auto <feature_id> <stage> [--pr <num>] [--title <title>]
 kanban-move.sh <board.md> <feature_id> <column> [--pr <num>] [--title <title>]
+kanban-move.sh --check
 ```
 
 Moves (or creates) the `#<feature_id>` card under the target `## <column>` heading — find,
 dedupe (keeps the first), sub-notes carried along, the `%% kanban:settings %%` block preserved,
 `— PR #<num>` appended with `--pr`. Exists so no agent ever reads a whole board (which grows
 with every feature ever tracked) into context.
+
+**`auto` resolves the board itself** — `name` from `PIPELINE.md`, then `kanban.enabled` /
+`obsidian.vault_path` / `boards[name]` from `~/.claude/cohorte.config.yaml` (override with
+`COHORTE_CONFIG`; skip the profile with `--project <name>`) — and maps a **stage key** (`ideas`,
+`brainstorm`, `spec`, `ready`, `building`, `review`, `fix`, `ship`, `shipped`) to that board's
+heading via `boards[name].columns` → `kanban.columns` → the built-in default. An explicit board
+path and a literal heading still work.
+
+When nothing resolves it prints `kanban: <reason>` — naming the missing link — and exits **0**. A
+board that *is* configured but can't be moved is loud instead: exit 2 usage, exit 3 missing board
+file or unknown column. Callers report which line they got; none of them may infer "no board" on
+their own. `--check` does the resolution and nothing else, which is what `/cohorte-doctor` and
+`/cohorte-update-pipeline` use to tell "not configured" from "configured and broken".
 
 ## `telemetry-send.sh` — the opt-in usage ping
 

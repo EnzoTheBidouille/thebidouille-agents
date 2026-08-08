@@ -11,8 +11,11 @@ that change the *contract*; `/cohorte-fix` is for everything else.
 > Read `PIPELINE.md` §`pipeline-profile` first: `surfaces` (paths + agent names) and `contract`.
 > _Skip the re-read if it's already in your context this session and unmodified since._
 >
-> **Kanban** (SCHEMA.md §Kanban): move card `#$ARGUMENTS` → **Fix** on ingest (it returns to **Review**
-> when `/cohorte-review` re-runs). No-op silently if no board.
+> **Kanban** (SCHEMA.md §Kanban): on ingest, run
+> `<core>/pipeline/scripts/kanban-move.sh auto $ARGUMENTS fix` (`<core>` = `.claude` bundled /
+> `~/.claude` global — probe with `test -x`); the card returns to **Review** when `/cohorte-review`
+> re-runs. `auto` resolves the board from the config itself and exits 0 with a `kanban: <reason>`
+> line when there is none — so **never decide "no board is configured" without running it**.
 
 ## 1. Ingest the report
 

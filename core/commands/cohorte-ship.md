@@ -9,9 +9,12 @@ You are the **lead**. Ship feature **$ARGUMENTS**. This is the outward-facing ga
 > Read `PIPELINE.md` §`vcs` (host, remote, default_branch, feature_branch_prefix).
 >
 > **Kanban** (SCHEMA.md §Kanban) is mirrored in **explicit steps** below, not as an afterthought:
-> §1 moves the card → **Ship**; §4 moves it → **Shipped** and writes the PR number. No-op silently if
-> no board. Do not skip §4's move — a shipped feature whose card is stuck in an earlier column is the
-> bug this ordering prevents.
+> §1 moves the card → **Ship**; §4 moves it → **Shipped** and writes the PR number. Both are one
+> call to `<core>/pipeline/scripts/kanban-move.sh auto …` (`<core>` = `.claude` bundled / `~/.claude`
+> global — probe with `test -x`), which resolves the board from the config itself and exits 0 with a
+> `kanban: <reason>` line when there is none. **Never decide "no board is configured" without running
+> it** — a ship session that inferred that, having opened neither the config nor `PIPELINE.md`, is
+> exactly how a merged feature's card stayed in "Ready to build". Do not skip §4's move either.
 
 ## 1. Pre-flight (confirm before doing anything irreversible)
 
@@ -29,7 +32,8 @@ You are the **lead**. Ship feature **$ARGUMENTS**. This is the outward-facing ga
   All `- [x]` ⇒ proceed silently.
 - Show `git status` + `git diff --stat`; confirm the branch is `<feature_branch_prefix>$ARGUMENTS`.
 - **Ask the human to confirm** they want to commit, push, and open the PR. Wait for yes.
-- After the yes: **move card `#$ARGUMENTS` → the `ship` column** (SCHEMA.md §Kanban "Move a card"). No-op if no board.
+- After the yes: `<core>/pipeline/scripts/kanban-move.sh auto $ARGUMENTS ship`. Report what it
+  printed — `moved #…` or `kanban: <reason>` — never a guess about which happened.
 
 ## 2. Mark the spec shipped (BEFORE dispatch, so it ships in the same commit)
 
@@ -51,14 +55,18 @@ never run migrations."
 Print the release agent's report: commit SHA(s), pushed branch, PR URL (or compare URL + drafted body).
 Confirm `specs/$ARGUMENTS.md` was committed as `status: shipped` (part of the release commit).
 
-**Move the card to Shipped — required, and verify it actually moved.** Move card `#$ARGUMENTS` → the
-`shipped` column (SCHEMA.md §Kanban "Move a card") and **append the PR number** so the line reads
-`- [ ] <title> #$ARGUMENTS — PR #<num>`. Take `<num>` from the PR URL (`…/pull/13` ⇒ `13`); **always write
-it when a PR was created** (the `gh` path) — it is what the dashboard turns into a PR link. If only a
-compare URL was emitted (no PR yet), move the card without a number. Then verify with a **grep for
-`#$ARGUMENTS`** on the board (with surrounding heading context — `grep -B20 '#$ARGUMENTS' | grep '^##'`
-or an offset-limited Read around the match): exactly one card, under the `shipped` heading — never
-re-read the whole board into context. No board ⇒ skip silently.
+**Move the card to Shipped — required, and verify it actually moved.** Run
+`<core>/pipeline/scripts/kanban-move.sh auto $ARGUMENTS shipped --pr <num>`, which **appends the PR
+number** so the line reads `- [ ] <title> #$ARGUMENTS — PR #<num>`. Take `<num>` from the PR URL
+(`…/pull/13` ⇒ `13`); **always pass it when a PR was created** (the `gh` path) — it is what the
+dashboard turns into a PR link. If only a compare URL was emitted (no PR yet), drop `--pr`.
+
+Then **read the script's own output**, which is the verification: `moved #$ARGUMENTS -> Shipped
+(PR #<num>)` means done, and a `kanban: <reason>` line means the mirror is off and says why. Both are
+exit 0 and they are not interchangeable — say which one you got. Only if it moved, confirm placement
+with a **grep for `#$ARGUMENTS`** on the board it named (with surrounding heading context —
+`grep -B20 '#$ARGUMENTS' | grep '^##'`, or an offset-limited Read around the match): exactly one card,
+under the `shipped` heading — never re-read the whole board into context.
 
 **Telemetry — the usage ping that closes the funnel.** Chain it onto the verify call above
 (`/cohorte-build` §4's shared form, `<phase>` = `ship`, `<seconds>` = `0` — the release agent's duration is

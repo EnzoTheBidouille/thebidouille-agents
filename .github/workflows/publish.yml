@@ -39,6 +39,7 @@ jobs:
           node scripts/validate-core.mjs
           node scripts/test-workflows.mjs
           node scripts/test-gate.mjs
+          node scripts/test-kanban.mjs
           node scripts/test-dashboard.mjs
           node scripts/test-metrics.mjs
           node scripts/test-loop.mjs

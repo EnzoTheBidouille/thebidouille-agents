@@ -536,16 +536,42 @@ Once shipped, `/cohorte-ship` appends the **PR number** to the card — `- [ ] <
 The bare `#<num>` is what the dashboard renders as a clickable link to the GitHub PR, so `/cohorte-ship` always
 writes it when a PR was actually created.
 
-**Move a card (the core op).** Use the shipped script — it does the whole op outside the agent's
-context (find, dedupe, sub-notes carried along, settings block preserved):
-`<core>/pipeline/scripts/kanban-move.sh <board.md> <id> <column> [--pr <num>] [--title <title>]`
-where `<core>` is `~/.claude` (global install) or `.claude` (bundled) — probe with `test -x`. It
-creates the card in the target column when none exists, keeps the first and drops duplicates, and
-appends ` — PR #<num>` with `--pr`. **Fallback when the script is absent** (older core): do it by
-hand, but never read the whole board into context — it grows with every feature ever tracked:
-`grep -n` for `#<id>` and the `## ` headings to locate lines, then use offset-limited Reads +
-targeted Edits around the matches. Either way: one card per `#<id>`, whole line moved tag-preserved,
-card created in the target column if missing.
+**Move a card (the core op).** One call — the script does resolution AND the move outside the
+agent's context (find, dedupe, sub-notes carried along, settings block preserved):
+
+```
+<core>/pipeline/scripts/kanban-move.sh auto <id> <stage> [--pr <num>] [--title <title>]
+```
+
+`<core>` is `~/.claude` (global install) or `.claude` (bundled) — probe with `test -x`. It creates
+the card in the target column when none exists, keeps the first and drops duplicates, and appends
+` — PR #<num>` with `--pr`.
+
+**`auto` is not a convenience, it is the contract.** It reads `name` from `PIPELINE.md`, then
+`kanban.enabled` / `obsidian.vault_path` / `boards[name]` from `~/.claude/cohorte.config.yaml`
+(override with `COHORTE_CONFIG`, or skip the profile with `--project <name>`), and it maps the
+**stage key** (`ideas` · `brainstorm` · `spec` · `ready` · `building` · `review` · `fix` · `ship` ·
+`shipped`) to that board's heading through `boards[name].columns` → `kanban.columns` → the built-in
+default. An explicit `<board.md>` path and a literal heading both still work, for one-off and
+non-pipeline moves.
+
+**Never conclude "no board is configured" without running it.** The command that resolves nothing
+prints `kanban: <reason>` — naming the missing link (no config file, `enabled: false`, no entry for
+this project, vault unset, board file gone) — and exits **0**. A configured board that cannot be
+moved is loud instead: exit 2 on usage, exit 3 on a missing board file or an unknown column. Both
+readings are on stdout, so a caller reports which one it got. This exists because inference was the
+actual failure mode: with only "no-op silently if no board" to go on, a fresh phase session (every
+phase runs after a `/clear`) decided there was no board without ever opening the config, and cards
+stopped moving mid-pipeline while every command still reported success.
+
+**Fallback when the script is absent** (older core): do it by hand, but never read the whole board
+into context — it grows with every feature ever tracked: `grep -n` for `#<id>` and the `## ` headings
+to locate lines, then use offset-limited Reads + targeted Edits around the matches. Either way: one
+card per `#<id>`, whole line moved tag-preserved, card created in the target column if missing.
+
+**Tag before you move.** The join key is the `#<id>` tag, and an **Ideas** card a human typed by hand
+does not have one. Moving it first finds nothing, creates a second card, and strands the original in
+Ideas — so `/cohorte-brainstorm` appends the tag to the picked line before its first move.
 
 **Stage → column**, used both by each pipeline command (to move its card live) and by backfill:
 

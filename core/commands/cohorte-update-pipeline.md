@@ -102,14 +102,20 @@ Four of the §Reconcile steps matter specifically here:
   (pre-telemetry install), top up the block from the template and ask the ONE opt-in consent
   question defined in `templates/steps/init-pipeline/02-interview-gaps.md` §Telemetry — record the
   answer either way so it is never re-asked. Consent is strictly opt-in; "No" is the default.
-- **Kanban sync** (§Reconcile step 6): resolve this project's board from `kanban.boards[<PIPELINE
-  name>]`. **Not linked** → offer to link/create a board (confirm the vault + `<folder>/Tasks.md`,
+- **Kanban sync** (§Reconcile step 6): resolve this project's board with
+  `<core>/pipeline/scripts/kanban-move.sh --check` — it prints either the board path or the exact
+  missing link. **Not linked** → offer to link/create a board (confirm the vault + `<folder>/Tasks.md`,
   write the `boards` entry, create the board file per §Kanban). **Linked** → verify the board file
   exists (recreate if the human confirms) and its columns match `kanban.columns` (repair drift). Either
-  way, run the §Kanban **full sync/backfill** from `specs/*.md` — this is what adds every
-  already-developed feature to the board and repositions cards to match each spec's `status`. Report
-  cards added / moved / already-correct. Skip silently if `kanban.enabled` is false and the human
-  doesn't want to turn it on.
+  way, run the §Kanban **full sync/backfill** from `specs/*.md` — one
+  `kanban-move.sh auto <id> <stage>` per spec, `<stage>` from the status mapping — this is what adds
+  every already-developed feature to the board and repositions cards to match each spec's `status`.
+  Report cards added / moved / already-correct. Skip silently if `kanban.enabled` is false and the
+  human doesn't want to turn it on.
+- **A project renamed since its last update loses its board silently** — `boards` is keyed by the
+  profile `name`, so a `name:` edit orphans the old entry and no lookup matches the new one. When
+  `--check` finds no entry for `<name>` but `boards` holds exactly one other key whose board file
+  exists, say so and offer to re-key it rather than creating a second board.
 
 ## 4. Tell the human the follow-ups
 
