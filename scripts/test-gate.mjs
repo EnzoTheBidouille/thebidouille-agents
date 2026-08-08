@@ -155,6 +155,36 @@ console.log("gate.py — branch-conditional gating");
   const norepo = scratch(); writeConfig(norepo, GATE_CFG);
   check("unknown branch (not a repo) ⇒ gated, to stay safe",
     run({ ...bash("git commit -m x"), cwd: norepo }, { projectDir: norepo }).decision === "ask");
+
+  // 2.0.2: the tool's shell keeps no cwd between calls, so agents write
+  // `cd <other repo> && git commit`. Resolving the branch at the payload cwd
+  // judged that commit against the wrong checkout — and the refusal named a
+  // branch the command was never going to run on, so no approval could lift it.
+  const chained = run({ ...bash(`cd ${feat} && git commit -m x`), cwd: main }, { projectDir: main });
+  check("`cd <feature checkout> && git commit` follows the cd ⇒ free",
+    chained.decision === null, `got ${chained.decision}: ${chained.reason}`);
+  check("`cd <default-branch checkout> && git commit` still gated",
+    run({ ...bash(`cd ${main} && git commit -m x`), cwd: feat }, { projectDir: feat }).decision === "ask");
+  check("a cd only affects segments AFTER it",
+    run({ ...bash(`git commit -m x && cd ${feat}`), cwd: main }, { projectDir: main }).decision === "ask");
+  check("relative cd resolves against the payload cwd",
+    run({ ...bash("cd .. && git commit -m x"), cwd: join(feat, ".claude") },
+        { projectDir: feat }).decision === null);
+  check("cd into a missing dir keeps the current cwd (still gated)",
+    run({ ...bash("cd /definitely/not/here && git commit -m x"), cwd: main },
+        { projectDir: main }).decision === "ask");
+  check("an unresolvable cd ($(…)) keeps the current cwd (still gated)",
+    run({ ...bash("cd $(mktemp -d) && git commit -m x"), cwd: main },
+        { projectDir: main }).decision === "ask");
+  check("`cd -` is never treated as a resolvable move",
+    run({ ...bash("cd - && git commit -m x"), cwd: main }, { projectDir: main }).decision === "ask");
+  check("a quoted cd path with a space is followed",
+    run({ ...bash(`cd "${feat}" && git commit -m x`), cwd: main }, { projectDir: main }).decision === null);
+  // A cd must not soften the unconditional tiers — those are branch-independent.
+  check("cd does not exempt a `deny` pattern",
+    run({ ...bash(`cd ${feat} && node ace db:wipe`), cwd: main }, { projectDir: main }).decision === "deny");
+  check("cd does not exempt an always-`ask` pattern",
+    run({ ...bash(`cd ${feat} && psql`), cwd: main }, { projectDir: main }).decision === "ask");
 }
 
 // ── config robustness ────────────────────────────────────────────────────────

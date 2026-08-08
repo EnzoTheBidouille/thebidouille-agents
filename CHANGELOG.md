@@ -39,6 +39,17 @@ short, user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` secti
   orphaned entry as a rename; `/cohorte-update-pipeline` offers to re-key it instead of creating a
   second board. New `kanban-move.sh --check` does the resolution alone, for both.
 
+- **The gate judged `cd <other repo> && git commit` against the wrong checkout.** Branch-conditional
+  patterns resolved the branch at the payload cwd, but the tool's shell keeps no cwd between calls,
+  so agents write the `cd` into the command itself. A commit on a feature branch in another repo was
+  therefore refused as if it were on the default branch — and the refusal named a branch the command
+  was never going to run on, so no confirmation could lift it (in an unattended run, where `ask`
+  escalates to `deny`, it was a hard wall). The branch is now resolved per segment at the cwd that
+  segment actually runs in, cached so the common case is still one `git` call. Deliberately narrow:
+  a plain absolute/relative/quoted `cd`, never `cd -`, `$(…)`, variables or globs — anything
+  unresolvable keeps the previous cwd, which is the direction that keeps gating. `cd` never softens
+  the unconditional `deny`/`ask` tiers; 10 new cases in `test-gate.mjs` pin all of it.
+
 - **`/cohorte-brainstorm` tags an Ideas card before moving it.** The join key is the `#<id>` tag,
   and an Ideas card a human typed by hand has none — so the move found nothing, created a second
   card, and stranded the original in Ideas. It now appends the tag first, located by `grep -n`,
