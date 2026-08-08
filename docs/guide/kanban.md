@@ -22,6 +22,10 @@ kanban:
       board: "MyProject/Tasks.md"
 ```
 
+Because the key is the profile `name`, **renaming a project unlinks its board**: the old key no
+longer matches and the lookup legitimately finds nothing. `/cohorte-update-pipeline` detects the
+orphaned entry and offers to re-key it; `kanban-move.sh --check` tells you where you stand.
+
 Wired for you by `/cohorte-init-pipeline` (opt-in question) or `/cohorte-update-pipeline` — including creating
 the board file with the right front-matter, one heading per column, and the plugin settings
 block. Don't hand-edit the config; the `# cfg:` anchors in it are what the installer prompts
@@ -62,11 +66,21 @@ Commands move cards through the shipped script — the whole operation happens o
 context (find, dedupe, sub-notes carried along, settings block preserved):
 
 ```sh
-<core>/pipeline/scripts/kanban-move.sh <board.md> <id> <column> [--pr <num>] [--title <title>]
+<core>/pipeline/scripts/kanban-move.sh auto <id> <stage> [--pr <num>] [--title <title>]
 ```
 
 It creates the card in the target column when none exists, keeps the first and drops duplicates.
-Every call site chains `|| true`, so a missing board — or a missing script — is silent;
+
+`auto` is the important word. The script resolves the board itself — profile `name`, then
+`kanban.enabled`, `obsidian.vault_path` and `boards[name]` — and maps the **stage key** to that
+board's heading. When nothing resolves it prints `kanban: <reason>` and exits 0; a board that is
+configured but unmovable exits non-zero. Commands are told to run it and report what it said, never
+to decide for themselves that there is no board: that inference, in a fresh phase session that had
+never opened the config, is what used to strand cards mid-pipeline while every stage still reported
+success.
+
+`kanban-move.sh --check` does the resolution alone — the quickest answer to "is this project's board
+actually wired?". Every call site chains `|| true`, so a missing script is still silent;
 `/cohorte-doctor` is what catches a half-copied core.
 
 ## Backfill / sync

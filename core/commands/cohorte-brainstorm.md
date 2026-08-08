@@ -20,8 +20,13 @@ at Finish, when a board is configured.
 > Template paths below (`.claude/templates/…`) resolve to `~/.claude/templates/…` when the core is
 > installed globally — read whichever exists.
 >
-> **Kanban** (SCHEMA.md §Kanban): resolve this project's board from `~/.claude/cohorte.config.yaml`
-> `kanban.boards[<PIPELINE name>]`. Everything kanban below no-ops silently if none resolves.
+> **Kanban** (SCHEMA.md §Kanban): every card move below is one call —
+> `<core>/pipeline/scripts/kanban-move.sh auto <feature_id> <stage> [--title "<human title>"]`, with
+> `<core>` = `.claude` bundled / `~/.claude` global (probe with `test -x`). `auto` resolves the
+> board from `~/.claude/cohorte.config.yaml` itself and exits 0 with a `kanban: <reason>` line when
+> none resolves — so **never decide "no board is configured" without running it**. Reading the Ideas
+> column at Start still needs the board path: get it from a `kanban-move.sh` run, or grep the config
+> for `boards[<PIPELINE name>]`.
 
 Idea (may be empty): **$ARGUMENTS**
 
@@ -52,9 +57,16 @@ when invoked with no paste). In chat print only a 3-line summary + the path. Tel
 — **recommend a `/clear` first**, the return is staged on disk (pasting it remains a fallback).
 
 **Kanban:** settle the `feature_id` (kebab-case slug) the return carries — it is the card's join key
-downstream. If a board is configured, **move** the card into the **Brainstorm** column tagged
-`#<feature_id>` (per §Kanban): the picked Ideas card if the human chose one, else a new card. No-op if
-no board.
+downstream. Then, in this order:
+
+1. **If the human picked an Ideas card, tag it first.** Ideas cards are free text a human typed, with
+   no `#<feature_id>` on them, and the move script joins on that tag: move before tagging and it
+   finds nothing, creates a second card, and leaves the untagged original sitting in Ideas forever.
+   One targeted Edit appending `  #<feature_id>` to that line, located by `grep -n`, never a full
+   board read.
+2. `<core>/pipeline/scripts/kanban-move.sh auto <feature_id> brainstorm --title "<human title>"` —
+   which moves the (now tagged) card, or creates one under `--title` if the human typed a fresh
+   idea. Read its output: `moved #…` or `kanban: <reason>`. Never assume either.
 
 **Telemetry:** chain the opt-in usage ping onto that same Bash call — `/cohorte-build` §4's shared form,
 `<phase>` = `brainstorm`, `<seconds>` = `0` (this phase is human thinking time, not pipeline

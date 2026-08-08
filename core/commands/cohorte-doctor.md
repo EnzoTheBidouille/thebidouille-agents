@@ -76,6 +76,15 @@ fix only with the human's go-ahead (or hand them the command).
    incoherent state: `enabled: true` with no `install_id` or no `consent_date` (sending without
    recorded consent — fix: set `enabled: false` until the consent question is re-run), or a
    `telemetry:` block missing entirely on a current core (top up via `/cohorte-update-pipeline`).
+7b. **Kanban** (the board mirror — SCHEMA.md §Kanban). Run
+   `<core>/pipeline/scripts/kanban-move.sh --check` and report its one line verbatim: the resolved
+   board path, or the exact link that is missing. A board mirror is optional, so "not configured" is
+   ℹ️, never ❌ — but it must be **stated**, because the whole class of bug here is a card that
+   quietly stopped moving while every command still reported success. Two states earn a ⚠️ with the
+   fix named: `boards` has no entry for this profile's `name` while it does have an entry for some
+   other key whose board file exists (a **rename** orphaned the link — re-key it via
+   `/cohorte-update-pipeline`), and an entry whose board file no longer exists at
+   `vault_path`-relative `board` (moved or renamed in the vault).
 8. **Workflows** (the opt-in execution path — SCHEMA.md §Workflows; the conversational commands
    stay the default, so failures here are ⚠️ at most, never ❌). Report which path this machine will
    take and why:

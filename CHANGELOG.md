@@ -7,6 +7,43 @@ short, user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` secti
 > They are history and are deliberately not rewritten — every command gained a `cohorte-` prefix
 > in 2.0.0.
 
+## 2.0.2 — 2026-08-08
+
+- **Kanban cards stopped moving mid-pipeline, and every stage still reported success.** The
+  stages only *described* the move — "move card `#<id>` → Building, no-op silently if no board" —
+  without saying where a board is even declared. Each phase runs in its own session after a
+  `/clear`, so the cheapest reading consistent with that instruction is "I see no board, so there
+  is none": a `/cohorte-ship` run announced "no kanban board configured", having opened neither
+  `~/.claude/cohorte.config.yaml` nor `PIPELINE.md`, and a feature that shipped and merged left
+  its card sitting in "Ready to build". Silence was indistinguishable from correctness, so this
+  went unnoticed across several features.
+
+  Resolution is not a judgment call, so it is no longer made by a judge. `kanban-move.sh auto <id>
+  <stage>` now reads the profile `name`, the config's `kanban.enabled` / `obsidian.vault_path` /
+  `boards[name]`, and maps the **stage key** (`ideas` … `shipped`) to that board's heading through
+  `boards[name].columns` → `kanban.columns` → a built-in default. Every stage calls exactly that,
+  and reports the line it printed: `moved #<id> -> <column>`, or `kanban: <reason>` naming the
+  missing link. Both exit 0 and they are not interchangeable. A board that *is* configured but
+  unmovable stays loud (exit 2 usage, exit 3 missing board / unknown column). Explicit board paths
+  and literal headings still work.
+
+  `validate-core` now fails any funnel command that moves a card without a literal
+  `kanban-move.sh auto …` call, or that omits the instruction not to conclude "no board" without
+  running it — the prose-only form is what regressed, so the prose-only form is what is banned.
+  New `scripts/test-kanban.mjs` (29 checks) pins the resolution table and the move semantics.
+
+- **Renaming a project silently unlinks its board.** `kanban.boards` is keyed by the profile
+  `name`, so editing `name:` orphans the old entry and no lookup matches the new one — a genuine
+  "not configured", identical from the outside to never having had a board. `/cohorte-doctor`
+  gains check **7b**, which reports the resolved board (or the exact missing link) and flags an
+  orphaned entry as a rename; `/cohorte-update-pipeline` offers to re-key it instead of creating a
+  second board. New `kanban-move.sh --check` does the resolution alone, for both.
+
+- **`/cohorte-brainstorm` tags an Ideas card before moving it.** The join key is the `#<id>` tag,
+  and an Ideas card a human typed by hand has none — so the move found nothing, created a second
+  card, and stranded the original in Ideas. It now appends the tag first, located by `grep -n`,
+  never a full board read.
+
 ## 2.0.1 — 2026-08-03
 
 Three fixes, one failure: an autonomous `/cohorte-loop` run that built 1 surface of 3, stamped

@@ -15,6 +15,19 @@ Every caller chains the shipped scripts with `|| true`, so a missing
 `kanban-move.sh`/`telemetry-send.sh`/`preflight.sh` is a *silent* no-op. `/cohorte-doctor` check 1 is
 the only thing that sees it; the fix is re-running the installer.
 
+**Cards move for some stages and not others.**
+Run `kanban-move.sh --check` (or `/cohorte-doctor` check 7b): it prints the resolved board, or the
+exact link that is missing. Before 2.0.2 the stages only *described* the move, so a phase session —
+each one starts after a `/clear`, with no memory of the config — could conclude "no board is
+configured" without opening it, and report success either way. Update the core; every stage now
+calls the resolver and reports what it printed.
+
+**The board went quiet right after renaming the project.**
+`kanban.boards` is keyed by the profile `name`, so editing `name:` in `PIPELINE.md` orphans the old
+entry and no lookup matches the new one — a legitimate "no board configured", indistinguishable from
+never having had one. `/cohorte-update-pipeline` spots the orphan and offers to re-key it; or edit
+the key in `~/.claude/cohorte.config.yaml` by hand.
+
 **`pipeline.json` claims an old `core_version` on a current core.**
 Global-mode drift: the shared core can't know which repos point at it. Warn-level, not broken —
 `/cohorte-update-pipeline` syncs the field (and tells you to commit it).

@@ -49,6 +49,14 @@ jobs:
       - name: Dashboard server tests
         run: node scripts/test-dashboard.mjs
 
+      # kanban-move.sh is the board mirror's only writer, and its failure mode is
+      # silence: every call site chains `|| true`, so a card that stopped moving
+      # looks exactly like a project with no board. `auto` resolution — which link
+      # is missing, and the fact that a refusal says so on stdout instead of
+      # exiting quietly — is pinned here.
+      - name: Kanban mirror tests
+        run: node scripts/test-kanban.mjs
+
       # The metrics collector reports money. Its failure mode is not a crash but a
       # confidently wrong number — double-billed responses, runs split by a background
       # agent's completion notice, subagent spend attributed nowhere. Each of those is

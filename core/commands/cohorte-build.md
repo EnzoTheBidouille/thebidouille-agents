@@ -10,8 +10,12 @@ You are the **lead**. Build feature **$ARGUMENTS** from its frozen spec.
 > dispatch + their agent names), `contract` (mechanism + path), and the `design` flag. _Skip the
 > re-read if it's already in your context this session and unmodified since._
 >
-> **Kanban** (SCHEMA.md §Kanban): once §1 confirms the frozen spec, move card `#$ARGUMENTS` →
-> **Building**. No-op silently if no board is configured.
+> **Kanban** (SCHEMA.md §Kanban): once §1 confirms the frozen spec, run
+> `<core>/pipeline/scripts/kanban-move.sh auto $ARGUMENTS building` (`<core>` = `.claude` bundled /
+> `~/.claude` global — probe with `test -x`). `auto` resolves the board from the config itself and
+> exits 0 with a `kanban: <reason>` line when there is none — so **never decide "no board is
+> configured" without running it**. That inference, not a missing board, is what used to freeze
+> cards mid-pipeline.
 
 ## 1. Load & check
 
