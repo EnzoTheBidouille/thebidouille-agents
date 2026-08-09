@@ -7,6 +7,34 @@ short, user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` secti
 > They are history and are deliberately not rewritten — every command gained a `cohorte-` prefix
 > in 2.0.0.
 
+## 2.1.0 — 2026-08-09
+
+- **A repo that gates merges on a per-feature release note shipped red PRs, and the flow reported
+  success.** Changesets' `changeset` job fails any PR that touches product code without a
+  `.changeset/*.md`, but that requirement lives in the project's `CLAUDE.md` — which the ship flow
+  never reads. So `/cohorte-ship` committed, pushed, opened the PR and moved the kanban card to
+  **Shipped** while the PR was unmergeable, red on a job nobody was watching.
+
+  The profile gains a `release_notes` block (`enabled`, `tool`, `dir`/`filename`,
+  `anchor_package`, `language`, `forbid_levels`, `empty_cmd`, `ci_job`, `guidance` — SCHEMA.md
+  §Release notes), and `/cohorte-ship` gains **§2b**: the lead writes the note itself, next to the
+  `status: shipped` flip, so it lands *inside* the release commit rather than in a second one after
+  the PR is already open. The bump level is project policy, not a git ritual — the release agent is
+  now explicitly forbidden from authoring or editing a note, and only stages the one it is handed.
+  §4 verifies the note is in the commit; §5 routes a red `ci_job` back to §2b instead of through
+  `/cohorte-fix`, which would treat a missing note as a code finding.
+
+  Two things the block encodes that the tool itself does not: `forbid_levels`, for the `0.x` repo
+  where a `major` changeset silently jumps to `1.0.0` with no human deciding it, and the rule to
+  **ask** rather than guess between two defensible levels — a wrong bump is a published version
+  number, not a fixable draft. `empty_cmd` covers the honest no-op, for a PR that must move no
+  version at all.
+
+- **Existing projects are asked, not defaulted.** `/cohorte-init-pipeline` detects a versioning tool
+  or note-enforcing CI job in Phase 1 and asks the anchor package, language and bump policy in Phase
+  2; `/cohorte-update-pipeline` treats `release_notes` as a genuine human decision during reconcile
+  rather than topping it up blind. No tool found ⇒ `enabled: false`, and §2b is a silent no-op.
+
 ## 2.0.2 — 2026-08-08
 
 - **Kanban cards stopped moving mid-pipeline, and every stage still reported success.** The
