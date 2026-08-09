@@ -33,6 +33,15 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
 | `contract.mechanism`                 | enum         | build, lead                       | `shared-types-zod`/`openapi`/`protobuf`/`json-schema`/`none`. |
 | `contract.path` `.ext` `.index`      | string       | build                             | Where `<feature_id>` contract is authored + barrel.           |
 | `contract.authored_by`               | const `lead` | build                             | Implementers import it read-only, never edit.                 |
+| `release_notes.enabled`              | bool         | ship                              | `false` ⇒ skip note authoring (§2b of /cohorte-ship). See §Release notes. |
+| `release_notes.tool`                 | enum         | ship                              | `changesets`/`none` — what consumes the file.                 |
+| `release_notes.dir` `.filename`      | string       | ship                              | Where the per-feature note is authored, e.g. `.changeset/<feature_id>.md`. |
+| `release_notes.anchor_package`       | string       | ship                              | Sole key in the note's front-matter; a lockstep/`fixed` group propagates the bump. |
+| `release_notes.language`             | string       | ship                              | Language of the note's prose — usually `ui_language`.         |
+| `release_notes.forbid_levels`        | list         | ship                              | Bump levels project policy refuses, e.g. `[major]` while `0.x`. |
+| `release_notes.empty_cmd`            | string       | ship                              | Escape hatch when no version should move; `""` if none.       |
+| `release_notes.ci_job`               | string       | ship                              | CI job that fails on a missing note — lets §5 name the red check. |
+| `release_notes.guidance`             | string       | ship                              | Project policy the lead follows when picking the bump + writing the prose. |
 | `commands.*`                         | string       | all                               | Repo-wide install/dev/lint/format/typecheck/test + migrate.   |
 | `commands.test_quiet` `.lint_quiet`  | string       | review, audit, workflows          | Repo-wide bridled variants — what the `/cohorte-review` pre-flight runs. Same fallback as the per-surface ones. |
 | `rbac.enabled`                       | bool         | brainstorm, review                | Toggle RBAC personas + authz audit.                           |
@@ -412,6 +421,36 @@ this exact procedure so a surface is always defined the same way. To add surface
 Removing/merging a surface is the reverse: drop the `surfaces[]` entry, delete its agent file, fold its
 conventions. Never leave an agent file with no matching `surfaces[]` entry (orphan) or vice-versa.
 
+## Release notes — the per-feature note the versioning tool consumes
+
+Many repos gate merges on a **per-feature release note**: Changesets' `changeset` CI job fails any PR
+that touches product code without a `.changeset/*.md`. That file is **not** something the release
+agent can invent — picking the bump level is project policy (semver over an API vs. over a product,
+a `0.x` rule forbidding `major`, what counts as user-visible), and the prose is outward-facing copy.
+It is the **lead's** to write, exactly like the contract.
+
+The failure mode this block exists to prevent is silent and reproducible: the requirement lives in the
+project's `CLAUDE.md`, which the ship flow never reads, so `/cohorte-ship` completes, opens the PR,
+moves the kanban card to **Shipped** — and CI goes red on a job nobody looked at. The feature reads as
+shipped while being unmergeable. Encoding it in the profile is what makes the step survive a stateless
+lead.
+
+- **Authored before the dispatch**, next to the `status: shipped` flip (`/cohorte-ship` §2b), so the note
+  lands **inside** the release commit. Written after the fact it needs a second commit, and the PR is
+  already open and red.
+- **One key in the front-matter** — `anchor_package`. Lockstep/`fixed` version groups propagate the bump
+  from it to every other workspace; listing more is how a repo ends up with a package bumped twice.
+- **`forbid_levels`** encodes policy the tool itself may not enforce. The common one: while the product
+  is `0.y.z`, a `major` changeset makes Changesets jump to `1.0.0` with no human deciding it — so `0.x`
+  repos forbid `major` and declare a breaking change as `minor`.
+- **Ask, don't guess, on an ambiguous bump.** Between two defensible levels (a refactor that also changes
+  what the user sees), state the reading and let the human pick — a wrong bump is a published version
+  number, not a fixable draft.
+- **`empty_cmd`** covers the honest no-op: a PR that touches product code but must move no version.
+  Prefer it to skipping the step; the CI job wants a file, not a version.
+
+`enabled: false` (or `tool: none`) ⇒ §2b is a no-op and nothing below applies.
+
 ## Reconcile — bringing generated files up to the current core
 
 `/cohorte-init-pipeline` is **one-time per project**. Afterwards, `/cohorte-update-pipeline` runs this procedure so a
@@ -423,7 +462,10 @@ files automatically. It works because every generated artifact is a **determinis
    `pipeline/PIPELINE.template.md`: every block/field the template has and the profile lacks is added
    with its documented default (e.g. `surfaces[].model: sonnet`, `retrieval.provider: serena`).
    **Ask only when a new field is a genuine human decision** (batch into ONE question set); never
-   change a value the profile already sets; never rewrite the prose sections.
+   change a value the profile already sets; never rewrite the prose sections. `release_notes` is one
+   such decision and must not be defaulted blind: detect a versioning tool / note-enforcing CI job per
+   `/cohorte-init-pipeline` Phase 1, and if there is one, ask Phase 2's release-notes question (anchor
+   package, language, bump policy, forbidden levels). No tool found ⇒ top up with `enabled: false`.
 2. **Re-render agent frontmatter + body.** For each `surfaces[]` entry, re-render
    `.claude/agents/<agent>.md` from the current `implementer.template.md` per §Rendering above. Safe by
    doctrine: rendered agents are regenerable artifacts — hand-written rules belong in `PIPELINE.md`

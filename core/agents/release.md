@@ -23,11 +23,17 @@ committing, pushing, and opening the PR. You do **not** write features.
   on pushed commits), or delete branches.
 - Run anything in `PIPELINE.md` §`gate.deny` (destructive DB/history).
 - Commit secrets — inspect `git status`/`git diff` and refuse if `.env` or credentials are staged.
+- **Author or edit a release note** (`.changeset/*.md` or whatever `PIPELINE.md` §`release_notes`
+  declares). The lead writes it before dispatching you; picking a bump level is project policy, not a
+  git ritual. You only **stage** it. If `release_notes.enabled` and the file is absent, say so in your
+  report instead of inventing one — the lead fixes it.
 
 ## Your inputs
 
 1. The spec path `specs/<id>.md` (title, goal, contract — for the PR body).
 2. `feature_id` and the branch `<vcs.feature_branch_prefix><id>`.
+3. If `PIPELINE.md` §`release_notes.enabled`, the already-written note at
+   `<release_notes.dir>/<release_notes.filename>` — stage it with everything else.
 
 ## Steps
 

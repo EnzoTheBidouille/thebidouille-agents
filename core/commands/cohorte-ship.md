@@ -6,7 +6,9 @@ argument-hint: <feature_id>
 
 You are the **lead**. Ship feature **$ARGUMENTS**. This is the outward-facing gate.
 
-> Read `PIPELINE.md` §`vcs` (host, remote, default_branch, feature_branch_prefix).
+> Read `PIPELINE.md` §`vcs` (host, remote, default_branch, feature_branch_prefix) **and
+> §`release_notes`** — §2b below is skipped or required based on it, and skipping it when it is
+> required opens a PR that CI fails on arrival.
 >
 > **Kanban** (SCHEMA.md §Kanban) is mirrored in **explicit steps** below, not as an afterthought:
 > §1 moves the card → **Ship**; §4 moves it → **Shipped** and writes the PR number. Both are one
@@ -41,19 +43,50 @@ Once the human confirms, edit `specs/$ARGUMENTS.md` front-matter `status: → sh
 dispatching the release agent, so the status flip is part of the tree it commits (otherwise it lands
 uncommitted after the PR opens). Only flip after the human's "yes"; if they decline, leave it.
 
+## 2b. Write the release note (only if `release_notes.enabled` — same reason: it must ship in the commit)
+
+`release_notes.enabled: false` (or `tool: none`) ⇒ skip this section entirely, silently.
+
+Otherwise **you** write it — never the release agent, never the implementers. Picking the bump is
+project policy and the prose is outward-facing copy; both are the lead's, exactly like the contract.
+See SCHEMA.md §Release notes.
+
+- Write `<release_notes.dir>/<release_notes.filename>` (`<feature_id>` substituted), front-matter
+  carrying the **single** key `release_notes.anchor_package` and the chosen level, then the prose body
+  in `release_notes.language`.
+- **Choose the level** against `release_notes.guidance`, and refuse any level in
+  `release_notes.forbid_levels` (a `0.x` repo forbidding `major` declares the rupture `minor`).
+- **Ambiguous between two defensible levels?** State your reading in one line and **ask the human to
+  pick** before writing. A wrong bump becomes a published version number.
+- The body describes what changed **for the user**, from the spec §1/§2 — no client names, no internal
+  paths, no exploitable attack vector, no file lists.
+- If the feature genuinely must move no version, use `release_notes.empty_cmd` instead. Prefer that to
+  skipping: the CI job wants a file, not a version.
+- Then say in one line which level you chose and why — this is the human's last chance to correct it
+  before it is committed.
+
+> **Why this is its own gate.** The requirement usually lives in the project's `CLAUDE.md`, which this
+> flow never reads. Skip it and everything below still "succeeds": commit, push, PR opened, kanban card
+> moved to **Shipped** — and CI red on a job nobody watched. The feature reads as shipped while being
+> unmergeable.
+
 ## 3. Dispatch the `release` agent
 
 Spawn one agent (`subagent_type: release`): "Release feature `$ARGUMENTS` on branch
 `<feature_branch_prefix>$ARGUMENTS`. Read `PIPELINE.md` §vcs first. Spec: `specs/$ARGUMENTS.md` (already
 `status: shipped` — stage it). Write conventional commit(s), push (no force), open the PR (use `gh` if
 `host: github` + available; else emit the compare URL + drafted PR body from `.claude/templates/pr-body.md`).
-Stage **all** the feature's changes including `specs/$ARGUMENTS.md`. Never edit source, never force-push,
-never run migrations."
+Stage **all** the feature's changes including `specs/$ARGUMENTS.md` and, if `release_notes.enabled`, the
+release note at `<release_notes.dir>/<release_notes.filename>` — it is already written, stage it as-is and
+never author or edit one yourself. Never edit source, never force-push, never run migrations."
 
 ## 4. Relay + move the card to Shipped (do not skip)
 
 Print the release agent's report: commit SHA(s), pushed branch, PR URL (or compare URL + drafted body).
-Confirm `specs/$ARGUMENTS.md` was committed as `status: shipped` (part of the release commit).
+Confirm `specs/$ARGUMENTS.md` was committed as `status: shipped` (part of the release commit), and — if
+`release_notes.enabled` — that the release note is in that same commit
+(`git show <sha> --stat | grep <release_notes.dir>`). Missing ⇒ commit and push it now, before §5's CI
+watch, rather than letting the job go red.
 
 **Move the card to Shipped — required, and verify it actually moved.** Run
 `<core>/pipeline/scripts/kanban-move.sh auto $ARGUMENTS shipped --pr <num>`, which **appends the PR
@@ -78,7 +111,9 @@ call. Silent no-op without consent; never ask about consent here.
 ## 5. After the PR — CI gate + teardown
 
 - If `host: github` and `gh` is available, watch the PR's checks (`gh pr checks <url> --watch`) and
-  report the result — the human merges only on green. A red check ⇒ back to `/cohorte-fix $ARGUMENTS`.
+  report the result — the human merges only on green. A red check ⇒ back to `/cohorte-fix $ARGUMENTS`,
+  **except** a red `release_notes.ci_job`: that one is this command's own miss, not a code finding —
+  write the note per §2b, commit, push, and re-watch. Never send a missing release note through `/cohorte-fix`.
 - Once the human confirms the PR is **merged**: if `isolation.enabled`, propose the teardown —
   `scripts/remove-feature.sh $ARGUMENTS` (add `--drop-db` to also drop the feature db; kept by
   default). It removes the worktree, deletes the merged branch, frees the slot. Never run it before

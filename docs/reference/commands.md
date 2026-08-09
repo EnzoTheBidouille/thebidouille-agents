@@ -144,10 +144,11 @@ shows the pass and phase on the card, and `/cohorte-doctor` names any spec left 
 
 Pre-flight: SHIP verdict confirmed; **freshness gate** (recompute the digest — mismatch ⇒
 refuse, re-review); DoD verification (open boxes need explicit human override); human
-confirmation. Then: spec → `status: shipped` *before* dispatch, `release` agent (conventional
-commits, plain push, PR via `gh` or compare URL + drafted body), kanban → Shipped with the PR
-number, telemetry ping (only on success), CI watch, and — after the confirmed merge — the
-worktree teardown proposal.
+confirmation. Then: spec → `status: shipped` *before* dispatch, the **release note** when
+`release_notes.enabled` (the lead writes it — bump level is project policy — so it lands in the
+release commit, not a follow-up), `release` agent (conventional commits, plain push, PR via `gh` or
+compare URL + drafted body), kanban → Shipped with the PR number, telemetry ping (only on success),
+CI watch, and — after the confirmed merge — the worktree teardown proposal.
 
 ## `/cohorte-audit [target]`
 

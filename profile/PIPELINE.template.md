@@ -97,6 +97,26 @@ contract:
   index: packages/shared-types/src/index.ts   # barrel to export from, or "" if none
   authored_by: lead                           # NEVER the implementer agents
 
+# ── release notes (optional) ────────────────────────────────────────────────
+# A per-feature release note the project's versioning tool consumes. When
+# enabled, /cohorte-ship authors it BEFORE dispatching the release agent, so it
+# ships inside the release commit. Repos whose CI fails a PR that lacks one
+# (Changesets' `changeset` job) MUST set this — otherwise every ship goes red.
+release_notes:
+  enabled: <true | false>                     # false ⇒ /cohorte-ship §2b is a no-op
+  tool: <changesets | none>                   # what consumes the file
+  dir: .changeset                             # where the note is authored
+  filename: "<feature_id>.md"                 # one file per feature
+  anchor_package: shared-types                # sole key in the front-matter; a lockstep/fixed group propagates the bump
+  language: <ui_language | English>           # language of the note's prose
+  forbid_levels: []                           # bumps project policy refuses, e.g. [major] while 0.x
+  empty_cmd: "pnpm changeset --empty"         # when no version should move; "" if the tool has no such escape hatch
+  ci_job: changeset                           # CI job that fails when the note is missing (name it so /cohorte-ship §5 recognizes the red)
+  guidance: |                                 # rules the lead follows when writing the note (project policy)
+    major = the deploy needs an operator action; minor = a user-visible capability;
+    patch = fix/perf/refactor with no change of use. No client names, no internal
+    paths, no exploitable attack vector.
+
 # ── repo-wide commands (root unless noted) ──────────────────────────────────
 commands:
   install: pnpm install

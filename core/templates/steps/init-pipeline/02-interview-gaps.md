@@ -24,6 +24,12 @@ Ask ONLY what you couldn't confidently detect. Batch related questions. Cover:
   the runner has no such flag, leave `""` — consumers then fall back to `<cmd> 2>&1 | tail -40`.
 - **Contract** — mechanism (`shared-types-zod` / `openapi` / `protobuf` / `json-schema` / `none`) and
   where feature contracts are authored. If `none`, surfaces sync by the spec prose alone.
+- **Release notes (only if Phase 1 found a versioning tool or a note-enforcing CI job)** — confirm the
+  anchor package (a `fixed`/lockstep group means ONE key propagates to all), the note's language, and the
+  **bump policy** the lead will apply at `/cohorte-ship`: what counts as major/minor/patch here, and
+  whether any level is forbidden (a `0.y.z` product normally forbids `major` — Changesets would jump it
+  to `1.0.0` with no human deciding). Policy prose lands in `release_notes.guidance`. Nothing detected ⇒
+  don't ask; leave `release_notes.enabled: false`.
 - **UI language** — language of all user-facing copy.
 - **RBAC** — is there a role hierarchy? If yes, list it highest→lowest.
 - **Design system** — enabled? provider (Claude Design / Figma / none) + project ids + kit/token paths.

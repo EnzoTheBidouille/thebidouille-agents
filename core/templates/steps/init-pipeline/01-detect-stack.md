@@ -24,6 +24,10 @@ Gather evidence, then summarize what you found. Look for:
   `package.json` scripts + the workspace filter syntax (e.g. `pnpm --filter <pkg> test`).
 - **Contract mechanism:** a shared types/schema package (`packages/shared-types`, Zod/`z.`),
   an `openapi.*`/`swagger.*` file, `.proto` files, or none.
+- **Release notes / versioning:** a `.changeset/` directory (+ `config.json`, and whether it declares a
+  `fixed`/lockstep group — that names the anchor package), `changesets` in devDependencies, or a CI job
+  that fails a PR lacking a note (grep `.github/workflows/*` for `changeset`). Also note the root
+  `version`: a `0.y.z` product usually forbids `major`. None of these ⇒ `release_notes.enabled: false`.
 - **DB / migrations:** migration tooling (`node ace make:migration`, `knex`, `prisma`, `alembic`,
   `golang-migrate`), a `docker-compose.yml`, DB service.
 - **Design system:** an existing `design-reference/` snapshot, `components/ui`, a DesignSync MCP
@@ -36,5 +40,5 @@ Gather evidence, then summarize what you found. Look for:
 - **Existing `CLAUDE.md`** — read it; it may already state stack/conventions to fold in. **Existing
   `PIPELINE.md`** — if present, this is a re-run: load it as the starting draft and only reconcile deltas.
 
-Print a compact **Detection Report**: layout, surfaces (with framework + commands), contract, DB,
-design, vcs. Mark each field `detected` / `guessed` / `unknown`.
+Print a compact **Detection Report**: layout, surfaces (with framework + commands), contract, release
+notes, DB, design, vcs. Mark each field `detected` / `guessed` / `unknown`.

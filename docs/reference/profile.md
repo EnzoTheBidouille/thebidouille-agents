@@ -81,6 +81,30 @@ contract:
 
 The only cross-surface sync channel. `enabled: false` ⇒ spec §5 prose is the contract.
 
+### Release notes
+
+```yaml
+release_notes:
+  enabled: true
+  tool: changesets               # none
+  dir: .changeset
+  filename: "<feature_id>.md"
+  anchor_package: shared-types   # a fixed/lockstep group propagates the bump from this one key
+  language: French
+  forbid_levels: [major]         # e.g. while the product is 0.y.z
+  empty_cmd: "pnpm changeset --empty"
+  ci_job: changeset
+  guidance: |
+    major = the deploy needs an operator action; minor = a user-visible capability;
+    patch = fix/perf/refactor with no change of use.
+```
+
+The per-feature note a versioning tool consumes. `/cohorte-ship` §2b has the **lead** write it before
+dispatching the release agent, so it lands inside the release commit — picking the bump is project
+policy, not a git ritual. Set this whenever CI fails a PR that lacks a note (Changesets' `changeset`
+job): without it the ship "succeeds" — PR opened, kanban card **Shipped** — on a red check.
+`enabled: false` ⇒ the step is a silent no-op.
+
 ### Repo-wide commands
 
 ```yaml
