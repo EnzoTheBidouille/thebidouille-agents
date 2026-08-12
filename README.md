@@ -256,6 +256,7 @@ it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.
 | `/cohorte-init-pipeline`     | Detect stack → interview → generate the profile + agents. Run once per project.       |
 | `/cohorte-brainstorm`        | Interactive persona panel that pressure-tests a feature idea.                         |
 | `/cohorte-spec`              | Freeze the feature spec + contract into `specs/<id>.md` (UI features also get a standalone design brief at `specs/design/<id>.md`). Also applies review returns. |
+| `/cohorte-patch [bug]`       | Bug-fix entry: triage a bug and freeze a ~60-line patch spec (`specs/patch-<slug>.md`) whose regression test replaces the contract. Then the normal `/cohorte-build → review → ship`. |
 | `/cohorte-build <id>`        | Readiness gate on the frozen spec, then the lead authors the contract and dispatches one implementer per surface in parallel. |
 | `/cohorte-review <id>`       | Read-only review agents (one per touched surface, parallel) audit the diff vs the spec; out-of-scope findings go to the refactor backlog. |
 | `/cohorte-fix <id>`          | Apply a review report: remediation into the spec, re-dispatch only the surfaces with findings. |
@@ -344,15 +345,13 @@ The essentials:
 
 Details: `profile/SCHEMA.md` §Workflows.
 
-## Privacy — opt-in telemetry
+## Privacy
 
-Cohorte can send **anonymous** usage pings (core version, OS, phase name, duration, per-surface
-result counts, and a *hash* of the feature id — never repo names, paths, code, or IPs). It is
-**strictly opt-in**: `/cohorte-init-pipeline` asks once per machine, the default is No, and both answers are
-recorded so you're never re-asked. Withdraw anytime (`telemetry.enabled: false` in
-`~/.claude/cohorte.config.yaml`); erase your history anytime (`/cohorte-doctor` prints your `install_id`,
-the collector's `DELETE /v1/install/<id>` drops it). Full spec + GDPR details:
-`profile/SCHEMA.md` §Telemetry (including the collector API contract).
+Cohorte sends nothing, anywhere. There is no telemetry, no usage pings, no collector — the
+opt-in stats that shipped through 2.2.0 were removed in 2.3.0, sender included. Everything the
+pipeline records (`pipeline-metrics.jsonl`, `specs/reports/`) stays in your repo, and the only
+network calls are the ones you can see: `git`, `gh`, and whatever MCP providers you wired
+yourself.
 
 ## License
 
@@ -380,7 +379,7 @@ profile/
   PIPELINE.template.md  # the profile skeleton /cohorte-init-pipeline fills
   SCHEMA.md             # field reference
   cohorte.config.template.yaml   # seeds ~/.claude/cohorte.config.yaml (kanban)
-scripts/                # worktree-isolation templates + shipped preflight/kanban/telemetry scripts
+scripts/                # worktree-isolation templates + the shipped preflight/kanban scripts
 dashboard/              # local web cockpit (npx … dashboard) — see dashboard/README.md
   server/               # dependency-free node runtime (serves the built app + JSON/stream API)
   app/                  # Vite + React source (built to dashboard/dist/ at publish time)

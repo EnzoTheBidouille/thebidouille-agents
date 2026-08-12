@@ -19,12 +19,14 @@ name: MyApp
 one_liner: what this product is
 ui_language: French            # language of ALL user-facing copy — review enforces it
 package_manager: pnpm
-vcs: { host: github, remote: acme/myapp, default_branch: main, feature_branch_prefix: feature/ }
+vcs: { host: github, remote: acme/myapp, default_branch: main, feature_branch_prefix: feature/,
+       patch_branch_prefix: fix/ }
 repo: { layout: monorepo, workspace_tool: turborepo }
 ```
 
 `vcs.default_branch` is the diff base for reviews and the PR base; the branch prefix drives the
-isolation scripts and `/cohorte-ship`.
+isolation scripts and `/cohorte-ship`. `patch_branch_prefix` is the same for a `kind: patch` spec
+(`/cohorte-patch`) — optional, and a profile that predates it falls back to `fix/`.
 
 ### Code retrieval
 

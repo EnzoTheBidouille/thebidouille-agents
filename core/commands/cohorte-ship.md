@@ -31,7 +31,10 @@ You are the **lead**. Ship feature **$ARGUMENTS**. This is the outward-facing ga
   §`Acceptance criteria / DoD`; if any item is still `- [ ]`, list the open ones and ask the human to
   confirm shipping anyway (they may be deferred on purpose — e.g. a UI item on a backend-only feature).
   All `- [x]` ⇒ proceed silently.
-- Show `git status` + `git diff --stat`; confirm the branch is `<feature_branch_prefix>$ARGUMENTS`.
+- Show `git status` + `git diff --stat`; confirm the branch is `<prefix>$ARGUMENTS`, where `<prefix>`
+  is `vcs.patch_branch_prefix` (falling back to `fix/` on a profile that predates the key) when the
+  spec front-matter carries `kind: patch`, and `vcs.feature_branch_prefix` otherwise. Resolve it once
+  here and pass the **literal** branch to §3's dispatch — the release agent must not re-derive it.
 - **Ask the human to confirm** they want to commit, push, and open the PR. Wait for yes.
 - After the yes: `<core>/pipeline/scripts/kanban-move.sh auto $ARGUMENTS ship`. Report what it
   printed — `moved #…` or `kanban: <reason>` — never a guess about which happened.
@@ -57,6 +60,9 @@ See SCHEMA.md §Release notes.
   `release_notes.forbid_levels` (a `0.x` repo forbidding `major` declares the rupture `minor`).
 - **Ambiguous between two defensible levels?** State your reading in one line and **ask the human to
   pick** before writing. A wrong bump becomes a published version number.
+- A `kind: patch` spec is a `patch` bump by default — that is what the level means. It is a default,
+  not a rule: a bug fix that changes documented behaviour is still a `minor`, and one that removes it
+  is still breaking. Say which you chose when it isn't `patch`.
 - The body describes what changed **for the user**, from the spec §1/§2 — no client names, no internal
   paths, no exploitable attack vector, no file lists.
 - If the feature genuinely must move no version, use `release_notes.empty_cmd` instead. Prefer that to
@@ -73,7 +79,7 @@ See SCHEMA.md §Release notes.
 
 Spawn one agent (`subagent_type: release`, or the equivalent dispatch for this runtime):
 "Release feature `$ARGUMENTS` on branch
-`<feature_branch_prefix>$ARGUMENTS`. Read `PIPELINE.md` §vcs first. Spec: `specs/$ARGUMENTS.md` (already
+`<the branch §1 resolved>`. Read `PIPELINE.md` §vcs first. Spec: `specs/$ARGUMENTS.md` (already
 `status: shipped` — stage it). Write conventional commit(s), push (no force), open the PR (use `gh` if
 `host: github` + available; else emit the compare URL + drafted PR body from `<core>/templates/pr-body.md`).
 Stage **all** the feature's changes including `specs/$ARGUMENTS.md` and, if `release_notes.enabled`, the
@@ -100,13 +106,6 @@ exit 0 and they are not interchangeable — say which one you got. Only if it mo
 with a **grep for `#$ARGUMENTS`** on the board it named (with surrounding heading context —
 `grep -B20 '#$ARGUMENTS' | grep '^##'`, or an offset-limited Read around the match): exactly one card,
 under the `shipped` heading — never re-read the whole board into context.
-
-**Telemetry — the usage ping that closes the funnel.** Chain it onto the verify call above
-(`/cohorte-build` §4's shared form, `<phase>` = `ship`, `<seconds>` = `0` — the release agent's duration is
-not the pipeline's, `<results>` = `pr` when a PR was created / `compare` when only a compare URL was
-emitted). Fire it **after** the release agent reports success, never on an aborted ship — a `ship`
-event must mean the feature actually left the pipeline. No board ⇒ still ping, in its own `|| true`
-call. Silent no-op without consent; never ask about consent here.
 
 ## 5. After the PR — CI gate + teardown
 

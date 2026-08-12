@@ -51,12 +51,7 @@ Detect the mode from the pasted content:
    it. This is just so the human isn't surprised when `/cohorte-build` proposes a new agent.
 5. When the human validates, **freeze**: write `specs/<id>.md` (`status: frozen`, front-matter filled).
    Create the file — do not ask the human to. **Postcondition:** `grep -q '^status: frozen' specs/<id>.md`
-   — if it fails the freeze didn't land; fix it before pointing the human at `/cohorte-build`. Chain the
-   opt-in usage ping onto the postcondition's Bash call (`/cohorte-build` §4's shared form, `<phase>` =
-   `spec`, `<seconds>` = `0` — interactive time, not pipeline wall-clock, `<results>` = `frozen`).
-   Ping only on a **landed** freeze, so the funnel counts specs that exist, not attempts. Mode B does
-   not ping — it re-enters an already-counted spec, and `/cohorte-fix` covers that loop. Silent no-op without
-   consent; never ask about consent here.
+   — if it fails the freeze didn't land; fix it before pointing the human at `/cohorte-build`.
 5b. **Record the transverse decisions — the journal, not a summary.** Walk what the interview settled
    and keep ONLY the decisions that **outlive this feature**: a rule the next spec would otherwise
    re-litigate or contradict (auth model, id/naming scheme, where a kind of state lives, an error

@@ -47,6 +47,13 @@ be precise and self-contained.
 1. **Spec conformance (highest priority).** Does the implementation match the frozen contract exactly —
    every endpoint/interface (method, path, auth, request/response shape, status codes, error cases) and
    every acceptance criterion? Any deviation is a finding. Cross-surface calls must match the contract.
+   **On a `kind: patch` spec** (front-matter) the contract is usually `none` and this check reads
+   differently: the diff must (a) contain the §4 regression test, asserting what §4 says it asserts,
+   (b) actually address the §1 repro through the §3 cause — a fix that suppresses the symptom
+   elsewhere is a finding, not a fix — and (c) stay inside §7 Out of scope. **Scope creep is a
+   first-class finding on a patch**: a correct, tidy improvement the spec did not ask for still
+   widens the blast radius of a change that is shipping fast, so report it rather than waving it
+   through. Genuinely-good-but-out-of-scope work is a **deferred** finding, exactly as elsewhere.
 2. **Correctness.** Logic bugs, unhandled errors, validation gaps, auth holes, data exposure.
 3. **Security.** Authz on every entry point, input validation, no secret/PII leakage, no injection.
    A security vulnerability ⇒ verdict **BLOCK**.

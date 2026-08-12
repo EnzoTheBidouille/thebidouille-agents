@@ -126,10 +126,14 @@ copy_core() {
   cp "$src/profile/cohorte.config.template.yaml" "$dest/pipeline/"
   cp "$src"/scripts/*.template           "$dest/pipeline/scripts/"
   cp "$src/scripts/kanban-move.sh"       "$dest/pipeline/scripts/"
-  cp "$src/scripts/telemetry-send.sh"    "$dest/pipeline/scripts/"
   cp "$src/scripts/preflight.sh"         "$dest/pipeline/scripts/"
-  chmod +x "$dest/pipeline/scripts/kanban-move.sh" "$dest/pipeline/scripts/telemetry-send.sh" \
+  chmod +x "$dest/pipeline/scripts/kanban-move.sh" \
            "$dest/pipeline/scripts/preflight.sh" 2>/dev/null || true
+  # 2.3.0 removed telemetry. Copy-over never deletes, so an existing install would keep an
+  # executable that still POSTs to the collector — scrub the script itself. The dead
+  # `telemetry:` block in the user's config is not this installer's to parse; the interactive
+  # /cohorte-update-pipeline deletes it (SCHEMA.md §Reconcile step 5).
+  rm -f "$dest/pipeline/scripts/telemetry-send.sh"
   cp "$src/core/agents/implementer.template.md" "$dest/pipeline/"
   [ -f "$src/CHANGELOG.md" ] && cp "$src/CHANGELOG.md" "$dest/pipeline/"
   printf '%s\n' "$ver" > "$dest/pipeline/VERSION"

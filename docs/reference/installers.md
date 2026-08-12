@@ -42,7 +42,7 @@ templates/    handoff, review-feedback, spec, design-brief, pr-body, brainstorm-
 workflows/    review.js · audit.js · refactor.js
 pipeline/     PIPELINE.template.md · SCHEMA.md · cohorte.config.template.yaml ·
               implementer.template.md · CHANGELOG.md · VERSION
-  scripts/    preflight.sh · kanban-move.sh · telemetry-send.sh ·
+  scripts/    preflight.sh · kanban-move.sh ·
               new-feature.sh.template · remove-feature.sh.template
 ```
 

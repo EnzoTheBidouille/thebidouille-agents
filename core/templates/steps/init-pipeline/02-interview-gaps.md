@@ -53,13 +53,3 @@ Prefer sensible defaults from Phase 1 as the first (Recommended) option in each 
 > The **kanban** link is user-scoped (it points at a personal vault, so it never goes in the committed
 > `PIPELINE.md`), but IS wired here because it is per-project — see Phase 4.
 
-- **Telemetry** (optional, machine-scoped — SKIP entirely if `<config>` already
-  has a `telemetry:` block with a `consent_date`, i.e. the human already answered on this machine).
-  Ask ONE opt-in question, stating exactly: _"Share anonymous usage stats with the cohorte project?
-  One ping per pipeline phase, `/cohorte-brainstorm` through `/cohorte-ship`: core version, OS, phase name, duration,
-  per-surface result counts, and a hash of the feature id — never repo names, paths, code, or IPs.
-  Setup and maintenance commands never ping. Off by default; withdraw anytime
-  (`telemetry.enabled: false`); erase your history anytime (SCHEMA.md §Telemetry). Default: No."_
-  On **yes**: in the global config set `telemetry.enabled: true`, mint `install_id` (`uuidgen`,
-  lowercase), set `consent_date` (ISO date). On **no**: set `enabled: false` + `consent_date` (so
-  no future command re-asks). Never touch `endpoint` — it ships with the template.

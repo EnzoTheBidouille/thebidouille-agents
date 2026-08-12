@@ -62,9 +62,9 @@ Either mode installs: `commands/` (the slash commands), `agents/` (the four fixe
 review, release, profile-reader), `hooks/gate.py`, `templates/`, `workflows/` (the four
 workflow scripts), and `pipeline/` (the profile templates, `SCHEMA.md`,
 `implementer.template.md` — the surface-agent template lives here, *not* in `agents/`, so it is
-never mistaken for a dispatchable agent — the shipped scripts `preflight.sh`, `kanban-move.sh`,
-`telemetry-send.sh`, and `VERSION` + `CHANGELOG.md`). A
-user-level `~/.claude/cohorte.config.yaml` is seeded once (kanban + telemetry config; never
+never mistaken for a dispatchable agent — the shipped scripts `preflight.sh` and `kanban-move.sh`,
+and `VERSION` + `CHANGELOG.md`). A
+user-level `~/.claude/cohorte.config.yaml` is seeded once (the kanban config; never
 clobbered on update).
 :::
 
@@ -93,7 +93,7 @@ One-time per project, interactive, in five steps:
      **code retrieval** provider (Serena by default), **isolation** (parallel git worktrees with
      per-feature DB + ports), **gate** patterns (destructive commands to deny / confirm), and the
      `/cohorte-brainstorm` **personas**.
-   - Optional: **kanban** mirror (Obsidian board) and the one-time **telemetry** consent
+   - Optional: **kanban** mirror (Obsidian board)
      question (default No).
 3. **Draft** — shows you the assembled `PIPELINE.md` for approval.
 4. **Write & render** — writes `PIPELINE.md`, renders one agent file per surface (conventions
@@ -117,8 +117,8 @@ git commit -m "chore: install cohorte pipeline"
 ```
 
 Verifies the whole wiring: core version + pointer coherence, agents ↔ surfaces (no orphans),
-model pins, hooks + gate config, retrieval health, design paths, isolation slots, telemetry
-consent hygiene, **workflows availability** (check 8), specs & metrics hygiene. Every failure
+model pins, hooks + gate config, retrieval health, design paths, isolation slots, the kanban
+board link, **workflows availability** (check 8), specs & metrics hygiene. Every failure
 comes with its exact fix command.
 
 ## Your first feature

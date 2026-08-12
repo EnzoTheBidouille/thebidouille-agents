@@ -26,6 +26,11 @@ You are the **lead**. Build feature **$ARGUMENTS** from its frozen spec.
   `/cohorte-spec` first. Only then read the body, selectively: front-matter, §5 contract, the surface
   task sections, and `## Remediation` (fall back to a full read if the spec doesn't follow the
   template's headings).
+- **`kind: patch` in the front-matter ⇒ this is a bug fix** frozen by `/cohorte-patch`, and it is
+  built by this command like any other spec, with two differences called out where they apply: §1.6
+  judges it against its regression test instead of a contract, and §2 authors no contract unless §5
+  carries a delta. Everything else — surface mapping, parallel dispatch, roll call, metrics — is
+  identical, and `kind` absent means feature, so nothing changes for existing specs.
 - **Route check** — if `## Remediation` has open `- [ ]` items and none requires a contract change,
   stop and tell the human to run `/cohorte-fix $ARGUMENTS` instead: it re-dispatches only the surfaces with
   findings. A full build with open items is only right when the contract change ripples into clean
@@ -79,6 +84,13 @@ good idea (that was `/cohorte-brainstorm`), never by re-reading files you don't 
    request fields with types + validation, the success shape, and its error cases. A missing
    **request or success shape** ⇒ `NOT-READY` (an implementer would invent it, and the other surface
    would invent a different one). A missing **error case** ⇒ `RESERVATIONS`.
+   **On a `kind: patch` spec this check is replaced, not skipped** — a patch has no contract to be
+   complete, so judge §1 Symptom & repro + §4 Regression test instead: no stated expected behaviour,
+   or a §4 that names no test and no reason the fix would be verifiable ⇒ `NOT-READY` (an implementer
+   would fix whatever it guessed the bug was, and nothing would catch a wrong guess). A repro
+   explicitly frozen as a hypothesis, or a cause left to the implementer to find, is
+   `RESERVATIONS` — normal for a patch, never a blocker. Then judge §5 as above **only** if it
+   carries a delta rather than `none`.
 2. **Surface coverage** — every §6 task maps to a surface in the reconciled list, and every contract
    entry has an owner **on each side it names** (producer and consumer). A contract entry no surface
    owns ⇒ `NOT-READY`.
@@ -103,7 +115,8 @@ this gate and any automated driver, which parses no prose:
 ```
 
 - **`gaps`** — one normalized string per gap, `<check>|<where>|<what is missing>`: `<check>` is
-  `contract` · `coverage` · `dependency` · `ambiguity` · `design`; `<where>` is the contract entry,
+  `contract` · `coverage` · `dependency` · `ambiguity` · `design` — plus `repro` on a `kind: patch`
+  spec, for a gap check 1 raised against §1/§4; `<where>` is the contract entry,
   surface key or dependency name (no `:line` — it shifts on every edit); `<what>` is the gap, not the
   fix. `READY` ⇒ `[]`.
 - **`NOT-READY` ⇒ STOP: author no contract and spawn NO agent.** Print the gaps and send the human to
@@ -116,6 +129,15 @@ this gate and any automated driver, which parses no prose:
 - **`READY` ⇒ continue silently** — one line, no restatement.
 
 ## 2. Author the contract (lead-only — the single sync channel)
+
+_Skipped entirely on a `kind: patch` spec whose §5 Contract delta is `none`_ — which is the usual
+case: a bug fix corrects behaviour behind a shape that already exists, and re-authoring that shape
+would put the contract file in the diff for nothing. Say you skipped it and why, in one line. A patch
+whose §5 **does** carry a delta is authored exactly as below, from the delta, against the existing
+file — never rewritten from scratch. (A patch needing *new* contract surface area never reaches here:
+`/cohorte-patch` §3 routes it to `/cohorte-spec`.) When you skip, still run `date +%s` on its own —
+the skipped postcondition is where §4's wall-clock start comes from, and a build with no start epoch
+writes a metrics line with no duration.
 
 _Only if `contract.enabled`._ From §5 of the spec, write/update the feature's contract file at
 `<contract.path>/$ARGUMENTS.<contract.ext>` in the profile's `mechanism` (e.g. Zod v4 schemas + inferred
@@ -186,12 +208,7 @@ anything went wrong. In the same call write the machine-readable batch result to
 `specs/reports/$ARGUMENTS.build.json` (overwrite) — the channel an automated driver reads, since it
 never sees your chat:
 `{"id":"$ARGUMENTS","phase":"build","ts":"<ISO>","surfaces":{"<key>":"ok|error|dead",…},"dead":["<key>",…]}`
-— this is the evidence SCHEMA.md §Specialization asks for before splitting a surface. In the same
-Bash call, chain the opt-in usage ping — **the shared form every phase command reuses**:
-`<core>/pipeline/scripts/telemetry-send.sh <phase> "$ARGUMENTS" <seconds> "<results>" || true` — a silent no-op unless the human explicitly consented (SCHEMA.md §Telemetry);
-never ask about consent here. `/cohorte-review` and `/cohorte-fix` chain the same line with their own
-phase + results. The `|| true` swallows a **missing** script too, so a half-copied core goes
-silent rather than loud — `/cohorte-doctor` check 1 is what catches that.
+— this is the evidence SCHEMA.md §Specialization asks for before splitting a surface.
 Then tell the human: exercise the feature by hand if it's worth it, then run `/cohorte-review $ARGUMENTS` —
 unless a surface is dead, in which case say so first and let them decide whether to re-run `/cohorte-build`
 (a dead surface has no findings, so `/cohorte-fix` has nothing to re-dispatch).

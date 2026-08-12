@@ -1,7 +1,7 @@
 {
   "name": "cohorte",
-  "version": "2.2.0",
-  "description": "Portable, stack-agnostic multi-agent development pipeline for Claude Code, Codex CLI, Cursor, Gemini CLI and OpenCode \u2014 install the core, run /cohorte-init-pipeline, and it adapts to your project's stack.",
+  "version": "2.3.0",
+  "description": "Portable, stack-agnostic multi-agent development pipeline for Claude Code, Codex CLI, Cursor, Gemini CLI and OpenCode — install the core, run /cohorte-init-pipeline, and it adapts to your project's stack.",
   "bin": {
     "cohorte": "bin/cli.js"
   },

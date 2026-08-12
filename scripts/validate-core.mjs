@@ -25,7 +25,7 @@ const frontmatter = (text) => {
 const PINNED = ["cohorte-build", "cohorte-review", "cohorte-fix", "cohorte-ship",
   "cohorte-audit", "cohorte-refactor", "cohorte-doctor", "cohorte-align-ds",
   "cohorte-update-pipeline"];
-const UNPINNED = ["cohorte-brainstorm", "cohorte-spec", "cohorte-init-pipeline"];
+const UNPINNED = ["cohorte-brainstorm", "cohorte-spec", "cohorte-init-pipeline", "cohorte-patch"];
 
 // Every command must carry the `cohorte-` prefix. This replaces the old RESERVED
 // blocklist, which chased collisions one name at a time and always lagged: a command
@@ -129,26 +129,28 @@ const steps = join(root, "core/templates/steps/init-pipeline");
 if (!existsSync(steps) || readdirSync(steps).length === 0)
   fail("core/templates/steps/init-pipeline", "router step files missing/empty");
 
-// ── telemetry coverage ──────────────────────────────────────────────────────
-// The funnel is only readable if every one of its stages pings — a single missing
-// one silently truncates it (that is how /cohorte-review and /cohorte-fix went unreported
-// until 1.2.3). The phase list here must match SCHEMA.md §Telemetry's table.
-// These are telemetry PHASE names, not command names — they stay unprefixed even though
-// the commands that emit them are now `/cohorte-*`. The phase is a wire field allowlisted
-// in telemetry-send.sh and keyed on by the collector's existing dataset; prefixing it would
-// orphan every ping ever sent. Command file = PREFIX + phase.
-const FUNNEL = ["brainstorm", "spec", "build", "review", "fix", "ship"];
-for (const c of FUNNEL)
-  if (!/usage ping/i.test(read(`core/commands/${PREFIX}${c}.md`)))
-    fail(`core/commands/${PREFIX}${c}.md`, "funnel command with no usage ping — breaks the telemetry funnel");
-// …and nothing outside the funnel may ping (consent text scopes it to the funnel).
-for (const f of readdirSync(join(root, "core/commands"))) {
-  const c = f.replace(/\.md$/, "").replace(new RegExp(`^${PREFIX}`), "");
-  // `telemetry-send.sh` + an argument = a call site; the bare filename (e.g. /cohorte-doctor
-  // listing the scripts it checks for) is a mention, not a ping.
-  if (!FUNNEL.includes(c) && /telemetry-send\.sh +\S|usage ping/i.test(read(`core/commands/${f}`)))
-    fail(`core/commands/${f}`, "non-funnel command pings telemetry — outside the consented scope");
-}
+// ── no telemetry ────────────────────────────────────────────────────────────
+// Telemetry was removed wholesale in 2.3.0: the shipped `telemetry-send.sh`, the
+// per-phase pings, the consent question, the `telemetry:` config block, the collector
+// endpoint. This check is the ratchet — it fails if any of it creeps back into the
+// core, which is easy to do by copying an old command file that still chains a ping.
+// Deliberately broad: the whole point is that there is nothing left to send with.
+const NO_TELEMETRY = /telemetry|usage ping/i;
+// One exemption, and it is the opposite of a regression: /cohorte-update-pipeline is what
+// DELETES the leftover `telemetry:` block from configs seeded before 2.3.0, so it is the one
+// file that must still name the thing. Narrow on purpose — a filename, not a pattern.
+const TELEMETRY_SCRUBBER = "core/commands/cohorte-update-pipeline.md";
+const walk = (dir) => readdirSync(join(root, dir), { withFileTypes: true }).flatMap((e) =>
+  e.isDirectory() ? walk(`${dir}/${e.name}`) : [`${dir}/${e.name}`]);
+for (const dir of ["core/commands", "core/agents", "core/templates", "core/workflows"])
+  for (const rel of walk(dir)) {
+    if (!/\.(md|js)$/.test(rel) || rel === TELEMETRY_SCRUBBER) continue;
+    if (NO_TELEMETRY.test(read(rel)))
+      fail(rel, "mentions telemetry — it was removed in 2.3.0; nothing may ping or ask for consent");
+  }
+// …and the exempt file may only REMOVE it: naming a send/ping/consent path there is still a bug.
+if (/usage ping|telemetry-send|consent/i.test(read(TELEMETRY_SCRUBBER)))
+  fail(TELEMETRY_SCRUBBER, "may reference the retired telemetry block only to delete it — no ping, sender or consent flow");
 
 // ── kanban call sites ───────────────────────────────────────────────────────
 // Every pipeline stage moves a card, and a stage that only *describes* the move
@@ -158,7 +160,7 @@ for (const f of readdirSync(join(root, "core/commands"))) {
 // having opened neither the config nor PIPELINE.md, and a merged feature's card
 // stayed in "Ready to build". `kanban-move.sh auto` moved resolution into the
 // script; this keeps it there. Prose is not a call site — the literal invocation is.
-const KANBAN_STAGES = ["brainstorm", "spec", "build", "review", "fix", "ship"];
+const KANBAN_STAGES = ["brainstorm", "spec", "build", "review", "fix", "ship", "patch"];
 for (const c of KANBAN_STAGES) {
   const path = `core/commands/${PREFIX}${c}.md`;
   const text = read(path);
@@ -174,7 +176,7 @@ for (const c of KANBAN_STAGES) {
 // ── shipped scripts ─────────────────────────────────────────────────────────
 // Every scripts/*.sh must be copied by BOTH shell installers. Callers chain these
 // with `|| true`, so one an installer forgets is a silent no-op forever — no kanban
-// card moves, no telemetry ping, no error. CI is the only place this is loud.
+// card moves, no error. CI is the only place this is loud.
 // The third installer, bin/cli.js (what `npx cohorte` runs), copies by rule rather
 // than by name, so grepping for filenames can't see it — ci.yml dry-runs it into a
 // scratch HOME and asserts the same postconditions instead. Both are needed: this

@@ -237,10 +237,10 @@ function copyCore() {
   // write where this runtime does not look.
   resolveTemplateConditionals(pipelineDir);
   // Copy the *.template files AND the shipped executables (kanban-move.sh,
-  // telemetry-send.sh). Until 1.2.4 this loop took only `.template`, so every
+  // preflight.sh). Until 1.2.4 this loop took only `.template`, so every
   // `npx cohorte install/update` produced a core missing both scripts — and since
   // every caller chains them with `|| true`, the result was silent: no kanban card
-  // moves, no telemetry pings, no error. The shell installers named them explicitly
+  // moves, no error. The shell installers named them explicitly
   // and this port drifted. The rule below needs no list to keep in sync: a `<x>.sh`
   // with an `<x>.sh.template` sibling is rendered per-project by /cohorte-init-pipeline, so
   // only the template ships; every other `.sh` is a shipped executable.
@@ -255,6 +255,12 @@ function copyCore() {
       try { fs.chmodSync(target, 0o755); } catch { /* optional */ }
     }
   }
+  // 2.3.0 removed telemetry. The copy loop above is by-rule, so it simply stops shipping the
+  // sender — but copy-over never deletes, and an existing install would keep an executable
+  // that still POSTs to the collector. Scrub it. The dead `telemetry:` block in the user's
+  // config is not this installer's to parse: /cohorte-update-pipeline deletes it, where an
+  // agent can edit the YAML surgically (SCHEMA.md §Reconcile step 5).
+  fs.rmSync(path.join(pipelineDir, 'scripts', 'telemetry-send.sh'), { force: true });
   // The per-surface implementer template is rendered per SURFACE later, by
   // /cohorte-init-pipeline inside the target repo — but its runtime shape (frontmatter keys,
   // capability branches, the preamble) is fixed here, at install time. Run it through the

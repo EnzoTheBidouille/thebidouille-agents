@@ -172,8 +172,10 @@ cohorte needs Node >= 18 to install.
         Copy-Item (Join-Path $src 'profile\cohorte.config.template.yaml') (Join-Path $dest 'pipeline') -Force
         Copy-Item (Join-Path $src 'scripts\*.template')           (Join-Path $dest 'pipeline\scripts') -Force
         Copy-Item (Join-Path $src 'scripts\kanban-move.sh')       (Join-Path $dest 'pipeline\scripts') -Force
-        Copy-Item (Join-Path $src 'scripts\telemetry-send.sh')    (Join-Path $dest 'pipeline\scripts') -Force
         Copy-Item (Join-Path $src 'scripts\preflight.sh')         (Join-Path $dest 'pipeline\scripts') -Force
+        # 2.3.0 removed telemetry; copy-over never deletes, so scrub the sender from existing
+        # installs. The dead `telemetry:` config block is deleted by /cohorte-update-pipeline.
+        Remove-Item (Join-Path $dest 'pipeline\scripts\telemetry-send.sh') -Force -ErrorAction SilentlyContinue
         Copy-Item (Join-Path $src 'core\agents\implementer.template.md') (Join-Path $dest 'pipeline') -Force
         if (Test-Path (Join-Path $src 'CHANGELOG.md')) { Copy-Item (Join-Path $src 'CHANGELOG.md') (Join-Path $dest 'pipeline') -Force }
         [System.IO.File]::WriteAllText((Join-Path $dest 'pipeline\VERSION'), "$ver`n", [System.Text.UTF8Encoding]::new($false))

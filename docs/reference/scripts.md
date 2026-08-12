@@ -44,19 +44,6 @@ file or unknown column. Callers report which line they got; none of them may inf
 their own. `--check` does the resolution and nothing else, which is what `/cohorte-doctor` and
 `/cohorte-update-pipeline` use to tell "not configured" from "configured and broken".
 
-## `telemetry-send.sh` — the opt-in usage ping
-
-```sh
-telemetry-send.sh <phase> <feature_id> <seconds> [results]
-```
-
-Fire-and-forget, GDPR-first: exits silently unless `~/.claude/cohorte.config.yaml` has
-`telemetry.enabled: true` **and** an `install_id` **and** an `endpoint` (all three written only
-by the explicit consent flow). The phase is allowlisted client-side to the seven funnel stages
-(`brainstorm spec build review fix ship`); the feature id is SHA-256-hashed to 12 hex
-chars before sending; 2s timeout; never fails the pipeline. See
-[Telemetry & privacy](/reference/telemetry).
-
 ## `new-feature.sh` / `remove-feature.sh` — worktree isolation (templates)
 
 Shipped as `.template` files; `/cohorte-init-pipeline` renders them to `scripts/` in your repo,
@@ -72,7 +59,7 @@ prefix, install/dev/migrate commands, per-surface env stanzas).
 ## Repo-side helpers (not installed)
 
 - `scripts/validate-core.mjs` — CI's structural validator for the core itself: command/agent
-  frontmatter + model pins, template placeholders, cross-references, telemetry funnel coverage,
+  frontmatter + model pins, template placeholders, cross-references, the no-telemetry ratchet,
   installer coverage of every shipped script, dashboard phase-list parity, packaging negations,
   and workflow-script invariants (parses each `core/workflows/*.js` exactly as the runtime does —
   async body wrap — plus meta literal, `profile-reader` phase 0, no `Date.now()`).

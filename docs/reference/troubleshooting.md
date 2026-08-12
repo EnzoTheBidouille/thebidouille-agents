@@ -22,9 +22,9 @@ Half-copied or stale core. Re-run the installer (`npx cohorte@latest update --gl
 `update`). `/cohorte-doctor` check 1 flags a `VERSION` newer than its sibling files — the signature of a
 half-done update.
 
-**Kanban cards stopped moving / telemetry went quiet — with no error anywhere.**
+**Kanban cards stopped moving — with no error anywhere.**
 Every caller chains the shipped scripts with `|| true`, so a missing
-`kanban-move.sh`/`telemetry-send.sh`/`preflight.sh` is a *silent* no-op. `/cohorte-doctor` check 1 is
+`kanban-move.sh`/`preflight.sh` is a *silent* no-op. `/cohorte-doctor` check 1 is
 the only thing that sees it; the fix is re-running the installer.
 
 **Cards move for some stages and not others.**

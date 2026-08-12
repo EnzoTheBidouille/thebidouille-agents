@@ -25,6 +25,7 @@ vcs:
   remote: <owner/repo>                        # e.g. acme/webapp
   default_branch: <main>
   feature_branch_prefix: feature/            # branch = <prefix><feature_id>
+  patch_branch_prefix: fix/                  # same, for /cohorte-patch specs (kind: patch)
 
 # ── repo shape ──────────────────────────────────────────────────────────────
 repo:

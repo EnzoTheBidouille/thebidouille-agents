@@ -196,7 +196,7 @@ function stateDir(runtime) {
   return runtime.id === 'claude' ? '.claude' : '.cohorte';
 }
 
-// The user-level config (kanban boards, shared vault, telemetry consent). One file per
+// The user-level config (kanban boards, shared vault). One file per
 // human, not per project or per runtime; the shipped scripts probe the same two paths.
 function configPath(runtime) {
   return runtime.id === 'claude' ? '~/.claude/cohorte.config.yaml' : '~/.cohorte/cohorte.config.yaml';
@@ -213,7 +213,7 @@ function preamble(runtime, paths, projectRoot, { kind = 'command' } = {}) {
   L.push(`> - \`<core>\` = \`${core}\` — the pipeline's shared assets (\`pipeline/scripts/\`, \`pipeline/SCHEMA.md\`, \`templates/\`). Every \`<core>/…\` path below resolves there, and nowhere else.`);
   L.push(`> - \`<state>\` = \`${stateDir(runtime)}/\` in **this repo** — what the pipeline generates for this project (\`gate-config.json\`, \`preflight.ok\`, \`pipeline-metrics.jsonl\`, \`pipeline.json\`). Always project-relative, even when \`<core>\` is global.`);
   L.push(`> - \`<memory>\` = \`${runtime.memory}\` — this runtime's project-instructions file at the repo root, loaded into every session here. Where the doctrine says to reference or extend it, that is the file.`);
-  L.push(`> - \`<config>\` = \`${configPath(runtime)}\` — your user-level config (kanban boards, shared vault, telemetry consent). One per human, never committed.`);
+  L.push(`> - \`<config>\` = \`${configPath(runtime)}\` — your user-level config (kanban boards, shared vault). One per human, never committed.`);
 
   L.push(`> - \`<agents>\` = \`${agentsDir}\` — real subagents. Dispatch: ${runtime.agent.dispatch}.`);
 

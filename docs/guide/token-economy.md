@@ -119,9 +119,6 @@ suits very large or mixed code+docs repos; `none` falls back to grep. Wiring is 
   sub-surfaces (see `SCHEMA.md` §Specialization).
 - **`/cost`** (built-in) reports per-subagent and per-command share of usage — what's
   *expensive* — the ledger to read before tuning a `model` tier.
-- For exact numbers, Claude Code's OpenTelemetry export
-  (`CLAUDE_CODE_ENABLE_TELEMETRY=1` + an OTLP endpoint) carries `claude_code.token.usage` /
-  `claude_code.cost.usage` per session and model.
 
 ## The habit list
 

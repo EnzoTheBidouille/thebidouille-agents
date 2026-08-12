@@ -41,7 +41,13 @@ A card is a list item under a `## <column>` heading:
 
 The `#<feature_id>` tag is the **join key** between the card and `specs/<feature_id>.md` — it's
 how every stage finds *its* card. Free-text sub-bullets under an **Ideas** card are seed context
-`/cohorte-brainstorm` picks up. Once shipped, `/cohorte-ship` appends the PR number — which the dashboard renders
+`/cohorte-brainstorm` picks up.
+
+A `[<kind>]` prefix in the title is a **human convention, not a mechanism** — nothing parses it, and
+you can use whatever set fits your board (`[chore]`, `[premium]`, `[base]`…). Cohorte only writes
+one itself: `/cohorte-patch` titles its cards `[patch] <title>`, and reads the prefix back when it
+offers the **Ideas** column, listing `[patch]` cards first. So a bug you drop in Ideas as
+`- [ ] [patch] 500 on empty cart` is what `/cohorte-patch` picks up with no argument. Once shipped, `/cohorte-ship` appends the PR number — which the dashboard renders
 as a clickable link with live open/merged/closed status.
 
 ## Stage → column
@@ -52,6 +58,7 @@ as a clickable link with live open/merged/closed status.
 | `/cohorte-brainstorm` picks it up | `brainstorm` |
 | `/cohorte-spec` opens (draft) | `spec` |
 | `/cohorte-spec` freezes | `ready` |
+| `/cohorte-patch` triages, then freezes | `spec` → `ready` |
 | `/cohorte-build` | `building` |
 | `/cohorte-review` | `review` |
 | `/cohorte-fix` | `fix` |

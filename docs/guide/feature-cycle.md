@@ -173,6 +173,39 @@ re-verdict. Kanban → **Fix**, then back to **Review**.
   worktree teardown (`scripts/remove-feature.sh <id>`). Kanban → **Shipped**, with the PR number
   written on the card.
 
+## The short way in — `/cohorte-patch` for a bug fix
+
+Steps 1 and 2 exist to *design* something that doesn't exist yet. A bug doesn't need designing: it
+is already specified by reality, and putting it through a persona panel and a 300-line contract
+interview costs more than the fix. So a bug enters one step earlier and one step lighter:
+
+```
+/cohorte-patch → /cohorte-build → /cohorte-review → (/cohorte-fix → /cohorte-review)* → /cohorte-ship
+     ↑ human
+```
+
+`/cohorte-patch` is a **triage, not an interview**: three questions (repro · expected behaviour ·
+what must not change), it locates the cause itself, and it freezes `specs/patch-<slug>.md` —
+`kind: patch`, ~60 lines, from `templates/patch.template.md`. With no argument and a board
+configured, it offers the **Ideas** column, `[patch]`-titled cards first.
+
+Then **nothing downstream is special-cased**, which is the whole design: a patch spec is a spec, so
+build, review, fix and ship consume it unchanged, with the same `/clear` between each. Three lines
+read `kind: patch` at all:
+
+- `/cohorte-build` §1.6 judges the **§4 regression test** and the §1 repro instead of contract
+  completeness — the test is what the diff gets checked against — and §2 authors no contract when §5
+  Contract delta is `none`.
+- The `review` agent adds scope creep as a first-class finding: a tidy improvement the spec didn't
+  ask for still widens the blast radius of a change that is shipping fast.
+- `/cohorte-ship` branches off `vcs.patch_branch_prefix` (`fix/`), defaults the release note to a
+  `patch` bump, and the release agent commits `fix(<scope>)`.
+
+A patch may span **several surfaces** — one bug, one repro, one spec. The single hard escalation:
+a fix that needs **new** contract surface area is a feature wearing a bug's clothes, and
+`/cohorte-patch` sends it to `/cohorte-spec` rather than letting two surfaces invent a shape
+independently. Changing an *existing* contract entry is a legitimate §5 delta.
+
 ## The disk artifacts, at a glance
 
 `<state>` is the project's pipeline dir: `.claude/` on a Claude Code install, `.cohorte/` on
@@ -181,6 +214,7 @@ every other runtime ([Runtimes](/reference/runtimes)).
 | Path | Written by | Read by |
 | --- | --- | --- |
 | `specs/<id>.md` | `/cohorte-spec` (+ `/cohorte-fix` remediation, `/cohorte-review` DoD + freshness stamp) | everyone |
+| `specs/patch-<slug>.md` | `/cohorte-patch` (same later writers) | everyone — it *is* a spec, `kind: patch` |
 | `specs/design/<id>.md` | `/cohorte-spec` | design surfaces, design tools |
 | `<contract.path>/<id>.<ext>` | the lead (`/cohorte-build`, `/cohorte-fix`) | implementers (read-only), reviewers |
 | `specs/reports/<id>.md` | `/cohorte-review` (gitignored buffer) | `/cohorte-fix` after a `/clear` |

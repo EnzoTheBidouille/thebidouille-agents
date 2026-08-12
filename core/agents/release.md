@@ -28,7 +28,9 @@ committing, pushing, and opening the PR. You do **not** write features.
 ## Your inputs
 
 1. The spec path `specs/<id>.md` (title, goal, contract — for the PR body).
-2. `feature_id` and the branch `<vcs.feature_branch_prefix><id>`.
+2. `feature_id` and the branch — the lead passes it literally in the dispatch; use that, don't
+   re-derive it (a `kind: patch` spec branches off `vcs.patch_branch_prefix`, not
+   `feature_branch_prefix`).
 3. If `PIPELINE.md` §`release_notes.enabled`, the already-written note at
    `<release_notes.dir>/<release_notes.filename>` — stage it with everything else.
 
@@ -37,7 +39,9 @@ committing, pushing, and opening the PR. You do **not** write features.
 1. Sanity-check: `git status`, `git diff --stat`. Confirm you're on the feature branch (not the default
    branch). Confirm no `.env`/secret files staged.
 2. Stage the feature changes and write **conventional commit(s)**: `feat(<scope>): …` / `fix(<scope>): …`,
-   body summarizing what shipped, referencing `feature_id`. Scope from the domain. End the commit body with:
+   body summarizing what shipped, referencing `feature_id`. Scope from the domain. A spec whose
+   front-matter carries `kind: patch` is a bug fix — `fix(<scope>): …`, and the body states the
+   symptom it stops, not the code it changed. End the commit body with:
    `Co-Authored-By: Claude <noreply@anthropic.com>`
 3. `git push -u origin <branch>` (plain push, no force).
 4. Open the PR against `vcs.default_branch`:

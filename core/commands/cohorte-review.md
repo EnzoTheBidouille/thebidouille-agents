@@ -118,8 +118,6 @@ re-ordered by severity, counts summed, duplicates collapsed, verdict = the worst
 routes them. Append ONE metrics line for the batch to the **main checkout's**
 `$(dirname "$(git rev-parse --git-common-dir)")/<state>/pipeline-metrics.jsonl` (rules in
 `/cohorte-build` §4; never a bare relative path — from a worktree that strands the lines): `{"ts":"<ISO>","feature":"$ARGUMENTS","phase":"review","seconds":<wall-clock>,"surfaces":{"<key>":"<verdict>:<finding count>",…}}`.
-In the same Bash call, chain the opt-in usage ping (`/cohorte-build` §4, `phase: "review"`, results = the
-merged verdict + total finding count, e.g. `"REVISE:3"`).
 **Stage the full report to `specs/reports/$ARGUMENTS.md`** (overwrite) — a gitignored buffer so a
 `/cohorte-fix` after a `/clear` can still read the findings; the `specs/reports/` subfolder is skipped by the
 non-recursive `specs/*.md` glob, so it's never mistaken for a spec (no phantom card, no bogus stage).

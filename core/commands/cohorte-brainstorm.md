@@ -64,8 +64,3 @@ downstream. Then, in this order:
 2. `<core>/pipeline/scripts/kanban-move.sh auto <feature_id> brainstorm --title "<human title>"` —
    which moves the (now tagged) card, or creates one under `--title` if the human typed a fresh
    idea. Read its output: `moved #…` or `kanban: <reason>`. Never assume either.
-
-**Telemetry:** chain the opt-in usage ping onto that same Bash call — `/cohorte-build` §4's shared form,
-`<phase>` = `brainstorm`, `<seconds>` = `0` (this phase is human thinking time, not pipeline
-wall-clock — the funnel signal is the event, not its duration), `<results>` = `""`. No board ⇒ still
-ping, in its own `|| true` call. Silent no-op without consent; never ask about consent here.

@@ -7,6 +7,59 @@ short, user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` secti
 > They are history and are deliberately not rewritten — every command gained a `cohorte-` prefix
 > in 2.0.0.
 
+## 2.3.0 — 2026-08-12
+
+- **A bug fix had to pretend to be a feature.** The only way into the pipeline was
+  `/cohorte-spec` — a section-by-section interview whose critical part is a frozen §5 contract, with
+  a ~300-line budget. For a `500` on an empty cart that is more work than the fix, so in practice you
+  left the pipeline and patched by hand: no frozen intent, no review, no trace.
+
+  `/cohorte-patch` is the bug-fix entry point. A **triage, not an interview** — repro, expected
+  behaviour, what must not change — it locates the cause itself and freezes
+  `specs/patch-<slug>.md` (`kind: patch`, ~60 lines). The **§4 regression test replaces §5 CONTRACT**
+  as the thing the diff is checked against.
+
+  Then nothing downstream is special-cased: a patch spec *is* a spec, so `/cohorte-build` →
+  `/cohorte-review` → `/cohorte-fix` → `/cohorte-ship` consume it unchanged, one `/clear` between
+  each — four short sessions instead of one thread re-sending its own triage history at input price
+  every turn. Only three places read `kind: patch`: build §1.6/§2 (judge the repro + test, author no
+  contract when §5 is `none`), the `review` agent (scope creep becomes a first-class finding), and
+  ship (branch off `vcs.patch_branch_prefix`, `patch` bump by default, `fix(<scope>)` commit).
+
+  A patch may span **several surfaces** — one bug, one repro, one spec. The single hard escalation:
+  a fix needing **new** contract surface area is a feature wearing a bug's clothes, and it is routed
+  to `/cohorte-spec` rather than letting two surfaces invent a shape independently.
+
+- **Telemetry is gone — all of it.** The opt-in usage pings that shipped through 2.2.0 are removed
+  wholesale: the `telemetry-send.sh` sender, the per-phase pings in the six funnel commands, the
+  consent question in `/cohorte-init-pipeline`, the `telemetry:` block in the config template, the
+  `/cohorte-doctor` consent check, the collector contract in `SCHEMA.md`. Cohorte now sends nothing,
+  anywhere.
+
+  **Upgrading removes what is already on disk.** Copy-over never deletes, so an existing install
+  would otherwise keep an executable that still POSTs to the collector — all three installers
+  (`install.sh`, `install.ps1`, `npx cohorte`) now scrub it, and CI asserts its absence. And
+  `/cohorte-update-pipeline` deletes the leftover `telemetry:` block from
+  `~/.claude/cohorte.config.yaml`: nothing reads it any more, and an `enabled: true` left sitting in
+  a file you may open reads as though data were still leaving the machine.
+
+  The OpenTelemetry tip (Claude Code's own metrics export, a collector you point at yourself) is
+  gone from `SCHEMA.md` §Measuring cost and the token-economy guide too. `/cost` and
+  `pipeline-metrics.jsonl` remain — both entirely local.
+
+  `validate-core.mjs` gained a ratchet: any mention of telemetry or a usage ping under
+  `core/{commands,agents,templates,workflows}` now fails CI, so it cannot creep back in by copying an
+  old command file. The single exemption is `/cohorte-update-pipeline` — the command that *deletes*
+  the leftovers has to name them — and it is itself checked for never naming a ping, a sender or a
+  consent flow.
+
+- **Kanban:** `/cohorte-patch` with no argument offers the **Ideas** column, `[patch]`-titled cards
+  first, and titles its own card `[patch] <title>` (join key `#patch-<slug>`). The `[<kind>]` prefix
+  stays a human convention — nothing parses it.
+
+- **Profile:** new optional `vcs.patch_branch_prefix` (default `fix/`); `/cohorte-update-pipeline`
+  tops it up, and a profile without it falls back to the same default.
+
 ## 2.2.0 — 2026-08-12
 
 - **The pipeline was Claude Code or nothing.** The doctrine — frozen spec, stateless surfaces, a

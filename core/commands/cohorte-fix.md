@@ -72,8 +72,7 @@ When the agents return:
   handoff content — and append ONE metrics line for the batch to the **main checkout's**
   `$(dirname "$(git rev-parse --git-common-dir)")/<state>/pipeline-metrics.jsonl` (never a bare
   relative path: from a feature worktree that writes a stray sink whose lines die at teardown)
-  (rules in `/cohorte-build` §4, `phase: "fix"`), chaining the opt-in usage ping in the same Bash call
-  (results = items fixed over items found across surfaces, e.g. `"5/6"`).
+  (rules in `/cohorte-build` §4, `phase: "fix"`).
 - Tell the human: re-test by hand if the failures were runtime ones, and `/cohorte-review $ARGUMENTS` for the
   re-verdict — the re-review is what *verifies* the ticked items actually hold (a regression simply
   reappears as a new finding in the next round). **Recommend a `/clear`** — all state (spec,

@@ -89,7 +89,9 @@ jobs:
           test ! -e "$scratch/.claude/commands/smoke.md"
           # Every caller chains these with `|| true`, so one the installer forgets
           # is a silent no-op on the user's machine, never an error. Assert them.
-          test -x "$scratch/.claude/pipeline/scripts/telemetry-send.sh"
+          # 2.3.0 removed telemetry: the sender must never ship, and must be scrubbed
+          # from an existing install (copy-over never deletes).
+          test ! -e "$scratch/.claude/pipeline/scripts/telemetry-send.sh"
           test -x "$scratch/.claude/pipeline/scripts/kanban-move.sh"
           test -x "$scratch/.claude/pipeline/scripts/preflight.sh"
           test -f "$scratch/.claude/pipeline/CHANGELOG.md"
@@ -165,7 +167,9 @@ jobs:
           # 1.5.0 retired /smoke — the port must scrub it too.
           test ! -e "$scratch/.claude/agents/smoke.md"
           test ! -e "$scratch/.claude/commands/smoke.md"
-          test -x "$scratch/.claude/pipeline/scripts/telemetry-send.sh"
+          # 2.3.0 removed telemetry: the sender must never ship, and must be scrubbed
+          # from an existing install (copy-over never deletes).
+          test ! -e "$scratch/.claude/pipeline/scripts/telemetry-send.sh"
           test -x "$scratch/.claude/pipeline/scripts/kanban-move.sh"
           test -x "$scratch/.claude/pipeline/scripts/preflight.sh"
           test -f "$scratch/.claude/pipeline/CHANGELOG.md"

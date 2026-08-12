@@ -98,10 +98,11 @@ Four of the §Reconcile steps matter specifically here:
 
 - **Global config seed** (§Reconcile step 5): if `<config>` is absent, seed it
   from the template so the kanban + shared-vault config has a home. Never clobber an existing filled
-  file. Report what was seeded. If the existing file has NO `telemetry:` block with a `consent_date`
-  (pre-telemetry install), top up the block from the template and ask the ONE opt-in consent
-  question defined in `templates/steps/init-pipeline/02-interview-gaps.md` §Telemetry — record the
-  answer either way so it is never re-asked. Consent is strictly opt-in; "No" is the default.
+  file. Report what was seeded. Then **scrub the retired `telemetry:` block** if the existing file
+  still has one (every install seeded before 2.3.0 does) — one targeted Edit deleting the block and
+  its comment header, nothing else touched. That capability was removed in 2.3.0, sender included,
+  so the block is dead config: nothing reads it, and an `enabled: true` left sitting in a file the
+  human may open reads as though data were still leaving the machine. Say you removed it.
 - **Kanban sync** (§Reconcile step 6): resolve this project's board with
   `<core>/pipeline/scripts/kanban-move.sh --check` — it prints either the board path or the exact
   missing link. **Not linked** → offer to link/create a board (confirm the vault + `<folder>/Tasks.md`,

@@ -119,7 +119,7 @@ Each runtime gets its **own** core, because the same template resolves different
 agent's capabilities. The **state** is deliberately shared: it describes the project — one gate
 config, one preflight stamp, one metrics log — so a repo driven from two agents cannot disagree with
 itself about what is gated and what has been verified. The user config is shared too; the shipped
-scripts probe `~/.claude` then `~/.cohorte`, so you keep one kanban board and one telemetry consent.
+scripts probe `~/.claude` then `~/.cohorte`, so you keep one kanban board across all of them.
 
 `<core>/pipeline/runtimes.json` records every runtime installed against that core; `/cohorte-doctor`
 reads it and reports what the current one can and cannot enforce.

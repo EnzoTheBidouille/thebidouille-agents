@@ -2,7 +2,7 @@
 
 Every slash command the core installs, in pipeline order. **Model pins:** mechanical commands pin
 `model: sonnet` in their frontmatter so orchestration turns never bill at the session model;
-interactive commands (`/cohorte-brainstorm`, `/cohorte-spec`, `/cohorte-init-pipeline`) deliberately inherit the session
+interactive commands (`/cohorte-brainstorm`, `/cohorte-spec`, `/cohorte-patch`, `/cohorte-init-pipeline`) deliberately inherit the session
 model — their value is the conversation.
 
 | Command | Model | Role |
@@ -10,6 +10,7 @@ model — their value is the conversation.
 | `/cohorte-init-pipeline` | inherit | Detect stack → interview → generate profile + agents. Once per project. |
 | `/cohorte-brainstorm` | inherit | Persona panel pressure-tests a feature idea. |
 | `/cohorte-spec` | inherit | Freeze the spec + contract; also applies review returns (Mode B). |
+| `/cohorte-patch [bug]` | inherit | Triage a bug → freeze `specs/patch-<slug>.md` (`kind: patch`). Then the normal build/review/ship. |
 | `/cohorte-build <id>` | sonnet | Author the contract, dispatch one implementer per surface, parallel. |
 | `/cohorte-review <id>` | sonnet | Preflight, staged diff, one reviewer per touched surface, merged verdict. |
 | `/cohorte-fix <id>` | sonnet | Apply a report; re-dispatch only the surfaces with findings. |
@@ -27,7 +28,7 @@ model — their value is the conversation.
 One-time per project, interactive, driven by step files (`templates/steps/init-pipeline/01…05`):
 **detect** the stack read-only → **interview only the gaps** (surfaces + model tiers, quiet
 command variants, contract mechanism, UI language, RBAC, design, retrieval provider, isolation,
-gate patterns, personas; optional kanban link and the one-time telemetry consent) → **show the
+gate patterns, personas; optional kanban link) → **show the
 draft** → **write & render** (`PIPELINE.md`, one agent per surface with baked conventions,
 `gate-config.json` incl. the preflight block, `settings.json` permissions + hooks per install
 mode, retrieval wiring with health check, isolation scripts, `specs/_template.md`, the committed
@@ -40,7 +41,7 @@ mode, retrieval wiring with health check, isolation scripts, `specs/_template.md
 Interactive panel from `PIPELINE.md` §Personas; one voice per RBAC role when enabled. Rounds of
 2–4 personas surfacing tensions + a focused question, until scope/roles/data/screens/risks/
 non-goals are clear. Finish stages the return to `specs/reports/<id>-brainstorm.md`, settles the
-`feature_id`, moves the kanban card, pings telemetry (opt-in). Empty idea + a board ⇒ it offers
+`feature_id`, moves the kanban card. Empty idea + a board ⇒ it offers
 the **Ideas** column cards.
 
 ## `/cohorte-spec [paste]`
@@ -51,6 +52,28 @@ section — §5 CONTRACT to zero-further-questions precision — authors the des
 `specs/design/<id>.md` (UI features), freezes with `status: frozen` (postcondition-checked).
 **Mode B (review return):** appends findings to `## Remediation`, updates §5 if the contract
 must change, sets `status: in-review`, routes to `/cohorte-build`.
+
+## `/cohorte-patch [bug description | stack trace | empty]`
+
+The bug-fix entry point — the cheap counterpart to `/cohorte-brainstorm` + `/cohorte-spec`, which
+exist to *design* something that doesn't exist yet. A bug is already specified by reality, so this
+is a triage, not an interview: three questions (repro · expected behaviour · blast radius), you
+locate the cause yourself, and it freezes `specs/patch-<slug>.md` from `templates/patch.template.md`
+with `kind: patch` and a ~60-line budget.
+
+Empty argument + a configured board ⇒ it offers the **Ideas** column cards, `[patch]`-tagged ones
+first. The `feature_id` is `patch-<slug>`, prefix included — it is the kanban join key, the filename
+and the branch.
+
+It stops at the freeze. Everything after is the unchanged pipeline: `/cohorte-build patch-<slug>` →
+`/cohorte-review` → `/cohorte-fix`* → `/cohorte-ship`, one `/clear` between each. That split is the
+point — a patch pays four short sessions instead of one long thread re-sending its own triage
+history at input price on every turn.
+
+**Multi-surface is allowed** (one bug, one repro, one spec). The single hard escalation: a fix
+needing **new** contract surface area is a feature wearing a bug's clothes ⇒ `/cohorte-spec`.
+Changing an *existing* contract entry is a legitimate §5 delta. See
+[SCHEMA §Spec status](/reference/profile) for the three places `kind: patch` changes behaviour.
 
 ## `/cohorte-build <id>`
 
@@ -68,7 +91,7 @@ file exists). §3 dispatches all implementers in one message, byte-stable prompt
 last. §3.5 does the **roll call**: a surface that returned no handoff is dead, not clean — retried once alone
 (byte-identical prompt), then marked `dead`, its tree verified with its own quiet commands rather than
 spoken for. §4 integrates handoffs, appends the batch metrics line (`ok|error|dead`, written even on an
-incomplete batch) + telemetry ping, writes `specs/reports/<id>.build.json` (`dead[]` — the driver's
+incomplete batch), writes `specs/reports/<id>.build.json` (`dead[]` — the driver's
 channel), recommends `/cohorte-review`, and a `/clear`.
 
 ## `/cohorte-review <id>`
@@ -79,7 +102,7 @@ surface in parallel (small re-reviews: lead verifies hunks itself). §3 **rolls 
 that died returns zero findings, which reads exactly like a clean surface, so a silent one is retried
 once and then listed in the verdict's `unreviewed[]`, which **forbids `SHIP`**. Then it merges into one
 report —
-verdict `SHIP`/`REVISE`/`BLOCK`, capped findings — stages it, appends metrics + telemetry; on
+verdict `SHIP`/`REVISE`/`BLOCK`, capped findings — stages it, appends metrics; on
 SHIP ticks the DoD and stamps `reviewed_base`/`reviewed_digest`; on REVISE/BLOCK routes to
 `/cohorte-fix`. §3.5 routes the reviewers' **deferred findings** — real but out of this feature's scope — into
 `specs/refactor-backlog.md` under the owning surface's domain heading, tagged `deferred:<id>`, on
@@ -96,7 +119,7 @@ machine contract with any automated driver; no prose is ever parsed. A red prefl
 `## Remediation`, re-authors the contract itself if a finding demands it (full `/cohorte-build` only
 when the change ripples into clean surfaces). §2 maps open items to surfaces by path and
 re-dispatches **only those**, items verbatim in the dispatch. §3 ticks `- [x]` per handoff,
-collapses fully-fixed rounds to one line, metrics + telemetry, routes to `/cohorte-review`.
+collapses fully-fixed rounds to one line, metrics, routes to `/cohorte-review`.
 
 ## `/cohorte-ship <id>`
 
@@ -105,7 +128,7 @@ refuse, re-review); DoD verification (open boxes need explicit human override); 
 confirmation. Then: spec → `status: shipped` *before* dispatch, the **release note** when
 `release_notes.enabled` (the lead writes it — bump level is project policy — so it lands in the
 release commit, not a follow-up), `release` agent (conventional commits, plain push, PR via `gh` or
-compare URL + drafted body), kanban → Shipped with the PR number, telemetry ping (only on success),
+compare URL + drafted body), kanban → Shipped with the PR number,
 CI watch, and — after the confirmed merge — the worktree teardown proposal.
 
 ## `/cohorte-audit [target]`
@@ -113,7 +136,7 @@ CI watch, and — after the confirmed merge — the worktree teardown proposal.
 §1 runs the mechanical gates (quiet variants) scoped to the target, redirected to
 `specs/reports/audit-gates.txt`. §2 dispatches `review` in **audit mode** (no spec; conventions +
 TDD coverage + design usage as the rulebook). §3 writes the prioritized
-`specs/refactor-backlog.md` grouped by domain. Never pings telemetry (outside the funnel).
+`specs/refactor-backlog.md` grouped by domain.
 
 ## `/cohorte-refactor <domain…>`
 
@@ -145,6 +168,6 @@ Nine check groups, each failure with its exact fix: **1** core & pointer (+ ship
 present & executable, VERSION not newer than siblings), **2** profile ↔ agents (orphans, tool
 lists, **model pins** on agents and commands), **3** hooks & gate (config drift, single
 registration), **4** retrieval health, **5** design paths, **6** isolation (rendered scripts,
-slot table, stale slots / zombie worktrees), **7** telemetry consent hygiene, **8** workflows
+slot table, stale slots / zombie worktrees), **7** the kanban board link, **8** workflows
 (CLI ≥ 2.1.154, the four scripts, `profile-reader`, runtime in-session, preflight wiring — with
 the one-line path summary), **9** specs & metrics hygiene.

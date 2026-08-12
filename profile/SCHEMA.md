@@ -16,6 +16,7 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
 | `vcs.remote`                         | string       | release                           | `owner/repo` for the PR/compare URL.                          |
 | `vcs.default_branch`                 | string       | build, review, release            | Base branch for diffs + PRs.                                  |
 | `vcs.feature_branch_prefix`          | string       | ship, isolation script            | `feature/` → branch `feature/<id>`.                           |
+| `vcs.patch_branch_prefix`            | string       | ship                              | Same, for a `kind: patch` spec: `fix/` → branch `fix/patch-<slug>`. Optional — a profile that predates it falls back to `fix/`. |
 | `repo.layout`                        | enum         | build, audit                      | `monorepo` (many surfaces) or `single`.                       |
 | `repo.workspace_tool`                | enum         | audit                             | `turborepo`/`nx`/`none`.                                      |
 | `retrieval.provider`                 | enum         | init, update-pipeline, implementer | `serena` (default) / `graphify` / `none` — see §Code retrieval. |
@@ -190,11 +191,6 @@ to log it. For what's EXPENSIVE, use Claude Code's own accounting:
   over the last 24 h / 7 d (e.g. _"Top subagents: frontend 7 %, backend 4 % · Top skills: /cohorte-build 1 %,
   /cohorte-review 1 %"_). That IS the per-phase ledger — approximate (share-of-total, machine-local, not exact
   tokens). Read it to see which surface/command actually dominates the bill before you tune a `model` tier.
-- **OpenTelemetry** (exact numbers + dashboards) — add an `env` block to `this runtime's settings file`:
-  `{"env":{"CLAUDE_CODE_ENABLE_TELEMETRY":"1","OTEL_METRICS_EXPORTER":"otlp","OTEL_EXPORTER_OTLP_PROTOCOL":"http/protobuf","OTEL_EXPORTER_OTLP_ENDPOINT":"http://localhost:4318"}}`
-  and point it at a collector. Metrics `claude_code.token.usage` + `claude_code.cost.usage` carry
-  `session.id` + model + type (input/output/cacheRead). Subagent tokens roll into the session total;
-  per-subagent attribution needs traces (`CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`, beta).
 
 **Lead context discipline — the silent bill.** The lead session's conversation history is re-sent as
 input on EVERY turn; a session that spans spec→build→review→fix without clearing re-pays the
@@ -245,6 +241,25 @@ built-in autonomous driver (`/cohorte-loop`) was retired in 2.2.0, and the human
 `frozen` → `in-review` → `shipped`. They stay valid states because specs in existing repos carry
 them, and because anything automating the cycle from outside needs somewhere to record "a round is
 under way" and "a round gave up". Every reader still routes on them; nothing produces them.
+
+**`kind` — feature (default) or `patch`.** Orthogonal to `status`, and the only other front-matter
+field commands route on. `/cohorte-patch` freezes `specs/patch-<slug>.md` with `kind: patch` from
+`templates/patch.template.md`: a ~60-line bug spec whose §4 **regression test** replaces §5 CONTRACT
+as the thing the diff is checked against. It moves through the same states and the same commands —
+`/cohorte-build` → `/cohorte-review` → `/cohorte-fix`* → `/cohorte-ship` — which is the whole design:
+a patch is a spec, so nothing downstream is special-cased beyond three lines.
+
+| what reads `kind: patch` | what it does differently |
+| --- | --- |
+| `/cohorte-build` §1.6 | judges §1 repro + §4 regression test instead of contract completeness; gap check `repro` |
+| `/cohorte-build` §2 | authors no contract when §5 Contract delta is `none` (the usual case) |
+| `/cohorte-ship` §1/§2b/§3 | branches off `vcs.patch_branch_prefix`; a `patch` bump by default; `fix(<scope>)` commit |
+
+A patch may span **several surfaces** — one bug, one repro, one spec. What it may never do is add
+**new** contract surface area: two surfaces agreeing on a shape that doesn't exist yet is what §5 is
+for, so `/cohorte-patch` routes that to `/cohorte-spec` instead. Changing an *existing* contract entry
+is a legitimate delta. The patch template keeps contract on **§5** and acceptance on **§9** — the two
+numbers `review.md` and `implementer.template.md` name verbatim — and simply has no §8.
 
 Corollaries worth knowing:
 
@@ -477,7 +492,13 @@ files automatically. It works because every generated artifact is a **determinis
    rots (PATH changes, uninstalls, hand-edits) — and repair whatever fails.
 5. **Global config seed.** If `<config>` is absent, seed it from the template
    (`profile/cohorte.config.template.yaml`) so the kanban + shared-vault config has a home. Never
-   clobber an existing filled file; report what was seeded.
+   clobber an existing filled file; report what was seeded. Then **scrub the retired `telemetry:`
+   block** if the file still carries one (every install seeded before 2.3.0 does): delete the block
+   and its comment header, leaving the rest byte-identical. It is dead config — the sender is gone
+   and nothing reads it — but a `telemetry.enabled: true` sitting in a file the human may open reads
+   as "this is still sending", which is the one thing it must not imply. This is the single
+   exception to "never rewrite the config": a targeted deletion of a block the core no longer
+   defines, never a re-seed.
 6. **Kanban sync.** Run the §Kanban reconcile: link/create the project's board if configured, verify
    its columns, and backfill/sync cards from `specs/*.md`. See §Kanban.
 7. **Spec-template top-up.** `specs/_template.md` is seeded once at install and then **never**
@@ -621,6 +642,7 @@ Ideas — so `/cohorte-brainstorm` appends the tag to the picked line before its
 | `/cohorte-brainstorm` picks it up               | `brainstorm`    |
 | `/cohorte-spec` opens (draft)                   | `spec`          |
 | `/cohorte-spec` freezes (`status: frozen`)      | `ready`         |
+| `/cohorte-patch` triages / freezes              | `spec` → `ready` (card titled `[patch] <title>`, tag `#patch-<slug>`) |
 | `/cohorte-build`                                | `building`      |
 | `/cohorte-review`                               | `review`        |
 | `/cohorte-fix`                                  | `fix`           |
@@ -642,60 +664,3 @@ added vs. moved vs. already-correct.
 per configured column in pipeline order, and the closing `%% kanban:settings %%` block
 (`{"kanban-plugin":"board","list-collapse":[false,…]}` with one `false` per column).
 
-## Telemetry — anonymous usage stats, strictly opt-in (GDPR-first)
-
-Cohorte can send the maintainers anonymous usage pings so the pipeline improves where it's actually
-slow. **Nothing is ever sent without explicit consent**: `/cohorte-init-pipeline` (and `/cohorte-update-pipeline` on
-pre-telemetry installs) ask ONE question, once per machine, default **No**, and record the answer in
-`<config>` §`telemetry` (`enabled`, `install_id`, `consent_date`). The sender —
-`pipeline/scripts/telemetry-send.sh` — is a silent no-op unless `enabled: true` AND `install_id` AND
-`endpoint` are all set, times out at 2s, and never fails the pipeline. Callers chain it with
-`|| true`, so a **missing** script is equally silent: `/cohorte-doctor` check 1 verifies `pipeline/scripts/`
-is fully populated.
-
-**Which commands ping** — the six that make up the feature funnel, and only those. The point is to
-see where features stall, so every stage of `idea → PR` reports and nothing else does:
-
-| phase | fired when | `seconds` | `results` |
-| --- | --- | --- | --- |
-| `brainstorm` | the return is staged | `0` | — |
-| `spec` | a freeze lands (Mode A only) | `0` | `frozen` |
-| `build` | after the batch metrics line | wall-clock | `ok,ok` / `error` |
-| `review` | after the merged verdict | wall-clock | `<verdict>:<count>` |
-| `fix` | after the batch metrics line | wall-clock | `<fixed>/<found>` |
-| `ship` | the release agent succeeded | `0` | `pr` / `compare` |
-
-> Workflow-variant runs (`review.js`) report `seconds: 0` for their phases — only the
-> conversational commands measure wall-clock. `results` is a free-text summary field, so both
-> forms are valid — but read the `fix` column knowing which path produced it.
-
-`seconds: 0` marks a phase whose duration is human thinking time, not pipeline wall-clock — the
-funnel signal there is the event, not how long it took. `/cohorte-doctor`, `/cohorte-audit`, `/cohorte-refactor`,
-`/cohorte-align-ds`, `/cohorte-init-pipeline` and `/cohorte-update-pipeline` **never** ping: they sit outside the funnel, and
-keeping them out is what holds the collected set to what the consent text describes.
-
-**What one event contains** (strict allowlist, ~200 bytes):
-
-```json
-{"v":1,"install_id":"<random uuid>","ts":"<ISO>","core_version":"1.2.0","os":"Darwin",
- "event":"phase","phase":"build","feature_hash":"<sha256[..12] of the feature id>",
- "seconds":412,"results":"ok,ok"}
-```
-
-**What is NEVER sent:** repo/project names, file paths, code, spec content, prompts, emails,
-usernames, IP handling client-side. The feature id is hashed (12 hex chars) so cross-feature counts
-work without revealing what is being built.
-
-**GDPR rights, concretely:**
-
-- **Consent** — opt-in only, recorded with a date; "No" is also recorded so nothing re-asks.
-- **Withdrawal** — set `telemetry.enabled: false` in `<config>`; effective on
-  the next phase, no restart.
-- **Erasure** — `/cohorte-doctor` prints your `install_id`; send
-  `curl -X DELETE <endpoint-origin>/v1/install/<install_id>` and the collector drops every event
-  for that id (the deployed collector implements this and stores no IPs).
-- **Access/portability** — events are keyed by your `install_id`; ask the operator for an export.
-
-**Collector contract** (any implementation must honor it):
-`POST /v1/events` (one JSON event, allowlisted fields) · `DELETE /v1/install/<id>` (erasure) ·
-`GET /healthz`. Operators must not retain IP-bearing access logs for the ingest vhost.

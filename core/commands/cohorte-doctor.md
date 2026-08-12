@@ -30,10 +30,10 @@ fix only with the human's go-ahead (or hand them the command).
    commands' step files are present — `templates/steps/init-pipeline/` non-empty (a router whose
    `templates/steps/<cmd>/` dir is missing is a partial/stale install ⇒
    re-run install/update). **Shipped scripts present and executable** in `<core>/pipeline/scripts/`:
-   `kanban-move.sh`, `telemetry-send.sh`, `preflight.sh`,
+   `kanban-move.sh`, `preflight.sh`,
    `new-feature.sh.template`, `remove-feature.sh.template` — ❌ any missing one.
    Every caller chains these with `|| true`, so an absent script is a **silent**
-   no-op (no kanban card moves, no telemetry ping, no error anywhere) — this check is the only thing
+   no-op (no kanban card moves, no error anywhere) — this check is the only thing
    that sees it. Also flag ❌ a `VERSION` **newer than** the other `pipeline/` files (compare mtimes):
    a version bumped without a full re-copy is a half-done update ⇒ re-run install/update.
 2. **Profile.** `PIPELINE.md` exists and its `yaml pipeline-profile` block parses. Every
@@ -51,7 +51,7 @@ fix only with the human's go-ahead (or hand them the command).
    (`build`, `review`, `fix`, `ship`, `audit`, `refactor`, `doctor`, `align-ds`,
    `update-pipeline` — in `<commands>/`) carries `model: sonnet` in
    its frontmatter — ⚠️ if missing (the lead's orchestration turn then bills at the session model,
-   e.g. Opus/Fable). `brainstorm`, `spec`, and `init-pipeline` are intentionally unpinned
+   e.g. Opus/Fable). `brainstorm`, `spec`, `patch`, and `init-pipeline` are intentionally unpinned
    (interactive — they inherit the session model).
 <!-- cohorte:endif -->
 
@@ -96,13 +96,7 @@ fix only with the human's go-ahead (or hand them the command).
    When ≥2 slots are live, print the parallel-feature table (feature · worktree · ports · db ·
    branch behind main by N commits) — a worktree far behind main means its next review will diff
    against stale code ⇒ suggest rebasing it.
-7. **Telemetry** (consent hygiene — read `<config>` §`telemetry`). Report the
-   status in one line: `disabled` / `enabled since <consent_date> · install_id <id> · endpoint <url>`
-   (the install_id is the human's GDPR erasure key — see SCHEMA.md §Telemetry). Flag ❌ any
-   incoherent state: `enabled: true` with no `install_id` or no `consent_date` (sending without
-   recorded consent — fix: set `enabled: false` until the consent question is re-run), or a
-   `telemetry:` block missing entirely on a current core (top up via `/cohorte-update-pipeline`).
-7b. **Kanban** (the board mirror — SCHEMA.md §Kanban). Run
+7. **Kanban** (the board mirror — SCHEMA.md §Kanban). Run
    `<core>/pipeline/scripts/kanban-move.sh --check` and report its one line verbatim: the resolved
    board path, or the exact link that is missing. A board mirror is optional, so "not configured" is
    ℹ️, never ❌ — but it must be **stated**, because the whole class of bug here is a card that

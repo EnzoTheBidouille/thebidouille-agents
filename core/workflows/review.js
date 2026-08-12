@@ -323,12 +323,10 @@ const staging = await agent(
   `1. Write EXACTLY this content to specs/reports/${feature}.md (overwrite):\n<<<REPORT\n${reportBody}\nREPORT\n` +
   `2. Append one line to $(dirname "$(git rev-parse --git-common-dir)")/.claude/pipeline-metrics.jsonl: ` +
   `{"ts":"<ISO now>","feature":"${feature}","phase":"review","seconds":0,"surfaces":{${results.map(r => `"${r.key}":"${verdict}:${r.kept.length}"`).join(',')}}}\n` +
-  `3. Chain the opt-in usage ping: <core>/pipeline/scripts/telemetry-send.sh review "${feature}" 0 "${verdict}:${kept.length}" || true ` +
-  '(<core> = .claude if .claude/pipeline/scripts/telemetry-send.sh exists, else ~/.claude; script on neither ⇒ skip the ping).\n' +
   // Deferred findings must land in the backlog on EVERY verdict — parked only on a
   // SHIP is parked nowhere the rest of the time, which is the leak this closes.
   (deferredAll.length
-    ? `3b. Route the deferred findings to specs/refactor-backlog.md (create it if absent): for each line below, ` +
+    ? `3. Route the deferred findings to specs/refactor-backlog.md (create it if absent): for each line below, ` +
       `append it under the \`## <domain>\` heading named in its prefix (create that heading if absent) — with \`>>\`, ` +
       `never by rewriting the file, and skip any whose file path + first words already appear there (grep -F first, ` +
       `they may be left from a prior round or an /cohorte-audit):\n` +
