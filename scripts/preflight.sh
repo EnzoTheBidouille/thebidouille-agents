@@ -58,7 +58,7 @@ sha=$(git rev-parse HEAD 2>/dev/null || echo none)
 # invalidates the stamp without changing a line of code, while an implementer's edit
 # changes every line without moving HEAD. A tree id is content-addressed: it survives a
 # commit of the same content and dies on any real edit (including new untracked files).
-# `.claude` (stamps, metrics) and `specs` (DoD ticks, report buffer) are excluded — the
+# `.claude`/`.cohorte` (stamps, metrics) and `specs` (DoD ticks, report buffer) are excluded — the
 # pipeline writes those itself between the preflight and the dispatch it must not invalidate.
 # gate.py recomputes this identically; any change here must land there too.
 digest=none
@@ -69,29 +69,48 @@ if [ -n "$tmpidx" ]; then
   idx=$(git rev-parse --git-path index 2>/dev/null || echo "")
   if [ -n "$idx" ] && [ -f "$idx" ]; then
     cp "$idx" "$tmpidx" 2>/dev/null || true
+    # Backdate the copy, for the reason spelled out in gate.py's tree_digest(): git trusts an
+    # entry's cached stat data only when its mtime predates the index file's, so a copy stamped
+    # `now` makes a file edited in this same second look clean. Both sides must age it by the
+    # same window or they compute different trees for the same content. `date -d` is GNU and
+    # `date -v` is BSD — try both, and if neither exists just skip the touch (the digest is
+    # still correct for anything not edited in the last few seconds).
+    stamp=$(date -u -d '5 seconds ago' +%Y%m%d%H%M.%S 2>/dev/null \
+         || date -u -v-5S +%Y%m%d%H%M.%S 2>/dev/null || echo "")
+    [ -n "$stamp" ] && touch -t "$stamp" "$tmpidx" 2>/dev/null || true
   else
     rm -f "$tmpidx"                       # a 0-byte index is a corrupt index
   fi
   # Drop the excluded paths from the throwaway index entirely: an `add` exclude only stops
   # them being *updated*, so anything already tracked there (a committed stamp, a spec)
   # would still land in the tree and shift the digest.
-  GIT_INDEX_FILE="$tmpidx" git rm --cached -r -q --ignore-unmatch -- .claude specs > /dev/null 2>&1 || true
-  if GIT_INDEX_FILE="$tmpidx" git add -A -- . ':(exclude).claude' ':(exclude)specs' > /dev/null 2>&1; then
+  GIT_INDEX_FILE="$tmpidx" git rm --cached -r -q --ignore-unmatch -- .claude .cohorte specs > /dev/null 2>&1 || true
+  if GIT_INDEX_FILE="$tmpidx" git add -A -- . ':(exclude).claude' ':(exclude).cohorte' ':(exclude)specs' > /dev/null 2>&1; then
     digest=$(GIT_INDEX_FILE="$tmpidx" git write-tree 2>/dev/null || echo none)
   fi
   rm -f "$tmpidx" "$tmpidx.lock" 2>/dev/null || true
 fi
 [ -n "$digest" ] || digest=none
-# Stamp BOTH the main checkout and the cwd: gate.py reads CLAUDE_PROJECT_DIR,
-# which is the worktree when the session was opened there and the main checkout
-# when it wasn't — the two disagree, and either layout is supported.
+# Stamp BOTH the main checkout and the cwd: gate.py reads COHORTE_PROJECT_DIR /
+# CLAUDE_PROJECT_DIR, which is the worktree when the session was opened there and the
+# main checkout when it wasn't — the two disagree, and either layout is supported.
+# Stamp every state dir that EXISTS (`.cohorte` on a non-Claude runtime, `.claude` on a
+# Claude one, both where a repo is driven from both), falling back to `.claude` when the
+# repo has neither yet — gate.py's state_path() probes in that same order.
 now=$(date +%s)
 last=""
 for d in "$proj" "$(pwd)"; do
   [ "$d" = "$last" ] && continue          # same dir twice in the main checkout
   last="$d"
-  mkdir -p "$d/.claude" 2>/dev/null || true
-  printf '%s %s %s\n' "$now" "$sha" "$digest" > "$d/.claude/preflight.ok" 2>/dev/null || true
+  wrote=0
+  for s in .cohorte .claude; do
+    [ -d "$d/$s" ] || continue
+    printf '%s %s %s\n' "$now" "$sha" "$digest" > "$d/$s/preflight.ok" 2>/dev/null && wrote=1
+  done
+  if [ "$wrote" -eq 0 ]; then
+    mkdir -p "$d/.claude" 2>/dev/null || true
+    printf '%s %s %s\n' "$now" "$sha" "$digest" > "$d/.claude/preflight.ok" 2>/dev/null || true
+  fi
 done
 
 echo "PREFLIGHT PASS ($n checks green) — full log: $report"

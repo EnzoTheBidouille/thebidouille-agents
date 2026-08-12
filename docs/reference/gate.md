@@ -3,16 +3,36 @@
 Autonomous agents running Bash need guardrails that don't depend on the model's good behavior.
 Cohorte layers three mechanisms, all generated from the profile.
 
-## `hooks/gate.py` — the PreToolUse gate
+## `hooks/gate.py` — the blocking pre-command gate
 
-A Python hook registered on the `Bash` (and `Task`) PreToolUse events — in the **global**
-`~/.claude/settings.json` for a global core (registered once; it reads each repo's own config
-and no-ops where absent), or the repo's `.claude/settings.json` for a bundled core. It inspects
-the **full command string**, splitting on `&&`, `||`, `;`, `|` and newlines, so chained forms
-like `cd apps/api && node ace migration:run` are caught — something prefix-based permission
-rules can't do.
+A Python hook registered on the runtime's pre-command event. It inspects the **full command
+string**, splitting on `&&`, `||`, `;`, `|` and newlines, so chained forms like
+`cd apps/api && node ace migration:run` are caught — something prefix-based permission rules
+can't do.
 
-Patterns come from `.claude/gate-config.json`, generated from the profile's `gate` block:
+**Four runtimes host it, and none of them agree on the envelope** — the installer registers it
+in the right file and passes `--runtime <id>` so the script answers in the dialect that runtime
+understands. A verdict in the wrong shape is read as *allow* by every one of them, so each is
+covered by `scripts/test-gate.mjs`:
+
+| Runtime | Config file | Event | Confirmation tier |
+| --- | --- | --- | --- |
+| Claude Code | `settings.json` (global once, or the repo's) | `PreToolUse` | deny + **ask** |
+| Codex CLI | `.codex/hooks.json` | `PreToolUse` | deny only |
+| Cursor | `.cursor/hooks.json` | `beforeShellExecution` | deny + **ask** |
+| Gemini CLI | `.gemini/settings.json` | `BeforeTool` | deny only |
+
+Where there is **no ask tier**, an `ask` verdict is escalated to `deny` with the reason
+attached rather than falling through: the point of that tier is that a human sees the command
+first, and a runtime that cannot ask cannot deliver it.
+
+**OpenCode has no blocking hook** (it extends via plugins). There the rendered commands call
+`gate.py --check "<command>"` themselves — same config, same patterns, same verdicts, exit
+0/1/2 — but **advisory**, because an agent can decline to call it. `/cohorte-doctor` reports it
+as advisory rather than ✅. See [Runtimes](/reference/runtimes).
+
+Patterns come from `gate-config.json` in the project's state dir (`.claude/` on a Claude
+install, `.cohorte/` on the others), generated from the profile's `gate` block:
 
 | Tier | Behavior |
 | --- | --- |
@@ -36,13 +56,16 @@ Design decisions worth knowing:
 
 The `preflight` block of `gate-config.json` (from `gate.preflight` in the profile) makes the
 gate enforce **pipeline ordering**, not just command safety: a `Task` dispatch of a listed
-`subagent_type` (default `review`) requires a fresh `.claude/preflight.ok` stamp —
+`subagent_type` (default `review`) requires a fresh `preflight.ok` stamp —
 written by `pipeline/scripts/preflight.sh` only when typecheck + lint + tests are green.
 Missing stamp, stamp older than `max_age_minutes` (default 30), or the code changed since ⇒ the
 dispatch gets an "ask": a lead can't accidentally review red code, a human can consciously
 override. Profiles without the block simply skip the phase gate (older installs keep working).
 
-## `settings.json` permissions
+## `settings.json` permissions — Claude Code
+
+Only Claude Code has a permission model the pipeline can generate; on the other runtimes the
+gate config above is the whole story, which is why filling it correctly matters more there.
 
 `/cohorte-init-pipeline` writes the repo's `.claude/settings.json`:
 

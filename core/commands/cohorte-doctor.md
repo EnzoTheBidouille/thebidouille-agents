@@ -12,8 +12,17 @@ fix only with the human's go-ahead (or hand them the command).
 
 ## Checks, in order
 
-1. **Core & pointer.** A core exists (`~/.claude/pipeline/VERSION` global, and/or
-   `.claude/pipeline/VERSION` bundled); `.claude/pipeline.json` names a mode + `core_version`
+0. **Runtime.** Say which coding agent you are running as and what it can enforce — every check
+   below is read through it. **You already know which one**: the Runtime preamble at the top of
+   this file names it. Read `<core>/pipeline/runtimes.json` for the details — a map of every
+   runtime installed against this core, since they share one core. Report one line:
+   `runtime: <label> · scope <global|project> · hooks <yes|no> · workflows <yes|no>`,
+   and name the other installed runtimes if there are any (they share `<state>` and `<config>`, so
+   a board or a gate config wired from one is seen by all — that is intended, and worth stating).
+   File absent ⇒ a core installed before the adapter existed ⇒ ⚠️, fix by re-running the installer.
+   A runtime without hooks makes check 3's gate **advisory** — say so there rather than
+   reporting a false ✅.
+1. **Core & pointer.** A core exists (`<core>/pipeline/VERSION`); `<state>/pipeline.json` names a mode + `core_version`
    coherent with the VERSION file. A **global**-mode pointer lagging the VERSION file is ⚠️, not ❌:
    nothing bumped that field before 1.2.5, so the core itself is fine and only the pointer is stale
    ⇒ fix by running `/cohorte-update-pipeline` (§3 syncs it now), or by editing the one field. Compare
@@ -21,40 +30,57 @@ fix only with the human's go-ahead (or hand them the command).
    commands' step files are present — `templates/steps/init-pipeline/` non-empty (a router whose
    `templates/steps/<cmd>/` dir is missing is a partial/stale install ⇒
    re-run install/update). **Shipped scripts present and executable** in `<core>/pipeline/scripts/`:
-   `kanban-move.sh`, `telemetry-send.sh`, `preflight.sh`, `loop.sh`, `loop-detach.sh`,
+   `kanban-move.sh`, `telemetry-send.sh`, `preflight.sh`,
    `new-feature.sh.template`, `remove-feature.sh.template` — ❌ any missing one.
-   `loop-detach.sh` absent is what silently turns `/cohorte-loop` back into a foreground run
-   that dies at the 600 s tool ceiling, so name it explicitly rather than folding it into
-   "some script is missing". Every caller chains these with `|| true`, so an absent script is a **silent**
+   Every caller chains these with `|| true`, so an absent script is a **silent**
    no-op (no kanban card moves, no telemetry ping, no error anywhere) — this check is the only thing
    that sees it. Also flag ❌ a `VERSION` **newer than** the other `pipeline/` files (compare mtimes):
    a version bumped without a full re-copy is a half-done update ⇒ re-run install/update.
 2. **Profile.** `PIPELINE.md` exists and its `yaml pipeline-profile` block parses. Every
-   `surfaces[].agent` has its `.claude/agents/<agent>.md` and every agent file has its `surfaces[]`
+   `surfaces[].agent` has its `<agents>/<agent>.md` and every agent file has its `surfaces[]`
    entry — **no orphans either way** (SCHEMA.md rule). Each rendered agent's frontmatter `tools`
    matches its surface's `tools` (incl. `DesignSync` iff `uses_design`, retrieval MCP tools iff
    `retrieval.provider` ≠ `none`). **Model pins:** each rendered agent's frontmatter `model` matches
    its `surfaces[].model` — ❌ if missing, mismatched, or a literal `<SURFACE_MODEL>` placeholder
    (all three silently fall back to inheriting the lead session's model — often Opus — on every
    dispatch); ⚠️ any `inherit` with the note that it bills at the lead's tier. The generic agents
-   (`review.md`, `release.md`, `profile-reader.md` — repo or `~/.claude/agents/`) must
-   each carry their `model:` line too (sonnet/haiku/haiku). **Command pins:** every mechanical command file
-   (`build`, `review`, `fix`, `loop`, `ship`, `audit`, `refactor`, `doctor`, `align-ds`,
-   `update-pipeline` — in `.claude/commands/` or `~/.claude/commands/`) carries `model: sonnet` in
+   (`review.md`, `release.md`, `profile-reader.md` in `<agents>/`) must
+   each carry their `model:` line too (sonnet/haiku/haiku).
+<!-- cohorte:if runtime:claude -->
+   **Command pins:** every mechanical command file
+   (`build`, `review`, `fix`, `ship`, `audit`, `refactor`, `doctor`, `align-ds`,
+   `update-pipeline` — in `<commands>/`) carries `model: sonnet` in
    its frontmatter — ⚠️ if missing (the lead's orchestration turn then bills at the session model,
    e.g. Opus/Fable). `brainstorm`, `spec`, and `init-pipeline` are intentionally unpinned
    (interactive — they inherit the session model).
-3. **Hooks & gate.** `.claude/gate-config.json` exists and mirrors the profile's `gate` block
-   (regenerate if drifted). The PreToolUse gate hook is registered **once** for the install mode
-   (bundled: repo `settings.json`; global: `~/.claude/settings.json` — flag double registration,
-   it double-prompts) **with a matcher covering both `Bash` and `Task`** — a `Bash`-only matcher
-   leaves the preflight phase gate dead (the 1.3.0–1.3.1 regression). Hook files exist at the
-   registered paths.
+<!-- cohorte:endif -->
+
+3. **Hooks & gate.** `<state>/gate-config.json` exists and mirrors the profile's `gate` block
+   (regenerate if drifted).
+<!-- cohorte:if hooks -->
+   The gate hook is registered **once** in the config file the Runtime preamble names — flag a
+   double registration, it double-prompts — and its `command` points at a `gate.py` that exists.
+   Check the **matcher** actually covers what it must: on Claude Code that means both `Bash` and
+   `Task`, since the preflight phase gate keys off `Task` dispatches and a `Bash`-only matcher
+   leaves it silently dead (the 1.3.0–1.3.1 regression). Prove the wiring end to end rather than
+   trusting the file: `python3 <core>/hooks/gate.py --check "<a pattern from the ask list>"` must
+   return a non-`allow` verdict. If the Runtime preamble said this runtime has **no confirmation
+   tier**, state it here too: every `ask` pattern behaves as a `deny`, which is safe but stricter
+   than the profile reads, and a human who expects a prompt will read the refusal as a bug.
+<!-- cohorte:endif -->
+<!-- cohorte:if !hooks -->
+   This runtime has **no blocking hook**, so the gate is **advisory**: it only fires when the agent
+   calls it. Say that in one line rather than reporting ✅ — the enforcement property genuinely is
+   weaker here, and a human who thinks otherwise will approve less carefully. Verify what CAN be
+   verified: `<core>/hooks/gate.py` exists and `python3 <core>/hooks/gate.py --check "git push"`
+   returns a verdict line (a non-`allow` on a gated pattern proves config + script are wired). ❌ if
+   the script is missing or errors; ℹ️ "advisory (this runtime has no hooks)" otherwise.
+<!-- cohorte:endif -->
    Then the **preflight stamp is local, never versioned**: `git ls-files --error-unmatch
-   .claude/preflight.ok` must miss, and `.gitignore` must cover it. A tracked stamp is a ❌ (not a
+   <state>/preflight.ok` must miss, and `.gitignore` must cover it. A tracked stamp is a ❌ (not a
    ⚠️) — it records the tree it verified, the commit that carries it moves HEAD past that tree, and
    the committed copy lands in every clone and new worktree; the gate then blocks clean trees and
-   greens unchecked ones. fix: `git rm --cached .claude/preflight.ok` + add it to `.gitignore`.
+   greens unchecked ones. fix: `git rm --cached <state>/preflight.ok` + add it to `.gitignore`.
 4. **Retrieval** (if `retrieval.provider` ≠ `none`). Run the SCHEMA.md §Code retrieval health
    check: CLI resolvable from PATH, `.mcp.json` entry present in PATH-proof launcher form,
    `.serena/` gitignored, server actually connects.
@@ -70,7 +96,7 @@ fix only with the human's go-ahead (or hand them the command).
    When ≥2 slots are live, print the parallel-feature table (feature · worktree · ports · db ·
    branch behind main by N commits) — a worktree far behind main means its next review will diff
    against stale code ⇒ suggest rebasing it.
-7. **Telemetry** (consent hygiene — read `~/.claude/cohorte.config.yaml` §`telemetry`). Report the
+7. **Telemetry** (consent hygiene — read `<config>` §`telemetry`). Report the
    status in one line: `disabled` / `enabled since <consent_date> · install_id <id> · endpoint <url>`
    (the install_id is the human's GDPR erasure key — see SCHEMA.md §Telemetry). Flag ❌ any
    incoherent state: `enabled: true` with no `install_id` or no `consent_date` (sending without
@@ -85,6 +111,7 @@ fix only with the human's go-ahead (or hand them the command).
    other key whose board file exists (a **rename** orphaned the link — re-key it via
    `/cohorte-update-pipeline`), and an entry whose board file no longer exists at
    `vault_path`-relative `board` (moved or renamed in the vault).
+<!-- cohorte:if workflows -->
 8. **Workflows** (the opt-in execution path — SCHEMA.md §Workflows; the conversational commands
    stay the default, so failures here are ⚠️ at most, never ❌). Report which path this machine will
    take and why:
@@ -92,8 +119,7 @@ fix only with the human's go-ahead (or hand them the command).
      on PATH ⇒ conversational only.
    - **Scripts present:** `<core>/workflows/review.js` + `audit.js` + `refactor.js` —
      missing on a current core ⇒ half-done install, re-run install/update.
-   - **Phase-0 agent present:** `<agents dir>/profile-reader.md` (repo `.claude/agents/` bundled or
-     `~/.claude/agents/` global) — the workflows abort without it.
+   - **Phase-0 agent present:** `<agents>/profile-reader.md` — the workflows abort without it.
    - **Workflows enabled in this session** — the `Workflow` tool is in your own toolset right now;
      absent ⇒ disabled for this session (a setting or an old client), conversational path.
    - **Preflight wiring** (used by both paths): `pipeline/scripts/preflight.sh` executable and
@@ -101,15 +127,20 @@ fix only with the human's go-ahead (or hand them the command).
    End the check with ONE summary line, e.g.
    `workflows: available (opt-in — ask to "run the review workflow")` or
    `workflows: unavailable (<first failing prerequisite>) — conversational commands (the default)`.
+<!-- cohorte:else -->
+8. **Preflight wiring.** `<core>/pipeline/scripts/preflight.sh` is executable and
+   `gate-config.json` carries the `preflight` block — mismatch ⇒ regenerate from the profile.
+   (The workflow execution path does not exist on this runtime; the conversational commands are
+   the only path, which is also the default everywhere else. Not a defect — state it and move on.)
+<!-- cohorte:endif -->
 9. **Specs & metrics.** Every `specs/*.md` front-matter `status` is a valid stage — one of
-   `draft · frozen · in-progress · in-review · shipped · blocked` (SCHEMA.md §Spec status; the last two
-   are written by the `/cohorte-loop` driver, so flagging them would report the pipeline's own state as a
-   defect) — excluding
+   `draft · frozen · in-progress · in-review · shipped · blocked` (SCHEMA.md §Spec status) — excluding
    `_`-prefixed files (the spec template and `specs/_decisions.md`, the decision journal) and
    `specs/refactor-backlog.md`, which `/cohorte-audit` writes as a backlog, not a
-   spec, and which has no front-matter to check. A spec left `in-progress`/`blocked` with
-   `loop_pass` > 0 is a loop that never finished ⇒ say so and name `/cohorte-loop <id> --resume`. `shipped` specs
-   with a live worktree flagged (see 6). `.claude/pipeline-metrics.jsonl` and `specs/reports/` (the
+   spec, and which has no front-matter to check. A spec left `in-progress` or `blocked` is a round
+   that never finished ⇒ say so and route it: open `## Remediation` items ⇒ `/cohorte-fix`, none ⇒
+   `/cohorte-build`. `shipped` specs
+   with a live worktree flagged (see 6). `<state>/pipeline-metrics.jsonl` and `specs/reports/` (the
    `/cohorte-review` report buffer that lets a `/cohorte-fix` survive a `/clear`) are gitignored. Metrics
    belong to the **main checkout** — a `pipeline-metrics.jsonl` inside a live feature worktree is a
    stale-core sign (its lines die at teardown) ⇒ suggest appending its lines to the main checkout's

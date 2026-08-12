@@ -1,7 +1,7 @@
 # The profile — `PIPELINE.md`
 
 Generated once by `/cohorte-init-pipeline` at the repo root, kept current by `/cohorte-update-pipeline`. The
-**single place** the pipeline reads for everything stack-specific — the core under `.claude/` is
+**single place** the pipeline reads for everything stack-specific — the installed core is
 generic and references this file by section. **Machine block first, prose after**: the fenced
 `yaml pipeline-profile` block is the deterministic contract commands parse and branch on; the
 prose sections carry conventions agents read (baked into their rendered files).
@@ -47,7 +47,7 @@ surfaces:
   - key: backend
     path: apps/api               # the ONLY tree this surface's agent may touch
     label: backend (AdonisJS)
-    agent: backend               # rendered file: .claude/agents/backend.md
+    agent: backend               # rendered as backend.md in the runtime's agents dir
     tools: [Read, Write, Edit, Bash, Grep, Glob, mcp__serena]
     model: sonnet                # sonnet (default) | haiku (mechanical) | inherit (rare)
     test_cmd: pnpm --filter api test

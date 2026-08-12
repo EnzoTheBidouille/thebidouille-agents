@@ -40,6 +40,33 @@ Two extra duties beyond Bash patterns:
 
 Protocol: reads the PreToolUse payload on stdin; emits a JSON permissionDecision
 of "deny" or "ask" on a match; otherwise exits 0 silently.
+
+Four runtimes can run this as a real blocking hook, and they disagree on the envelope —
+`--runtime <id>` (passed by the installer when it registers the hook) selects the dialect:
+
+    claude    PreToolUse           {"hookSpecificOutput": {"permissionDecision": "deny"|"ask", …}}
+    codex     PreToolUse           same envelope, but `ask` is parsed and NOT honoured
+    cursor    beforeShellExecution {"permission": "deny"|"ask", "user_message", "agent_message"}
+    gemini    BeforeTool           {"decision": "deny", "reason": …}         (no ask tier)
+
+Where a runtime has no `ask`, an `ask` verdict is escalated to `deny` with the reason
+attached rather than downgraded to allow: the whole point of the tier is that a human sees
+the command before it runs, and a runtime that cannot ask cannot deliver that — so the safe
+translation is to refuse and let the human re-run it deliberately. Same rule the
+bypassPermissions escalation has always used.
+
+Explicit mode (`--check`) — for OpenCode, whose extension point is plugins rather than a
+blocking hook. Same config, same patterns, same verdicts; the difference is who calls it.
+There the rendered commands instruct the agent to run the check itself before a gated
+command or a phase dispatch:
+
+    gate.py --check "git push --force"      # a Bash command
+    gate.py --check-dispatch review         # the preflight phase gate
+
+It prints ONE line (`gate: allow` / `gate: ask — <reason>` / `gate: deny — <reason>`)
+and exits 0 / 1 / 2 so a shell can branch on it. This is advisory by construction — an
+agent can decline to call it, which a hook makes impossible — so /cohorte-doctor reports
+the gate as "advisory" on those runtimes rather than pretending parity.
 """
 
 import json
@@ -54,13 +81,37 @@ import time
 SPLIT = re.compile(r"&&|\|\||[;|\n]")
 WS = re.compile(r"\s+")
 
+# How far to backdate the throwaway index in tree_digest(), in seconds. Anything modified
+# within this window of the digest is re-hashed by content instead of trusted from its cached
+# stat data. Must stay ≥ the filesystem's mtime granularity (1 s on ext4/HFS+); 5 s covers a
+# clock that ticks backwards a little without costing anything on a quiet tree.
+RACY_WINDOW_S = 5
+
 
 def project_root() -> str:
-    return os.environ.get("CLAUDE_PROJECT_DIR", ".")
+    return os.environ.get("COHORTE_PROJECT_DIR") or os.environ.get("CLAUDE_PROJECT_DIR", ".")
+
+
+# The generated per-project files (gate config + preflight stamp) live under `.claude/`
+# on a Claude install and `.cohorte/` on every other runtime. Probe both, newest layout
+# first, so one gate serves a repo whichever agent is driving it — and so a repo that
+# adds a second runtime doesn't end up with two configs, one of them silently unread.
+STATE_DIRS = (".cohorte", ".claude")
+
+
+def state_path(name: str) -> str:
+    """Path to a per-project pipeline file: the first layout that has it, else `.claude`
+    (the historical default, so a fresh write lands where existing tooling looks)."""
+    root = project_root()
+    for d in STATE_DIRS:
+        p = os.path.join(root, d, name)
+        if os.path.exists(p):
+            return p
+    return os.path.join(root, ".claude", name)
 
 
 def load_config() -> dict:
-    path = os.path.join(project_root(), ".claude", "gate-config.json")
+    path = state_path("gate-config.json")
     empty = {"deny": [], "ask": [], "ask_on_default_branch": [], "default_branch": "main",
              "preflight": {}}
     try:
@@ -187,7 +238,7 @@ def worktree_dirs(cwd: str):
 
 def tree_digest(cwd: str):
     """The digest pipeline/scripts/preflight.sh stamps for the checkout at `cwd`: the git
-    tree id of the working tree, computed in a throwaway index (`.claude` and `specs`
+    tree id of the working tree, computed in a throwaway index (`.claude`, `.cohorte` and `specs`
     excluded — the pipeline writes those itself). Content-addressed, so a commit of the
     same code keeps the stamp valid and any real edit invalidates it. Must stay identical
     to the shell side. Returns None when git can't answer, and the caller falls back."""
@@ -206,17 +257,29 @@ def tree_digest(cwd: str):
         # what changed instead of the whole tree on every dispatch.
         if os.path.exists(real_index):
             shutil.copyfile(real_index, tmp)
+            # Age the copy by a few seconds. Git trusts an entry's cached stat data only when
+            # the entry's mtime is OLDER than the index file's; entries at or after it are
+            # "racily clean" and get re-hashed by content. copyfile stamps the temp index with
+            # `now`, so a file edited in the same second as the preflight — with an unchanged
+            # size — looked clean here and the gate greened code that had changed. Backdating
+            # forces a content check for anything touched inside that window, and leaves the
+            # stat-cache fast path (the whole point of seeding from the real index) intact for
+            # every older file.
+            old = time.time() - RACY_WINDOW_S
+            os.utime(tmp, (old, old))
         else:
             os.unlink(tmp)  # a 0-byte index is a corrupt index — let git create it
         env = dict(os.environ, GIT_INDEX_FILE=tmp)
         # Drop the excluded paths outright — an `add` exclude only stops them being
         # *updated*, so already-tracked ones would still shift the tree id.
         subprocess.run(
-            ["git", "rm", "--cached", "-r", "-q", "--ignore-unmatch", "--", ".claude", "specs"],
+            ["git", "rm", "--cached", "-r", "-q", "--ignore-unmatch", "--",
+             ".claude", ".cohorte", "specs"],
             cwd=cwd, capture_output=True, timeout=10, env=env,
         )
         add = subprocess.run(
-            ["git", "add", "-A", "--", ".", ":(exclude).claude", ":(exclude)specs"],
+            ["git", "add", "-A", "--", ".",
+             ":(exclude).claude", ":(exclude).cohorte", ":(exclude)specs"],
             cwd=cwd, capture_output=True, timeout=30, env=env,
         )
         if add.returncode != 0:
@@ -250,11 +313,17 @@ def check_preflight(payload: dict, cfg: dict) -> int:
     if not pf.get("enabled"):
         return 0
     agents = pf.get("agents") or ["review"]
+    # Runtimes name a subagent dispatch differently. Claude Code and Cursor send a `Task` tool
+    # carrying `subagent_type`; Gemini exposes each subagent as a tool of the SAME NAME, so the
+    # dispatch arrives as `tool_name: review`. Accept both rather than gating only the shape
+    # one vendor happens to use — a phase gate that silently never fires is the 1.3.0 bug.
     subagent = (payload.get("tool_input") or {}).get("subagent_type", "") or ""
+    if not subagent and payload.get("tool_name") in agents:
+        subagent = payload.get("tool_name")
     if subagent not in agents:
         return 0
 
-    stamp = os.path.join(project_root(), ".claude", "preflight.ok")
+    stamp = state_path("preflight.ok")
     why = None
     try:
         with open(stamp, "r", encoding="utf-8") as fh:
@@ -300,20 +369,65 @@ def check_preflight(payload: dict, cfg: dict) -> int:
     )
 
 
-def main() -> int:
-    try:
-        payload = json.load(sys.stdin)
-    except Exception:
-        return 0  # malformed input → don't block
+def check_cli(argv) -> int:
+    """Explicit gate for runtimes with no PreToolUse hook.
 
-    tool = payload.get("tool_name")
+    Builds the same payload the hook would have received and runs the same evaluation,
+    then translates the verdict into a line + exit code a shell (or an agent reading the
+    output) can act on. Exit 0 = allow, 1 = ask, 2 = deny — chosen so `&&` naturally
+    stops on anything that isn't a clean allow."""
+    mode = argv[0]
+    unattended = False
+    cwd = os.getcwd()
+    words = []
+    i = 1
+    while i < len(argv):
+        a = argv[i]
+        if a == "--unattended":
+            unattended = True
+        elif a == "--cwd" and i + 1 < len(argv):
+            cwd = argv[i + 1]
+            i += 1
+        elif a.startswith("--cwd="):
+            cwd = a[6:]
+        else:
+            words.append(a)
+        i += 1
+    subject = " ".join(words).strip()
+    if not subject:
+        print(f"gate: usage — gate.py {mode} <{'command' if mode == '--check' else 'agent'}>",
+              file=sys.stderr)
+        return 2
+
+    payload = {"cwd": cwd, "permission_mode": "bypassPermissions" if unattended else "default"}
+    if mode == "--check":
+        payload["tool_name"] = "Bash"
+        payload["tool_input"] = {"command": subject}
+    else:
+        payload["tool_name"] = "Task"
+        payload["tool_input"] = {"subagent_type": subject}
+
+    # Reuse the hook path verbatim — one evaluator, so the two modes can never drift into
+    # different verdicts on the same config. `decide()` records instead of printing while
+    # DECISIONS is armed, so the hook's JSON never leaks into the human-readable output.
+    global DECISIONS
+    DECISIONS = []
     cfg = load_config()
+    if payload["tool_name"] == "Task":
+        check_preflight(payload, cfg)
+    else:
+        check_bash(payload, cfg)
 
-    if tool == "Task":
-        return check_preflight(payload, cfg)
-    if tool != "Bash":
+    if not DECISIONS:
+        print("gate: allow")
         return 0
+    decision, reason = DECISIONS[0]
+    print(f"gate: {decision} — {reason}")
+    return 2 if decision == "deny" else 1
 
+
+def check_bash(payload: dict, cfg: dict) -> int:
+    """Pattern gate on a Bash command. Split out of main() so --check reuses it."""
     command = (payload.get("tool_input") or {}).get("command", "") or ""
     deny, ask, branch_gated = cfg["deny"], cfg["ask"], cfg["ask_on_default_branch"]
     default = cfg["default_branch"]
@@ -368,7 +482,80 @@ def main() -> int:
     return 0
 
 
+def main() -> int:
+    argv = sys.argv[1:]
+    if argv and argv[0] in ("--check", "--check-dispatch"):
+        return check_cli(argv)
+
+    global RUNTIME
+    for i, a in enumerate(argv):
+        if a == "--runtime" and i + 1 < len(argv):
+            RUNTIME = argv[i + 1]
+        elif a.startswith("--runtime="):
+            RUNTIME = a[10:]
+
+    try:
+        payload = json.load(sys.stdin)
+    except Exception:
+        return 0  # malformed input → don't block
+
+    tool = payload.get("tool_name")
+    # Cursor's shell hook carries the command at the top level rather than in tool_input, and
+    # names no tool. Normalise once here so every check below stays runtime-agnostic.
+    if RUNTIME == "cursor" and not tool:
+        tool = "Bash"
+        payload = dict(payload, tool_name="Bash",
+                       tool_input=payload.get("tool_input") or {"command": payload.get("command", "")})
+    cfg = load_config()
+
+    # A dispatch, in whichever shape this runtime sends it (see check_preflight).
+    if tool == "Task" or tool in ((cfg.get("preflight") or {}).get("agents") or ["review"]):
+        return check_preflight(payload, cfg)
+    # Bash is Claude's/Codex's name for the shell tool; Gemini calls it run_shell_command, and
+    # Cursor's beforeShellExecution was normalised to "Bash" above. Anything else is not a
+    # command we gate.
+    if tool not in ("Bash", "shell", "run_shell_command"):
+        return 0
+    return check_bash(payload, cfg)
+
+
+# Armed by --check: while it is a list, decide() records the verdict instead of emitting
+# a hook envelope, which only a hook host understands.
+DECISIONS = None
+
+# Which runtime is hosting this hook — set from `--runtime <id>`. Defaults to Claude Code:
+# it is the only host that ran this file before the flag existed, so an old registration
+# that predates the adapter keeps behaving exactly as it did.
+RUNTIME = "claude"
+
+# Runtimes whose hook contract has no "ask" tier. Codex parses `permissionDecision: ask` and
+# ignores it — which would let a gated command through — and Gemini's BeforeTool only
+# allows or denies. Escalate rather than downgrade: see the module docstring.
+NO_ASK = {"codex", "gemini"}
+
+
 def decide(decision: str, reason: str) -> int:
+    if DECISIONS is not None:
+        DECISIONS.append((decision, reason))
+        return 0
+
+    if decision == "ask" and RUNTIME in NO_ASK:
+        decision = "deny"
+        reason += (f" (denied outright: {RUNTIME} has no confirmation tier, so an \"ask\" here "
+                   f"would silently run. Re-run it yourself if you meant to.)")
+
+    if RUNTIME == "cursor":
+        # Cursor's own envelope. `agent_message` is what the model is told, `user_message`
+        # what the human sees — the reason serves both.
+        print(json.dumps({"permission": decision, "user_message": reason, "agent_message": reason}))
+        return 2 if decision == "deny" else 0
+
+    if RUNTIME == "gemini":
+        # BeforeTool speaks {"decision", "reason"}; anything else is read as allow.
+        print(json.dumps({"decision": decision, "reason": reason}))
+        return 0
+
+    # Claude Code and Codex share the PreToolUse envelope.
     print(
         json.dumps(
             {

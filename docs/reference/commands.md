@@ -13,7 +13,6 @@ model — their value is the conversation.
 | `/cohorte-build <id>` | sonnet | Author the contract, dispatch one implementer per surface, parallel. |
 | `/cohorte-review <id>` | sonnet | Preflight, staged diff, one reviewer per touched surface, merged verdict. |
 | `/cohorte-fix <id>` | sonnet | Apply a report; re-dispatch only the surfaces with findings. |
-| `/cohorte-loop <id>` | sonnet | Autonomous `/cohorte-build → /cohorte-review → /cohorte-fix → /cohorte-review …` in child sessions, until no blocking finding; `--resume` picks a killed run back up. |
 | `/cohorte-ship <id>` | sonnet | Freshness + DoD gates, human confirm, release agent, CI watch, teardown. |
 | `/cohorte-audit [target]` | sonnet | Mechanical gates + convention/TDD audit → prioritized backlog. |
 | `/cohorte-refactor <domain…>` | sonnet | Apply the backlog per domain via the surface implementers, TDD-first. |
@@ -88,7 +87,7 @@ SHIP ticks the DoD and stamps `reviewed_base`/`reviewed_digest`; on REVISE/BLOCK
 a SHIP take the same route.
 §3 also writes **`specs/reports/<id>.verdict.json`** on every run — counts by severity, per-surface
 breakdown, normalized `blocking_items` and a stable `fingerprint` over them. That file is the only
-machine contract with `/cohorte-loop`; no prose is ever parsed. A red preflight writes the degraded
+machine contract with any automated driver; no prose is ever parsed. A red preflight writes the degraded
 `{"aborted":"preflight"}` form instead of nothing, so an abort reads as a diagnosis.
 
 ## `/cohorte-fix <id> [paste]`
@@ -98,47 +97,6 @@ machine contract with `/cohorte-loop`; no prose is ever parsed. A red preflight 
 when the change ripples into clean surfaces). §2 maps open items to surfaces by path and
 re-dispatches **only those**, items verbatim in the dispatch. §3 ticks `- [x]` per handoff,
 collapses fully-fixed rounds to one line, metrics + telemetry, routes to `/cohorte-review`.
-
-## `/cohorte-loop <id> [--max=N] [--no-build] [--rebuild] [--resume]`
-
-Runs the cycle for you: `/cohorte-build` (skipped when the `specs/reports/<id>.built` stamp is there —
-`--no-build` never builds, `--rebuild` always does), then `/cohorte-review` ⇄ `/cohorte-fix` until one of five
-stops. **The loop does not run in your session** — each phase is a separate `claude -p` child with
-its own context, driven by [`loop.sh`](/reference/scripts); all their output lands in
-`specs/reports/<id>.loop.log`, which the command is **forbidden** to read back. You get one line
-per phase and a three-line summary. Child flags come from `CLAUDE_FLAGS` (default
-`--permission-mode bypassPermissions` — an unattended child cannot answer a permission prompt, and
-the [gate hook](gate.md) hard-denies the dangerous commands in that mode instead of asking).
-`disable-model-invocation: true` — it only starts when you ask.
-
-**It also does not run in your session's *process tree*.** The driver is launched detached via
-[`loop-detach.sh`](/reference/scripts) into its own `screen` session, then polled in ~9-minute
-waits. Both halves of that are load-bearing: a single Bash call is capped at 600 s (a build is
-25–40 min), and a merely *backgrounded* call is not detached — it dies with the Claude Code
-process, taking `loop.sh` and every `claude -p` child with it mid-write. `loop.sh` additionally
-holds a `caffeinate` assertion so idle sleep cannot abort its requests. Lid-close sleep is the one
-thing nothing can prevent, so keep the lid open for an unattended run.
-
-| exit | stop condition |
-| --- | --- |
-| `0` | clean — a review returned `blocking == 0` |
-| `1` | ceiling — `--max` passes used, still blocking (the fix was progressing ⇒ raise `--max`) |
-| `2` | no usable verdict — `/cohorte-review` produced none, aborted on a red preflight, or a subagent died (`dead[]` in `build.json` / `unreviewed[]` in the verdict), checked **before** `blocking` |
-| `3` | non-convergent — the same blocking fingerprint twice; a higher `--max` will not help |
-| `4` | not implementable — `/cohorte-build`'s readiness gate returned `NOT-READY`; no agent ran, go to `/cohorte-spec` |
-| `64` | usage — bad flag, missing spec, no `claude` on PATH |
-
-`blocking` counts CRITICAL + security findings only, so a LOW nit never costs a pass; the verdict's
-`deferred` count is reported on a fourth line when non-zero. Every fix
-pass is committed (`loop(<id>): fix pass <i>`) — the way back after N autonomous passes — and **no
-fix runs on the last pass**: fixing without a review behind it leaves unaudited code.
-
-**Resume.** Before each phase the driver stamps `status: in-progress` + `loop_pass` + `loop_phase` into
-the spec's front-matter (plain `awk`, no tokens); on exit it stamps `in-review` when clean and `blocked`
-otherwise. `--resume` reads `loop_pass` back and continues from that pass — `--max` stays a ceiling on
-the *total*, so `--max=8 --resume` at pass 5 buys three more. The build is still decided by the build
-stamp alone, so a run killed mid-build rebuilds. The spec is the state: the dashboard's specs board
-shows the pass and phase on the card, and `/cohorte-doctor` names any spec left mid-loop.
 
 ## `/cohorte-ship <id>`
 

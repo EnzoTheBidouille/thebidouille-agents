@@ -1,5 +1,8 @@
 # Workflows — deterministic multi-agent runs
 
+**Claude Code only** — the other runtimes have no workflow engine, so these scripts are not
+installed there and the conversational commands (the default everywhere) are the only path.
+
 Since 1.3.0, the heavyweight phases also ship as **workflow scripts** for the Claude Code
 Workflow runtime: the same fan-out the commands orchestrate, but driven by a deterministic
 JavaScript script instead of the lead reasoning it out turn by turn. Loops, caps, "shared first",

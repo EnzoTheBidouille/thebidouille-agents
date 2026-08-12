@@ -26,6 +26,13 @@ jobs:
       - name: Workflow behaviour tests
         run: node scripts/test-workflows.mjs
 
+      # The adapter turns one set of source prompts into five runtimes' worth of
+      # commands. Its failures are silent by nature — a dropped conditional or a
+      # leaked marker still installs cleanly and only misleads the model at run
+      # time — so this asserts what actually lands on disk per runtime.
+      - name: Runtime adapter tests
+        run: node scripts/test-adapter.mjs
+
       - name: Syntax-check CLI + dashboard server
         run: |
           node --check bin/cli.js
@@ -64,14 +71,6 @@ jobs:
       - name: Metrics collector tests
         run: node scripts/test-metrics.mjs
 
-      # loop.sh drives autonomous multi-pass runs with no human watching, so its
-      # failure modes are expensive and quiet: a mis-read exit code turns "the spec
-      # can't be built" into "the fix is progressing", and the front-matter stamps
-      # (what makes an interrupted loop resumable) are awk over a file every other
-      # command reads — a sed -i there would pass on GNU and corrupt specs on macOS.
-      - name: Loop driver tests
-        run: node scripts/test-loop.mjs
-
       - name: Shell-check installers (syntax)
         run: bash -n install.sh && sh -n install.sh
 
@@ -93,10 +92,6 @@ jobs:
           test -x "$scratch/.claude/pipeline/scripts/telemetry-send.sh"
           test -x "$scratch/.claude/pipeline/scripts/kanban-move.sh"
           test -x "$scratch/.claude/pipeline/scripts/preflight.sh"
-          test -x "$scratch/.claude/pipeline/scripts/loop.sh"
-          # Without loop-detach.sh, /cohorte-loop silently reverts to a foreground run that dies
-          # at the 600 s tool ceiling — a missing script here is not a loud failure.
-          test -x "$scratch/.claude/pipeline/scripts/loop-detach.sh"
           test -f "$scratch/.claude/pipeline/CHANGELOG.md"
           # Workflow variants + their phase-0 agent must ship together.
           test -f "$scratch/.claude/workflows/review.js"
@@ -114,6 +109,11 @@ jobs:
           mkdir -p "$scratch/.claude/commands" "$scratch/.claude/workflows" "$scratch/.claude/agents"
           : >"$scratch/.claude/commands/cycle.md"
           : >"$scratch/.claude/commands/loop.md"
+          # 2.2.0 retired /cohorte-loop. Same reasoning: only a planted copy proves the scrub.
+          : >"$scratch/.claude/commands/cohorte-loop.md"
+          mkdir -p "$scratch/.claude/pipeline/scripts"
+          : >"$scratch/.claude/pipeline/scripts/loop.sh"
+          : >"$scratch/.claude/pipeline/scripts/loop-detach.sh"
           : >"$scratch/.claude/workflows/cycle.js"
           : >"$scratch/.claude/agents/smoke.md"
           : >"$scratch/.claude/commands/smoke.md"
@@ -132,14 +132,15 @@ jobs:
           # users accumulated four.
           HOME="$scratch" sh ./install.sh --update --global
           node scripts/assert-gate-hook.mjs "$scratch/.claude/settings.json"
-          for orphan in commands/cycle.md workflows/cycle.js commands/loop.md agents/smoke.md commands/smoke.md; do
+          for orphan in commands/cycle.md workflows/cycle.js commands/loop.md agents/smoke.md \
+                        commands/smoke.md commands/cohorte-loop.md \
+                        pipeline/scripts/loop.sh pipeline/scripts/loop-detach.sh; do
             test ! -e "$scratch/.claude/$orphan" || { echo "installer left $orphan behind"; exit 1; }
           done
           # Assert the whole command surface is prefixed, not just that named files went:
           # this also catches a NEW unprefixed command being added later.
           stale=$(ls "$scratch/.claude/commands" | grep -v '^cohorte-' || true)
           test -z "$stale" || { echo "unprefixed command files survived: $stale"; exit 1; }
-          test -f "$scratch/.claude/commands/cohorte-loop.md"
 
       # bin/cli.js is what `npx cohorte install/update` actually runs — a
       # hand-written port of install.sh, so it drifts silently (until 1.2.4 it
@@ -167,10 +168,6 @@ jobs:
           test -x "$scratch/.claude/pipeline/scripts/telemetry-send.sh"
           test -x "$scratch/.claude/pipeline/scripts/kanban-move.sh"
           test -x "$scratch/.claude/pipeline/scripts/preflight.sh"
-          test -x "$scratch/.claude/pipeline/scripts/loop.sh"
-          # Without loop-detach.sh, /cohorte-loop silently reverts to a foreground run that dies
-          # at the 600 s tool ceiling — a missing script here is not a loud failure.
-          test -x "$scratch/.claude/pipeline/scripts/loop-detach.sh"
           test -f "$scratch/.claude/pipeline/CHANGELOG.md"
           test -f "$scratch/.claude/workflows/review.js"
           test -f "$scratch/.claude/workflows/audit.js"
@@ -186,6 +183,11 @@ jobs:
           # independent list, so it drifts independently.
           : >"$scratch/.claude/commands/cycle.md"
           : >"$scratch/.claude/commands/loop.md"
+          # 2.2.0 retired /cohorte-loop. Same reasoning: only a planted copy proves the scrub.
+          : >"$scratch/.claude/commands/cohorte-loop.md"
+          mkdir -p "$scratch/.claude/pipeline/scripts"
+          : >"$scratch/.claude/pipeline/scripts/loop.sh"
+          : >"$scratch/.claude/pipeline/scripts/loop-detach.sh"
           : >"$scratch/.claude/workflows/cycle.js"
           : >"$scratch/.claude/agents/smoke.md"
           for c in align-ds audit brainstorm build doctor drive fix init-pipeline \
@@ -194,7 +196,8 @@ jobs:
           done
           CLAUDE_CONFIG_DIR="$scratch/.claude" node bin/cli.js update --global
           node scripts/assert-gate-hook.mjs "$scratch/.claude/settings.json"
-          for orphan in commands/cycle.md workflows/cycle.js commands/loop.md agents/smoke.md; do
+          for orphan in commands/cycle.md workflows/cycle.js commands/loop.md agents/smoke.md \
+                        commands/cohorte-loop.md pipeline/scripts/loop.sh; do
             test ! -e "$scratch/.claude/$orphan" || { echo "cli.js left $orphan behind"; exit 1; }
           done
           stale=$(ls "$scratch/.claude/commands" | grep -v '^cohorte-' || true)
@@ -275,9 +278,12 @@ jobs:
           # 13 decoys could survive an upgrade on Windows and nothing would notice.
           $stale = Get-ChildItem $cmds -Filter *.md | Where-Object { $_.Name -notlike 'cohorte-*' }
           if ($stale) { throw "unprefixed command files survived the update: $($stale.Name -join ', ')" }
-          if (-not (Test-Path (Join-Path $cmds 'cohorte-loop.md'))) { throw 'cohorte-loop.md missing' }
+          # 2.2.0 retired /cohorte-loop and its two scripts. Copy-over never deletes, so this
+          # asserts the Windows scrub actually runs — a surviving command file is a decoy the
+          # model can still fire against a core that no longer ships its driver.
+          if (Test-Path (Join-Path $cmds 'cohorte-loop.md')) { throw 'retired cohorte-loop.md survived' }
           $detach = Join-Path $env:CLAUDE_CONFIG_DIR 'pipeline\scripts\loop-detach.sh'
-          if (-not (Test-Path $detach)) { throw 'loop-detach.sh was never copied' }
+          if (Test-Path $detach) { throw 'retired loop-detach.sh survived' }
 
       - name: Dry-run the npx CLI twice + assert the hook (win32 quoting)
         shell: pwsh

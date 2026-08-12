@@ -71,6 +71,27 @@ else
 fi
 [ -d "$src/core" ] || { echo "error: pipeline source not found (no core/ in $src)" >&2; exit 1; }
 
+# --- delegate to the Node CLI ------------------------------------------------
+# Since 2.2.0 the commands in core/ are runtime-NEUTRAL sources: they carry capability
+# conditionals (`<!-- cohorte:if subagents -->`) and path tokens (`<core>`, `<state>`) that
+# the adapter resolves per coding agent. Copying them verbatim, as this script used to,
+# would install prompts full of unresolved markers — an install that looks successful and
+# instructs the model with text meant for a different runtime. There is no shell renderer,
+# so hand the whole job to bin/cli.js, which is the documented route anyway.
+if command -v node >/dev/null 2>&1; then
+  set -- install
+  [ "$mode" = "update" ] && set -- update
+  [ "$scope" = "global" ] && set -- "$@" --global
+  [ "$scope" = "project" ] && set -- "$@" "$target"
+  exec node "$src/bin/cli.js" "$@"
+fi
+echo "error: cohorte needs Node ≥ 18 to install." >&2
+echo "  The pipeline's commands are rendered per coding agent (Claude Code, Codex, Cursor," >&2
+echo "  Gemini CLI, OpenCode) at install time; there is no shell equivalent of that step," >&2
+echo "  and a raw copy would install prompts this runtime cannot follow." >&2
+echo "  Install Node, then:  npx cohorte install${scope:+ }$([ "$scope" = global ] && echo --global)" >&2
+exit 1
+
 # --- resolve the destination .claude dir ------------------------------------
 if [ "$scope" = "global" ]; then
   dest="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
@@ -107,11 +128,8 @@ copy_core() {
   cp "$src/scripts/kanban-move.sh"       "$dest/pipeline/scripts/"
   cp "$src/scripts/telemetry-send.sh"    "$dest/pipeline/scripts/"
   cp "$src/scripts/preflight.sh"         "$dest/pipeline/scripts/"
-  cp "$src/scripts/loop.sh"              "$dest/pipeline/scripts/"
-  cp "$src/scripts/loop-detach.sh"       "$dest/pipeline/scripts/"
   chmod +x "$dest/pipeline/scripts/kanban-move.sh" "$dest/pipeline/scripts/telemetry-send.sh" \
-           "$dest/pipeline/scripts/preflight.sh" "$dest/pipeline/scripts/loop.sh" \
-           "$dest/pipeline/scripts/loop-detach.sh" 2>/dev/null || true
+           "$dest/pipeline/scripts/preflight.sh" 2>/dev/null || true
   cp "$src/core/agents/implementer.template.md" "$dest/pipeline/"
   [ -f "$src/CHANGELOG.md" ] && cp "$src/CHANGELOG.md" "$dest/pipeline/"
   printf '%s\n' "$ver" > "$dest/pipeline/VERSION"

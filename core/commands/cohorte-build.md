@@ -11,8 +11,7 @@ You are the **lead**. Build feature **$ARGUMENTS** from its frozen spec.
 > re-read if it's already in your context this session and unmodified since._
 >
 > **Kanban** (SCHEMA.md §Kanban): once §1 confirms the frozen spec, run
-> `<core>/pipeline/scripts/kanban-move.sh auto $ARGUMENTS building` (`<core>` = `.claude` bundled /
-> `~/.claude` global — probe with `test -x`). `auto` resolves the board from the config itself and
+> `<core>/pipeline/scripts/kanban-move.sh auto $ARGUMENTS building`. `auto` resolves the board from the config itself and
 > exits 0 with a `kanban: <reason>` line when there is none — so **never decide "no board is
 > configured" without running it**. That inference, not a missing board, is what used to freeze
 > cards mid-pipeline.
@@ -20,9 +19,9 @@ You are the **lead**. Build feature **$ARGUMENTS** from its frozen spec.
 ## 1. Load & check
 
 - Check the spec front-matter FIRST — `grep '^status:' specs/$ARGUMENTS.md` (or Read with a ~15-line
-  limit) — before any full read. Buildable statuses are `frozen`, `in-review` and `in-progress` (the
-  last one means a `/cohorte-loop` is or was driving this spec — SCHEMA.md §Spec status). `blocked` means a
-  loop gave up here: say so, and route by the spec's `## Remediation` — open items ⇒ `/cohorte-fix`, none ⇒
+  limit) — before any full read. Buildable statuses are `frozen`, `in-review` and `in-progress`
+  (SCHEMA.md §Spec status). `blocked` means a previous round gave up here: say so, and route by the
+  spec's `## Remediation` — open items ⇒ `/cohorte-fix`, none ⇒
   continue this build. Anything else (`draft`, missing, `shipped`) ⇒ stop and tell the human to run
   `/cohorte-spec` first. Only then read the body, selectively: front-matter, §5 contract, the surface
   task sections, and `## Remediation` (fall back to a full read if the spec doesn't follow the
@@ -58,13 +57,13 @@ Map every area the spec touches (§5 contract + each surface's tasks + touched p
 For each surface to add: infer its `key`, `path`, `label`, `agent`, `tools`, `model`, `*_cmd`s, and
 `uses_design` (mirror a sibling surface), show the human a one-line proposal, and on go-ahead **render it now** per
 SCHEMA.md §"Rendering / reconciling a surface agent" — write the `surfaces[]` entry + §Conventions/§Testing
-stanza into `PIPELINE.md`, render `.claude/agents/<agent>.md` from the implementer template, applying the
+stanza into `PIPELINE.md`, render `<agents>/<agent>.md` from the implementer template, applying the
 shared-code rule (shared trees get a single-owner surface; cross-slice shapes go through the contract).
 This is the automatic path: you don't send the human back to `/cohorte-init-pipeline`. If nothing new is needed,
 say so and continue. Dispatch (§3) then covers the reconciled surface list.
 
 **Adding or splitting a surface is an architectural decision** — append ONE line for it to
-`specs/_decisions.md` §Live (SCHEMA.md §Decisions; create from `.claude/templates/decisions.template.md`
+`specs/_decisions.md` §Live (SCHEMA.md §Decisions; create from `<core>/templates/decisions.template.md`
 if absent), area `surfaces`, e.g.
 `- <date> · surfaces · <key> owns <path>, single owner of <what> — because <the boundary reason> · $ARGUMENTS`.
 One `>>` in the Bash call you're already making. Nothing added ⇒ nothing to append.
@@ -94,8 +93,8 @@ good idea (that was `/cohorte-brainstorm`), never by re-reading files you don't 
 
 Write the machine-readable verdict to `specs/reports/$ARGUMENTS.readiness.json` (overwrite,
 `mkdir -p specs/reports` first — the same gitignored buffer dir `/cohorte-review` stages into, which may not
-exist yet on a first build) — on **every** build, including `READY`. It is the only channel between this gate and a driver (`/cohorte-loop`),
-which parses no prose:
+exist yet on a first build) — on **every** build, including `READY`. It is the only channel between
+this gate and any automated driver, which parses no prose:
 
 ```json
 { "id": "$ARGUMENTS", "phase": "readiness", "ts": "<ISO>", "verdict": "RESERVATIONS",
@@ -129,7 +128,7 @@ wall-clock start — no separate timing call).
 
 ## 3. Dispatch one implementer per surface — IN PARALLEL
 
-Spawn every surface's agent in a **single message** (one Task call each) so they run concurrently —
+Spawn every surface's agent in a **single message** (one dispatch each) so they run concurrently —
 NEVER serially: build wall-clock must be the slowest surface, not the sum. Use
 the reconciled `surfaces` list from §1.5 (existing + any just-rendered). Give EACH only what a stateless
 agent needs — re-supply everything every time, as **exact file paths** (spec, contract, the surface's
@@ -153,11 +152,11 @@ tree. For each surface in `surfaces`:
 
 ## 3.5 Roll call — account for EVERY dispatch before integrating
 
-A subagent can die: a rate limit mid-run, a transport error after retries, its own context exhausted.
+A surface's work can die: a rate limit mid-run, a transport error after retries, context exhausted.
 When it does, it returns **nothing** — and nothing is byte-identical to "a clean surface with nothing
 to report". Silence is not a green light; treat it as the failure it is (SCHEMA.md §Dead agents).
 
-- **Roll call.** Every surface you dispatched in §3 must come back with a handoff in the format its
+- **Roll call.** Every surface handled in §3 must come back with a handoff in the format its
   agent instructions define. Missing, empty, or truncated mid-sentence ⇒ that surface is **dead**.
 - **Never infer success from silence,** and never speak for a dead agent — you did not see its work.
 - **Retry that surface ONCE, alone.** Re-dispatch it with the byte-identical §3 prompt. The other
@@ -174,9 +173,9 @@ to report". Silence is not a green light; treat it as the failure it is (SCHEMA.
 When all return, flag any contract mismatch or failing test from the handoffs; otherwise print one
 status line per surface (`<key> · tests pass/fail · <n> TODOs`) — do not restate handoff content.
 A dead surface (§3.5) prints `<key> · DEAD — unverified` and **the batch is never reported as ok**.
-Append **ONE line for the batch** to the **main checkout's** `.claude/pipeline-metrics.jsonl` —
+Append **ONE line for the batch** to the **main checkout's** `<state>/pipeline-metrics.jsonl` —
 NOT the worktree's, which dies at teardown while metrics must accumulate across features. Resolve
-it from anywhere: `$(dirname "$(git rev-parse --git-common-dir)")/.claude/pipeline-metrics.jsonl`
+it from anywhere: `$(dirname "$(git rev-parse --git-common-dir)")/<state>/pipeline-metrics.jsonl`
 (in the main checkout this resolves to itself). Create it if absent; it must be gitignored.
 Compute the elapsed time in the same Bash call
 (`echo "{...\"seconds\":$(($(date +%s)-<start epoch from §2>)),...}" >> …`):
@@ -189,9 +188,7 @@ never sees your chat:
 `{"id":"$ARGUMENTS","phase":"build","ts":"<ISO>","surfaces":{"<key>":"ok|error|dead",…},"dead":["<key>",…]}`
 — this is the evidence SCHEMA.md §Specialization asks for before splitting a surface. In the same
 Bash call, chain the opt-in usage ping — **the shared form every phase command reuses**:
-`<core>/pipeline/scripts/telemetry-send.sh <phase> "$ARGUMENTS" <seconds> "<results>" || true`
-(`<core>` = `~/.claude` global / `.claude` bundled; here `<phase>` = `build`, `<results>` =
-`<ok,ok|error,…>`) — a silent no-op unless the human explicitly consented (SCHEMA.md §Telemetry);
+`<core>/pipeline/scripts/telemetry-send.sh <phase> "$ARGUMENTS" <seconds> "<results>" || true` — a silent no-op unless the human explicitly consented (SCHEMA.md §Telemetry);
 never ask about consent here. `/cohorte-review` and `/cohorte-fix` chain the same line with their own
 phase + results. The `|| true` swallows a **missing** script too, so a half-copied core goes
 silent rather than loud — `/cohorte-doctor` check 1 is what catches that.

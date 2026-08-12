@@ -62,7 +62,7 @@ function knownCommands() {
   if (!names.size) {
     for (const n of ['cohorte-brainstorm', 'cohorte-spec', 'cohorte-build', 'cohorte-review',
                      'cohorte-fix', 'cohorte-ship', 'cohorte-audit', 'cohorte-refactor',
-                     'cohorte-align-ds', 'cohorte-doctor', 'cohorte-loop',
+                     'cohorte-align-ds', 'cohorte-doctor',
                      'cohorte-init-pipeline', 'cohorte-update-pipeline']) names.add(n);
   }
   // Retired commands. The list above is read from the shipped core, so a command that is
@@ -73,8 +73,10 @@ function knownCommands() {
   // 2.0.0 prefixed every command with `cohorte-`, which retires all 13 bare names at once:
   // months of transcripts say `/build`, and without these they would all reclassify to (chat)
   // — the largest instance of exactly the bug this list exists to prevent. `drive`/`loop` are
-  // both here because the driver was `/loop` → `/drive` (1.6.0) → `/cohorte-loop` (2.0.0).
-  for (const n of ['cycle', 'smoke', 'drive', 'loop', 'brainstorm', 'spec', 'build', 'review',
+  // both here because the driver was `/loop` → `/drive` (1.6.0) → `/cohorte-loop` (2.0.0), and
+  // `cohorte-loop` joins them now that 2.2.0 retired the driver outright.
+  for (const n of ['cycle', 'smoke', 'drive', 'loop', 'cohorte-loop',
+                   'brainstorm', 'spec', 'build', 'review',
                    'fix', 'ship', 'audit', 'refactor', 'align-ds', 'doctor',
                    'init-pipeline', 'update-pipeline']) names.add(n);
   return names;

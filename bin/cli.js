@@ -14,6 +14,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const adapter = require('../core/adapter/render.js');
 
 const pkgRoot = path.resolve(__dirname, '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(pkgRoot, 'package.json'), 'utf8'));
@@ -32,8 +33,8 @@ function usage(code) {
   console.log(`cohorte v${VERSION}
 
 Usage:
-  cohorte install   [target] [--global]
-  cohorte update    [target] [--global]
+  cohorte install   [target] [--global] [--runtime=a,b | --all-runtimes]
+  cohorte update    [target] [--global] [--runtime=a,b | --all-runtimes]
   cohorte dashboard [target] [--port=N] [--host=ADDR] [--open]
   cohorte metrics   [target] [--days=N] [--since=ISO] [--runs] [--json]
   cohorte version
@@ -55,7 +56,15 @@ Commands:
             ~/.claude/projects — nothing to enable, and it covers runs that
             already happened. Worktree-aware, so a feature adds up. --json for
             the raw rollup, --runs to include every individual invocation.
-  version   Print the installed CLI version.`);
+  version   Print the installed CLI version.
+
+Runtimes (--runtime=): ${adapter.listRuntimes().join(', ')}
+  The pipeline's doctrine is one set of source prompts; the installer renders them into
+  whatever each coding agent reads (markdown + frontmatter, plain markdown, or TOML) and
+  branches the text on what that agent can actually enforce — where there is no blocking
+  hook the gate becomes an explicit check the commands call. Real subagents are required.
+  Omit the flag and the installer detects what you have and asks; with no TTY it installs
+  for Claude Code alone.`);
   process.exit(code);
 }
 
@@ -77,9 +86,26 @@ const metricsFlags = [];
 const isMetricsFlag = (a) =>
   a === '--json' || a === '--runs' || a.startsWith('--days=') || a.startsWith('--since=');
 
+// Which coding agents to install for. Empty ⇒ resolved later (detect, then ask on a TTY,
+// then fall back to claude — the only behaviour that existed before 2.2.0).
+let wantRuntimes = [];
+
 for (const a of args) {
   if (a === 'install' || a === 'update' || a === 'dashboard' || a === 'metrics') mode = a;
   else if (isMetricsFlag(a)) metricsFlags.push(a);
+  else if (a === '--all-runtimes') wantRuntimes = adapter.listRuntimes();
+  else if (a === '--runtimes' || a === '--runtime') {
+    console.error('error: --runtime needs a value, e.g. --runtime=codex,cursor'); process.exit(2);
+  }
+  else if (a.startsWith('--runtime=') || a.startsWith('--runtimes=')) {
+    for (const id of a.slice(a.indexOf('=') + 1).split(',').map((s) => s.trim()).filter(Boolean)) {
+      if (!adapter.listRuntimes().includes(id)) {
+        console.error(`error: unknown runtime "${id}" (known: ${adapter.listRuntimes().join(', ')})`);
+        process.exit(2);
+      }
+      if (!wantRuntimes.includes(id)) wantRuntimes.push(id);
+    }
+  }
   else if (a === 'version' || a === '--version' || a === '-v') { console.log(VERSION); process.exit(0); }
   else if (a === '--global' || a === '-g') scope = 'global';
   else if (a.startsWith('--port=')) {
@@ -125,22 +151,66 @@ if (mode === 'metrics') {
 
 // --- paths -------------------------------------------------------------------
 const globalDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
-const dest = scope === 'global' ? globalDir : path.join(target, '.claude');
 const src = pkgRoot;
 
 if (!fs.existsSync(path.join(src, 'core'))) {
   console.error(`error: pipeline source not found (no core/ in ${src})`);
   process.exit(1);
 }
-fs.mkdirSync(dest, { recursive: true });
+
+// Filled per runtime by the install loop. `dest` stays the Claude-shaped root (`.claude` /
+// `~/.claude`) so every helper below — hook registration, the legacy scrubs — keeps working
+// unchanged; non-Claude runtimes put their shared assets under `paths.core` instead.
+// CLAUDE_CONFIG_DIR moves Claude Code's whole tree; the registry declares it as `~/.claude`,
+// so every resolution has to be re-rooted or the install lands half here, half there.
+const PATH_OVERRIDES = { '~/.claude': globalDir };
+
+let runtime = adapter.loadRuntime('claude');
+let paths = adapter.resolvePaths(runtime, scope, target, { overrides: PATH_OVERRIDES });
+let dest = scope === 'global' ? globalDir : path.join(target, '.claude');
+
+// 2.2.0 retired /cohorte-loop — the autonomous build→review→fix driver. Copy-over never
+// deletes, so on an upgrade its command file and its two scripts would survive as a decoy the
+// model can still fire: a command that spawns headless children against a core that no longer
+// documents them. Scrub the command in every shape this runtime could have installed it, plus
+// the scripts, for every runtime rather than only the Claude layout.
+function scrubLoop() {
+  const ext = runtime.command.ext || '.md';
+  fs.rmSync(path.join(paths.commands, `cohorte-loop${ext}`), { recursive: true, force: true });
+  // Skills are a directory (`<name>/SKILL.md`), so the parent has to go too.
+  if (runtime.command.format === 'skill') {
+    fs.rmSync(path.join(paths.commands, 'cohorte-loop'), { recursive: true, force: true });
+  }
+  for (const f of ['loop.sh', 'loop-detach.sh']) {
+    fs.rmSync(path.join(paths.core, 'pipeline', 'scripts', f), { force: true });
+  }
+}
+
+// Resolve every capability conditional in the copied templates, in place. Unlike commands
+// and agents these get no frontmatter and no preamble of their own: a template is always
+// read from within a command that already established the runtime.
+function resolveTemplateConditionals(dir) {
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) { resolveTemplateConditionals(p); continue; }
+    if (!p.endsWith('.md')) continue;
+    const src = fs.readFileSync(p, 'utf8');
+    if (!src.includes('cohorte:if')) continue;
+    fs.writeFileSync(p, adapter.applyConditionals(src, runtime));
+  }
+}
 
 // --- helpers (mirror install.sh) --------------------------------------------
 function copyCore() {
-  // `workflows` = the deterministic orchestration scripts (review/audit/refactor) the
-  // Workflow runtime resolves from .claude/workflows (bundled) or ~/.claude/workflows
-  // (global) — same copy rule in both modes, like commands.
-  for (const d of ['commands', 'hooks', 'templates', 'workflows']) {
-    fs.cpSync(path.join(src, 'core', d), path.join(dest, d), {
+  // The runtime-neutral assets. `commands` is NOT among them any more: it is rendered per
+  // runtime by renderSurfaces() into whatever directory that agent actually reads.
+  // `workflows` = the deterministic orchestration scripts (review/audit/refactor), copied
+  // only where a Workflow engine exists — shipping them elsewhere would advertise a path
+  // the rendered commands have already conditionalled out.
+  const dirs = ['hooks', 'templates'];
+  if (runtime.capabilities.workflows) dirs.push('workflows');
+  for (const d of dirs) {
+    fs.cpSync(path.join(src, 'core', d), path.join(paths.core, d), {
       recursive: true,
       force: true,
       // Never carry a Python bytecode cache into a user's .claude. It appears in a
@@ -149,14 +219,23 @@ function copyCore() {
       filter: s => !s.split(/[\\/]/).includes('__pycache__') && !s.endsWith('.pyc'),
     });
   }
-  fs.rmSync(path.join(dest, 'hooks', '__pycache__'), { recursive: true, force: true });
+  fs.rmSync(path.join(paths.core, 'hooks', '__pycache__'), { recursive: true, force: true });
+  // Templates are read at run time BY a command, so they inherit that command's preamble and
+  // its `<core>`/`<state>` tokens — but their capability conditionals are still theirs to
+  // resolve, and copying them raw would leave `cohorte:if` markers in the model's context.
+  resolveTemplateConditionals(path.join(paths.core, 'templates'));
   // 0.1.19 renamed questionnaire-domain-brief.md → research-brief.md; drop the stale copy.
-  fs.rmSync(path.join(dest, 'templates', 'questionnaire-domain-brief.md'), { force: true });
-  const pipelineDir = path.join(dest, 'pipeline');
+  fs.rmSync(path.join(paths.core, 'templates', 'questionnaire-domain-brief.md'), { force: true });
+  const pipelineDir = path.join(paths.core, 'pipeline');
   fs.mkdirSync(path.join(pipelineDir, 'scripts'), { recursive: true });
   for (const f of ['PIPELINE.template.md', 'SCHEMA.md', 'cohorte.config.template.yaml']) {
     fs.copyFileSync(path.join(src, 'profile', f), path.join(pipelineDir, f));
   }
+  // SCHEMA.md is the agents' rulebook, read at RUN time from `<core>/pipeline/`, so its
+  // capability conditionals have to be resolved here like any other prompt — a `cohorte:if`
+  // left in it would reach the model as visible noise, and the wrong branch would tell it to
+  // write where this runtime does not look.
+  resolveTemplateConditionals(pipelineDir);
   // Copy the *.template files AND the shipped executables (kanban-move.sh,
   // telemetry-send.sh). Until 1.2.4 this loop took only `.template`, so every
   // `npx cohorte install/update` produced a core missing both scripts — and since
@@ -176,17 +255,47 @@ function copyCore() {
       try { fs.chmodSync(target, 0o755); } catch { /* optional */ }
     }
   }
-  fs.copyFileSync(path.join(src, 'core', 'agents', 'implementer.template.md'),
-                  path.join(pipelineDir, 'implementer.template.md'));
+  // The per-surface implementer template is rendered per SURFACE later, by
+  // /cohorte-init-pipeline inside the target repo — but its runtime shape (frontmatter keys,
+  // capability branches, the preamble) is fixed here, at install time. Run it through the
+  // adapter with its <SURFACE_*> placeholders untouched, so init only fills the blanks.
+  fs.writeFileSync(path.join(pipelineDir, 'implementer.template.md'), adapter.renderAgent({
+    source: fs.readFileSync(path.join(src, 'core', 'agents', 'implementer.template.md'), 'utf8'),
+    name: 'implementer.template', runtime, paths, projectRoot: target,
+  }).content);
+  // What the runtimes ARE, for /cohorte-doctor and anything else that must branch on them at
+  // run time. A MAP, merged across installs, not one record: every non-Claude runtime shares
+  // the same `.cohorte` core, so a single-record file made each install silently erase the
+  // previous one and left /cohorte-doctor diagnosing the wrong agent. Each rendered command
+  // already names its own runtime in its preamble; this file supplies the details.
+  const registry = path.join(pipelineDir, 'runtimes.json');
+  let installed = {};
+  try { installed = JSON.parse(fs.readFileSync(registry, 'utf8')) || {}; } catch { /* first install */ }
+  installed[runtime.id] = {
+    label: runtime.label, scope, core_version: VERSION,
+    capabilities: runtime.capabilities,
+    excluded_commands: runtime.exclude_commands || [],
+    paths: {
+      core: paths.core, commands: paths.commands,
+      agents: paths.agents || path.join(paths.core, 'agents'),
+      // Where the gate registration lives. The dashboard needs it to tell a registered hook
+      // from a missing one without re-deriving each runtime's config layout itself.
+      hooks_config: paths.hooks_config,
+      state: adapter.stateDir(runtime), config: adapter.configPath(runtime),
+    },
+  };
+  fs.writeFileSync(registry, JSON.stringify(installed, null, 2) + '\n');
+  fs.rmSync(path.join(pipelineDir, 'runtime.json'), { force: true });  // 2.2.0-dev single-record form
   // /cohorte-doctor reads this to tell the human what they're missing; the shell installers
   // have always copied it, this port never did.
   const changelog = path.join(src, 'CHANGELOG.md');
   if (fs.existsSync(changelog)) fs.copyFileSync(changelog, path.join(pipelineDir, 'CHANGELOG.md'));
   fs.writeFileSync(path.join(pipelineDir, 'VERSION'), VERSION + '\n');
   if (process.platform !== 'win32') {
-    try { fs.chmodSync(path.join(dest, 'hooks', 'gate.py'), 0o755); } catch { /* optional */ }
+    try { fs.chmodSync(path.join(paths.core, 'hooks', 'gate.py'), 0o755); } catch { /* optional */ }
   }
   scrubTddGate();
+  scrubLoop();
 }
 
 // The TDD gate was removed in 0.1.6. Older installs have hooks/tdd_gate.py on disk and
@@ -208,9 +317,14 @@ function scrubTddGate() {
   }
 }
 
-// the fixed (non-rendered) agents: the dev review/release pipeline agents
-function copyFixedAgents() {
-  fs.mkdirSync(path.join(dest, 'agents'), { recursive: true });
+// The fixed (non-rendered-per-surface) agents — review, release, profile-reader — plus every
+// command. Both go through the adapter, so the same source text lands as a native subagent +
+// slash command on Claude/OpenCode and as a persona file + prompt file everywhere else.
+function renderSurfaces() {
+  const agentsOut = paths.agents || path.join(paths.core, 'agents');
+  fs.mkdirSync(agentsOut, { recursive: true });
+  fs.mkdirSync(paths.commands, { recursive: true });
+
   // Every agent in core/agents/ EXCEPT the *.template.md ones, which /cohorte-init-pipeline renders
   // per-surface. Until 1.2.6 this was a hardcoded ['review.md', 'release.md'] that never grew
   // the agents the shell installers copy, so `npx cohorte install` shipped a command with no
@@ -219,8 +333,35 @@ function copyFixedAgents() {
   const agentDir = path.join(src, 'core', 'agents');
   for (const f of fs.readdirSync(agentDir)) {
     if (!f.endsWith('.md') || f.endsWith('.template.md')) continue;
-    fs.copyFileSync(path.join(agentDir, f), path.join(dest, 'agents', f));
+    const out = adapter.renderAgent({
+      source: fs.readFileSync(path.join(agentDir, f), 'utf8'),
+      name: f.slice(0, -3), runtime, paths, projectRoot: target,
+    });
+    fs.writeFileSync(path.join(agentsOut, out.filename), out.content);
   }
+
+  const cmdDir = path.join(src, 'core', 'commands');
+  const excluded = runtime.exclude_commands || [];
+  for (const f of fs.readdirSync(cmdDir)) {
+    if (!f.endsWith('.md')) continue;
+    // A command the runtime cannot actually execute is not installed at all. Shipping it
+    // would put a working-looking entry in the slash menu that fails on first use — and the
+    // human would reasonably read that as the pipeline being broken.
+    if (excluded.includes(f.slice(0, -3))) continue;
+    const out = adapter.renderCommand({
+      source: fs.readFileSync(path.join(cmdDir, f), 'utf8'),
+      name: f.slice(0, -3), runtime, paths, projectRoot: target,
+    });
+    // A Codex skill is `<name>/SKILL.md`, so the filename can carry a directory.
+    const dest = path.join(paths.commands, out.filename);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.writeFileSync(dest, out.content);
+  }
+
+  // The scrubs below repair Claude-shaped installs that predate the adapter. They are a
+  // no-op anywhere else — a fresh non-Claude runtime has no history to clean up — so guard
+  // them rather than rm-ing paths that never existed.
+  if (runtime.id !== 'claude') return;
   // 0.1.19 split the bi-mode questionnaire-researcher into research-agent + questionnaire-architect;
   // copy-over never deletes, so scrub the retired agent lest a dead subagent_type linger.
   fs.rmSync(path.join(dest, 'agents', 'questionnaire-researcher.md'), { force: true });
@@ -286,6 +427,59 @@ function setCfg(text, cfgKey, value) {
   }).join('\n');
 }
 
+// Register gate.py as this runtime's blocking pre-command hook. Four of the five can do it —
+// only OpenCode has no hook contract (plugins are a different thing), and there the rendered
+// commands call `gate.py --check` explicitly instead.
+//
+// Three config shapes, all reconciled rather than appended: drop every existing cohorte gate
+// entry, then add exactly one. Idempotent, collapses duplicates an older installer left, and
+// repairs a stale matcher in place — an append-if-absent would find the stale entry and skip.
+function registerRuntimeHook() {
+  const spec = runtime.hook;
+  const cfgPath = runtime.scopes[scope].hooks_config;
+  if (!spec || !cfgPath) return 'n/a (this runtime has no hook contract — the gate runs as an explicit --check)';
+  const python = findPython();
+  if (!python) return 'skipped (no python found — register the gate hook manually)';
+
+  const file = path.join(paths.core, 'hooks', 'gate.py');
+  // Quoted on every platform — see registerGlobalHook: an unquoted path with a space breaks
+  // every tool call in the session, and the config dirs these runtimes use live under the
+  // user's home, which on macOS routinely contains one.
+  const cmd = `${python} "${file}" --runtime ${runtime.id}`;
+  const isOurs = (s) => typeof s === 'string' && s.includes('gate.py');
+
+  const dest = adapter.expandHome(cfgPath);
+  const abs = path.isAbsolute(dest) ? dest : path.join(target, dest);
+  fs.mkdirSync(path.dirname(abs), { recursive: true });
+  let data = {};
+  try {
+    const parsed = JSON.parse(fs.readFileSync(abs, 'utf8'));
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) data = parsed;
+  } catch { /* absent or invalid → start fresh */ }
+  if (!data.hooks || typeof data.hooks !== 'object') data.hooks = {};
+
+  if (spec.format === 'cursor') {
+    // { "version": 1, "hooks": { "beforeShellExecution": [ { "command": "…" } ] } }
+    if (!data.version) data.version = 1;
+    const list = Array.isArray(data.hooks[spec.event]) ? data.hooks[spec.event] : [];
+    data.hooks[spec.event] = list.filter((e) => !isOurs(e && e.command));
+    data.hooks[spec.event].push({ command: cmd });
+  } else {
+    // Claude/Codex PreToolUse and Gemini BeforeTool share the matcher-group shape.
+    const list = Array.isArray(data.hooks[spec.event]) ? data.hooks[spec.event] : [];
+    data.hooks[spec.event] = list.filter(
+      (e) => !((e && e.hooks) || []).some((h) => isOurs(h && h.command)));
+    data.hooks[spec.event].push({
+      matcher: spec.matcher, hooks: [{ type: 'command', command: cmd }],
+    });
+  }
+  fs.writeFileSync(abs, JSON.stringify(data, null, 2) + '\n');
+  const where = adapter.displayPath(abs, target);
+  return spec.supports_ask
+    ? `registered in ${where} (${spec.event})`
+    : `registered in ${where} (${spec.event}) — no confirmation tier here, so a gated command is denied rather than queried`;
+}
+
 // Fill the seeded config from a short TTY interview (shared Obsidian vault for the kanban mirror).
 // Kanban is per-project, so it is wired later by /cohorte-init-pipeline — not asked here.
 async function promptConfig(text) {
@@ -300,11 +494,24 @@ async function promptConfig(text) {
 // ~/.claude regardless of install scope. Seed it only if the user has no copy (consolidated OR
 // legacy). On a TTY, offer a quick interview to fill it; otherwise seed disabled defaults.
 async function seedConfig() {
-  const cfg = path.join(globalDir, 'cohorte.config.yaml');
+  // One config per human, but it has to live somewhere the running agent can find without
+  // being told: `~/.claude` for Claude Code (unchanged — existing files stay authoritative),
+  // `~/.cohorte` for every other runtime. The shipped scripts probe both, in that order, so
+  // a human who drives one repo from two agents still has a single board and a single consent.
+  const cfg = adapter.expandHome(adapter.configPath(runtime));
+  fs.mkdirSync(path.dirname(cfg), { recursive: true });
   // Pre-rename names, newest first — read as a fallback so upgrades don't lose the config.
   const legacy = ['thebidouille.config.yaml']
     .map((n) => path.join(globalDir, n)).find(fs.existsSync);
   if (fs.existsSync(cfg)) { console.log(`  · kept your existing ${cfg}`); return; }
+  // A second runtime must not fork the config: two files means two boards and two consent
+  // records, and the human edits whichever one they happen to open. The scripts read
+  // `~/.cohorte` first, so seeding it here would SHADOW a filled `~/.claude` copy.
+  const claudeCfg = adapter.expandHome(adapter.configPath({ id: 'claude' }));
+  if (cfg !== claudeCfg && fs.existsSync(claudeCfg)) {
+    console.log(`  · reusing your existing ${claudeCfg} (the scripts read it as a fallback)`);
+    return;
+  }
   if (legacy) {
     console.log(`  · found legacy ${legacy} — kept as-is (still read as a fallback).`);
     console.log('    Run /cohorte-update-pipeline to migrate it into cohorte.config.yaml + wire the kanban.');
@@ -354,7 +561,13 @@ function registerGlobalHook() {
   // once per copy on every Bash call).
   const isGate = entry => (entry.hooks || []).some(
     h => typeof h.command === 'string' && h.command.trim().replace(/"+$/, '').endsWith(base));
-  const cmd = process.platform === 'win32' ? `${python} "${file}"` : `${python} ${file}`;
+  // ALWAYS quote the path. The hook command is handed to a shell, so a config dir containing a
+  // space — `~/Library/Application Support/…`, which is exactly where a desktop host puts it —
+  // splits into two arguments and python reports `can't open file '/Users/x/Library/Application'`
+  // on EVERY tool call, in a session the human cannot easily un-break. Only the Windows form was
+  // quoted, so this failed silently on precisely the platform where the path is most likely to
+  // contain a space.
+  const cmd = `${python} "${file}"`;
 
   // Reconcile rather than append-if-absent: drop every existing gate.py
   // registration, then add exactly one. Idempotent, collapses duplicates older
@@ -379,13 +592,90 @@ function bumpPointerVersion(ptr) {
   }
 }
 
+// --- runtime selection -------------------------------------------------------
+
+// Which coding agents this install targets. Explicit flags win. Otherwise: detect what is
+// configured on this machine, and — on a TTY — let the human confirm, because installing
+// into a runtime they don't use litters a config dir they never asked us to touch. With no
+// TTY and no flag we install for Claude Code alone: the behaviour of every version before
+// the adapter, so a scripted `npx cohorte install` keeps doing exactly what it did.
+async function selectRuntimes() {
+  if (wantRuntimes.length) return wantRuntimes;
+  const found = adapter.detectRuntimes();
+  if (found.length <= 1) return found.length ? found : ['claude'];
+  if (!(process.stdin.isTTY && process.stdout.isTTY)) {
+    console.log(`  · several runtimes detected (${found.join(', ')}) — installing for claude only.`);
+    console.log('    Pass --runtime=a,b or --all-runtimes to cover the others.');
+    return ['claude'];
+  }
+  console.log('\n  Coding agents detected on this machine:');
+  found.forEach((id, i) => console.log(`    ${i + 1}. ${adapter.loadRuntime(id).label}`));
+  const a = await ask('    Install for which? (Enter = all, or e.g. 1,3): ');
+  if (!a) return found;
+  const picked = a.split(/[,\s]+/).map((n) => found[parseInt(n, 10) - 1]).filter(Boolean);
+  return picked.length ? [...new Set(picked)] : found;
+}
+
 // --- run ---------------------------------------------------------------------
 (async () => {
+const selected = await selectRuntimes();
+for (const id of selected) {
+  runtime = adapter.loadRuntime(id);
+  paths = adapter.resolvePaths(runtime, scope, target, { overrides: PATH_OVERRIDES });
+  dest = runtime.id === 'claude'
+    ? (scope === 'global' ? globalDir : path.join(target, '.claude'))
+    : paths.core;
+  fs.mkdirSync(paths.core, { recursive: true });
+  if (selected.length > 1) console.log(`\n── ${runtime.label} ──`);
+  await installOne();
+}
+if (selected.length > 1) {
+  console.log(`\n✓ installed for ${selected.length} runtimes: ${selected.join(', ')}.`);
+  console.log('  The doctrine is identical; what differs is enforcement — run /cohorte-doctor in');
+  console.log('  each one to see what it can and cannot guarantee.');
+}
+})();
+
+async function installOne() {
+if (runtime.id !== 'claude') {
+  // Everything below the Claude branch assumes Claude's own layout (settings.json hook
+  // registration, the `.claude` pointer). A non-Claude runtime gets the shared core, the
+  // rendered commands/personas, and nothing that would only pretend to be wired.
+  copyCore();
+  renderSurfaces();
+  const hookState = registerRuntimeHook();
+  await seedConfig();
+  if (mode === 'install' && scope === 'project') {
+    fs.mkdirSync(path.join(target, 'specs'), { recursive: true });
+    const specTemplate = path.join(target, 'specs', '_template.md');
+    if (!fs.existsSync(specTemplate)) {
+      fs.copyFileSync(path.join(src, 'core', 'templates', 'spec.template.md'), specTemplate);
+    }
+  }
+  const cmds = adapter.displayPath(paths.commands, target);
+  const agentsWhere = paths.agents
+    ? `${adapter.displayPath(paths.agents, target)} (${runtime.agent.format})`
+    : 'sequential personas — this runtime has no subagents';
+  console.log(`
+✓ ${runtime.label}: core in ${adapter.displayPath(paths.core, target)}, commands in ${cmds}  (version ${VERSION})
+  invoke: ${runtime.command.invoke.replace('<name>', 'cohorte-init-pipeline')}
+  agents: ${agentsWhere}
+  gate: ${hookState}`);
+  if ((runtime.exclude_commands || []).length) {
+    const named = runtime.exclude_commands.map((c) => runtime.command.invoke.replace('<name>', c));
+    console.log(`  not installed here: ${named.join(', ')}${runtime.exclude_reason ? ` — ${runtime.exclude_reason}` : ''}`);
+  }
+  if (runtime.scopes[scope].commands_scope === 'global' && scope === 'project') {
+    console.log(`  note: ${runtime.label} reads commands only from your home dir, so they were`);
+    console.log('        installed there even though the core is bundled in this repo.');
+  }
+  return;
+}
 if (scope === 'global') {
   console.log(mode === 'install'
     ? `→ installing pipeline core GLOBALLY into ${dest}`
     : `→ updating pipeline core GLOBALLY in ${dest} (keeping global settings.json)`);
-  copyFixedAgents();
+  renderSurfaces();
   copyCore();
   // Register on UPDATE too — install.sh and install.ps1 always have, and this
   // port skipping it is why a duplicated or stale-matcher registration could
@@ -417,7 +707,7 @@ Global kanban config, user-scoped — optional:
     for you: creating + syncing an Obsidian kanban board of the pipeline in your shared vault.`);
 } else if (mode === 'install') {
   console.log(`→ installing pipeline core into ${dest}`);
-  copyFixedAgents();
+  renderSurfaces();
   copyCore();
   await seedConfig();
   fs.mkdirSync(path.join(target, 'specs'), { recursive: true });
@@ -439,11 +729,11 @@ Prefer one shared core across all your repos?  Re-run with  --global.`);
 } else {
   console.log(`→ updating pipeline core in ${dest} (keeping your PIPELINE.md + rendered agents)`);
   copyCore();
-  try { copyFixedAgents(); } catch { /* best-effort, as in install.sh */ }
+  try { renderSurfaces(); } catch { /* best-effort, as in install.sh */ }
   await seedConfig();
   bumpPointerVersion(path.join(dest, 'pipeline.json'));
   console.log(`
 ✓ core refreshed to ${VERSION}. Your PIPELINE.md, rendered surface agents, gate-config.json and
   settings.json were left as-is. Re-run /cohorte-init-pipeline if your stack changed.`);
 }
-})();
+}

@@ -8,10 +8,12 @@ You are the **lead**. Refactor domain **$ARGUMENTS** to match `PIPELINE.md`, usi
 
 > Read `PIPELINE.md` §`surfaces` (map the domain → a surface + its agent + commands) and §`contract`.
 >
+<!-- cohorte:if workflows -->
 > **Workflow variant** (opt-in — SCHEMA.md §Workflows): for BIG domains (many open backlog items
 > across several surfaces), on Claude Code ≥ 2.1.154 with workflows enabled, the human can ask to
 > "run the refactor workflow" (`<core>/workflows/refactor.js`). For a handful of items this
 > conversational path is cheaper — and it stays the default and the fallback.
+<!-- cohorte:endif -->
 
 ## 1. Gather
 
@@ -22,11 +24,12 @@ You are the **lead**. Refactor domain **$ARGUMENTS** to match `PIPELINE.md`, usi
 
 ## 2. Dispatch the surface's implementer agent — TDD-first, stateless
 
-Spawn the matching `<surface.agent>` with the template below. Keep it **byte-identical across loop
+Spawn the matching `<surface.agent>` with the template below (as `subagent_type: <surface.agent>`).
+Keep it **byte-identical across loop
 rounds** (only the final items slot varies — it sits at the end so repeats hit the prompt cache), and
 never paste a diff — the agent computes its own, scoped to its tree:
 
-> `subagent_type: <surface.agent>` — "Refactor pass on your surface (no feature spec). Read
+> "Refactor pass on your surface (no feature spec). Read
 > `PIPELINE.md` first. **Add the missing tests FIRST** (pin current behavior / cover the entry
 > points), watch them pass, **then** refactor to clear each item. Preserve current public behavior
 > unless an item marks it a bug. Migrations stay additive. Need the current state of your tree?

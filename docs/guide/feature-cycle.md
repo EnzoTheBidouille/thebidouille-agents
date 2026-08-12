@@ -99,7 +99,7 @@ quiet commands. Its return is a tight **handoff** (summary, migrations, test res
 mismatches, TODOs — no file lists, no code excerpts).
 
 The lead integrates: flags contract mismatches and failing tests, appends one metrics line to
-`.claude/pipeline-metrics.jsonl` (the evidence used later to decide surface splits). Kanban →
+`<state>/pipeline-metrics.jsonl` (the evidence used later to decide surface splits). Kanban →
 **Building**.
 
 **Roll call — silence is not a green light.** A subagent can die mid-run (rate limit, transport error,
@@ -160,28 +160,6 @@ When agents return, the lead ticks `- [x]` what each handoff reports fixed, coll
 rounds to one summary line (the spec stays bounded), and sends you back to `/cohorte-review` for the
 re-verdict. Kanban → **Fix**, then back to **Review**.
 
-### Or let it run itself — `/cohorte-loop <id>`
-
-`/cohorte-loop feat-x` runs steps 3–5 for you (`--no-build` starts at the review, on an already-built
-feature) until a review returns **zero blocking findings** — CRITICAL or security only, so a LOW
-nit never costs a pass. It also stops at the `--max` ceiling (default 5) and, crucially, as soon
-as two consecutive reviews return the *same* blocking findings: the fix is treading water and
-more passes won't help. Each fix pass is committed, and no fix runs on the last pass — fixing
-without a review behind it leaves unaudited code.
-
-Each phase is a **separate `claude -p` child session**, so your session never accumulates the
-diff, the N reports or the N contracts; it sees one line per phase and a three-line summary. The
-child transcripts go to `specs/reports/<id>.loop.log`, which the command is forbidden to read
-back — that log is for you, in an editor, for free. See
-[`/cohorte-loop`](/reference/commands) for the exit codes.
-
-**It survives being interrupted.** Before every phase the driver stamps `status: in-progress` plus
-`loop_pass` and `loop_phase` into the spec's front-matter (deterministic `awk`, zero tokens), and on
-exit a terminal status — `in-review` when clean, `blocked` otherwise. So `/cohorte-loop feat-x --resume`
-continues at the pass it reached instead of re-paying the ones it already made, whether the session
-died, the ceiling hit, or the fix stopped converging. The spec *is* the state: the dashboard's specs
-board shows `↻ pass 3 · /cohorte-review` on the card, and `/cohorte-doctor` names any spec left mid-loop.
-
 ## 6. `/cohorte-ship` — the human gate
 
 - Confirms the last verdict was **SHIP**; recomputes the freshness digest — **if the source
@@ -197,6 +175,9 @@ board shows `↻ pass 3 · /cohorte-review` on the card, and `/cohorte-doctor` n
 
 ## The disk artifacts, at a glance
 
+`<state>` is the project's pipeline dir: `.claude/` on a Claude Code install, `.cohorte/` on
+every other runtime ([Runtimes](/reference/runtimes)).
+
 | Path | Written by | Read by |
 | --- | --- | --- |
 | `specs/<id>.md` | `/cohorte-spec` (+ `/cohorte-fix` remediation, `/cohorte-review` DoD + freshness stamp) | everyone |
@@ -205,10 +186,9 @@ board shows `↻ pass 3 · /cohorte-review` on the card, and `/cohorte-doctor` n
 | `specs/reports/<id>.md` | `/cohorte-review` (gitignored buffer) | `/cohorte-fix` after a `/clear` |
 | `specs/reports/<id>.<surface>.diff` | `/cohorte-review` §1 | the per-surface reviewers |
 | `specs/reports/<id>.preflight.txt` | `preflight.sh` | you, on abort |
-| `specs/reports/<id>.verdict.json` | `/cohorte-review` §3, every run | `/cohorte-loop` — the only machine contract |
-| `specs/reports/<id>.readiness.json` | `/cohorte-build` §1.6, every build | `/cohorte-loop` (exit 4), you on a `NOT-READY` |
-| `specs/reports/<id>.build.json` | `/cohorte-build` §4, every batch | `/cohorte-loop` (exit 2 on a dead implementer) |
-| `specs/reports/<id>.loop.log` · `.built` | `loop.sh` | you, in an editor — **never** an agent |
-| `.claude/pipeline-metrics.jsonl` | `/cohorte-build` `/cohorte-review` `/cohorte-fix` (gitignored) | surface-split decisions, dashboard |
+| `specs/reports/<id>.verdict.json` | `/cohorte-review` §3, every run | you; an external driver — the only machine contract |
+| `specs/reports/<id>.readiness.json` | `/cohorte-build` §1.6, every build | you on a `NOT-READY`; an external driver |
+| `specs/reports/<id>.build.json` | `/cohorte-build` §4, every batch | you; an external driver (dead implementers) |
+| `<state>/pipeline-metrics.jsonl` | `/cohorte-build` `/cohorte-review` `/cohorte-fix` (gitignored) | surface-split decisions, dashboard |
 | `specs/refactor-backlog.md` | `/cohorte-audit` + `/cohorte-review`'s deferred findings | `/cohorte-refactor` |
 | `specs/_decisions.md` | `/cohorte-spec` at freeze, `/cohorte-build` on a surface split | `/cohorte-brainstorm` `/cohorte-spec` `/cohorte-audit` only |

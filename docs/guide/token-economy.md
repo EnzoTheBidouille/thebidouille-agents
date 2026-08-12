@@ -15,7 +15,7 @@ redirected to `specs/reports/<id>.preflight.txt`:
 - **Any check red** ⇒ it prints the raw last-40 lines and exits 1. The command **stops there:
   zero agents are spawned.** A reviewer dispatched onto code that doesn't compile burns its whole
   run rediscovering what `tsc` printed for free.
-- **All green** ⇒ it stamps `.claude/preflight.ok` (`<epoch> <HEAD sha> <tree digest>`), which the
+- **All green** ⇒ it stamps `<state>/preflight.ok` (`<epoch> <HEAD sha> <tree digest>`), which the
   gate hook enforces as a **phase gate**: a `review` dispatch with a missing or stale stamp (older
   than `gate.preflight.max_age_minutes`, or the code changed since) gets a confirmation prompt. A lead can't
   accidentally skip the gate; a human can consciously override it.
@@ -81,14 +81,13 @@ always safe** — each command's closing line tells you when. Corollaries the co
 themselves: never paste a diff into a dispatch (agents compute their own, scoped), never echo a
 staged report into chat, redirect bulky output to a file and grep it.
 
-**`/cohorte-loop` is the same rule taken to its conclusion.** A slash command cannot `/clear` itself, so an
-autonomous `/cohorte-review ⇄ /cohorte-fix` loop running *inside* your session would pile the diff plus N review
-reports plus N contracts into a history re-sent at input price on every turn — it would cost more
-than the automation saves. Instead each phase runs as a separate `claude -p` child with its own
-fresh context, and the parent reads back only two things: one line per phase, and
-`specs/reports/<id>.verdict.json` — a handful of numbers. The child transcripts sit in
-`specs/reports/<id>.loop.log`, which the command is explicitly forbidden to read; re-importing it
-would undo the entire design.
+**The same rule is why there is no in-session autonomous driver.** A slash command cannot `/clear`
+itself, so an automated `/cohorte-review ⇄ /cohorte-fix` loop running *inside* your session would pile
+the diff plus N review reports plus N contracts into a history re-sent at input price on every turn
+— it would cost more than the automation saves. That is why every phase writes its result to a file
+(`specs/reports/<id>.verdict.json` — a handful of numbers) rather than to the conversation: anything
+driving the cycle from outside reads those, and your session stays small. A built-in driver shipped
+until 2.2.0 and was retired; the file contract it used is still written on every run.
 
 ## Model routing — pay for judgment, not mechanics
 
@@ -115,7 +114,7 @@ suits very large or mixed code+docs repos; `none` falls back to grep. Wiring is 
 
 ## Measuring: what's slow vs what's expensive
 
-- `.claude/pipeline-metrics.jsonl` records **wall-clock seconds** per phase batch — what's
+- `<state>/pipeline-metrics.jsonl` records **wall-clock seconds** per phase batch — what's
   *slow*. It's the evidence required before splitting a bottleneck surface into specialized
   sub-surfaces (see `SCHEMA.md` §Specialization).
 - **`/cost`** (built-in) reports per-subagent and per-command share of usage — what's

@@ -1,8 +1,8 @@
 import React from 'react';
 
-// Mirrors SCHEMA.md §Spec status — `in-progress` (a /cohorte-loop is driving this spec) and
-// `blocked` (a /cohorte-loop gave up on it) are terminal-ish states the driver writes, and the
-// board is where a human notices a loop that died mid-flight.
+// Mirrors SCHEMA.md §Spec status — `in-progress` (a round is under way) and `blocked` (a round
+// gave up) are written by an external driver, if any; the board is where a human notices a spec
+// left mid-flight.
 const STAGES = [
   { key: 'draft', label: 'Draft' },
   { key: 'frozen', label: 'Frozen' },
@@ -74,7 +74,7 @@ function SpecCard({ s, bad }) {
       </div>
       {s.loop && (
         <div className="spec-loop muted small mono">
-          ↻ pass {s.loop.pass}{s.loop.phase ? ` · /${s.loop.phase}` : ''} — resume with <code>--resume</code>
+          ↻ left at pass {s.loop.pass}{s.loop.phase ? ` · /${s.loop.phase}` : ''} by a retired driver
         </div>
       )}
       {s.branch && <div className="spec-branch muted small mono">⑂ {s.branch}</div>}

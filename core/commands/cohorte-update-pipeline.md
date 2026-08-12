@@ -6,14 +6,14 @@ argument-hint: [path-to-local-checkout]
 
 You are the **pipeline updater**. Refresh the installed pipeline core to the latest version of the pipeline
 repo. The installer's `--update` mode never touches generated files: `PIPELINE.md`, rendered surface agents,
-`gate-config.json`, `settings.json`, and the filled `~/.claude/cohorte.config.yaml` are all preserved.
+`gate-config.json`, `settings.json`, and the filled `<config>` are all preserved.
 YOU then bring those generated files up to the new core yourself (§3.5) — additively, never clobbering
 the human's choices — so `/cohorte-init-pipeline` never needs re-running for an upgrade.
 
 ## 1. Detect the install scope + current version
 
-- **Global** install ⇒ `~/.claude/pipeline/VERSION` exists. **Bundled** ⇒ this repo's
-  `.claude/pipeline/VERSION` exists. (Both can exist; prefer the bundled one when running inside such a
+- **Global** install ⇒ `<core>/pipeline/VERSION` exists. **Bundled** ⇒ this repo's
+  `<core>/pipeline/VERSION` exists. (Both can exist; prefer the bundled one when running inside such a
   repo, and update both if the human wants.)
 - **Never migrate a repo between bundled and global mode on your own.** Updating means refreshing the
   core *in its current mode*. Only migrate (e.g. delete a bundled core in favor of the global one) if
@@ -52,7 +52,7 @@ the human's choices — so `/cohorte-init-pipeline` never needs re-running for a
 
 Re-read the VERSION file(s) and print `old → new`. If unchanged, say the core was already up to date.
 
-**Sync the pointer — in BOTH modes.** If this repo has a `.claude/pipeline.json` whose `core_version`
+**Sync the pointer — in BOTH modes.** If this repo has a `<state>/pipeline.json` whose `core_version`
 differs from the core you just installed, rewrite that one field (leave every other field untouched)
 and tell the human to commit it. In **bundled** mode the installer already did it; in **global** mode
 **nothing does** — the installer refreshes one shared core and cannot know which repos point at it,
@@ -87,16 +87,16 @@ missing, say so. This is why `/cohorte-init-pipeline` never needs re-running for
 Four of the §Reconcile steps matter specifically here:
 
 - **Local-artifact hygiene** (§Reconcile step 8): gitignore + untrack the pipeline's runtime files
-  (`.claude/preflight.ok`, `.claude/pipeline-metrics.jsonl`, `specs/reports/`). A tracked
+  (`<state>/preflight.ok`, `<state>/pipeline-metrics.jsonl`, `specs/reports/`). A tracked
   `preflight.ok` — what every pre-2.0.0 install ends up with once a release agent stages `.claude/` —
   makes the phase gate ask on every single review dispatch, so fix it here and say so.
 
 - **Spec-template top-up** (§Reconcile step 7): `specs/_template.md` was seeded at install and never
   refreshed since, so add the front-matter fields the current `templates/spec.template.md` has and the
-  repo's copy lacks (1.6 added `loop_pass`/`loop_phase` and two states to the `status:` comment) —
+  repo's copy lacks — and drop `loop_pass`/`loop_phase`, retired with `/cohorte-loop` in 2.2.0 —
   front-matter only, never the body.
 
-- **Global config seed** (§Reconcile step 5): if `~/.claude/cohorte.config.yaml` is absent, seed it
+- **Global config seed** (§Reconcile step 5): if `<config>` is absent, seed it
   from the template so the kanban + shared-vault config has a home. Never clobber an existing filled
   file. Report what was seeded. If the existing file has NO `telemetry:` block with a `consent_date`
   (pre-telemetry install), top up the block from the template and ask the ONE opt-in consent
@@ -125,5 +125,5 @@ Four of the §Reconcile steps matter specifically here:
   `/cohorte-update-pipeline` inside each (it will skip the already-done core update and just reconcile).
 - **Commit** the reconciled files (`PIPELINE.md`, `.claude/`, `.mcp.json` if added) so teammates get them.
 - The kanban config is global and user-scoped
-  (`~/.claude/cohorte.config.yaml`) — never committed. The core update never touches it; only the
+  (`<config>`) — never committed. The core update never touches it; only the
   reconcile above seeds the file and writes kanban board links (into that global file, not the repo).

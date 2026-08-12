@@ -6,6 +6,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { layouts, primary, stateDirs } = require('./runtime.js');
 const { parseProfileBlock } = require('./yaml');
 const { versions } = require('./versions');
 
@@ -19,9 +20,9 @@ const FIXED_AGENTS = new Set([
   'implementer.template',
 ]);
 
-// The spec lifecycle (SCHEMA.md §Spec status). `in-progress` and `blocked` are written by
-// the /cohorte-loop driver — they are what makes an interrupted autonomous loop resumable, so a
-// dashboard that flagged them as invalid would report the pipeline's own state as a defect.
+// The spec lifecycle (SCHEMA.md §Spec status). `in-progress` and `blocked` stay valid after
+// /cohorte-loop was retired in 2.2.0: specs in existing repos carry them, and an external driver
+// still needs somewhere to record "a round is under way" / "a round gave up".
 const VALID_STATUS = ['draft', 'frozen', 'in-progress', 'in-review', 'shipped', 'blocked'];
 
 // Artifacts the pipeline itself writes into specs/ that are NOT feature specs and have no
@@ -40,6 +41,12 @@ const sameSet = (a, b) => {
   if (A.size !== B.size) return false;
   for (const x of A) if (!B.has(x)) return false;
   return true;
+};
+
+// Paths are reported to a human looking at a repo: show them relative to it.
+const rel = (projectRoot) => (p) => {
+  const r = path.relative(projectRoot, p);
+  return r && !r.startsWith('..') ? r : p;
 };
 
 function mk(id, label, status, detail, fix) {
@@ -84,11 +91,14 @@ function checkProfile(profile, hasPipelineMd) {
     n ? undefined : 'add at least one surface to §surfaces');
 }
 
-function checkAgents(profile, projectRoot) {
+function checkAgents(profile, projectRoot, layout) {
   if (!profile || !(profile.surfaces || []).length) {
     return mk('agents', 'Surfaces ↔ agents', 'skip', 'no surfaces to reconcile');
   }
-  const agentsDir = path.join(projectRoot, '.claude', 'agents');
+  if (!layout) {
+    return mk('agents', 'Surfaces ↔ agents', 'skip', 'no core installed — nothing renders agents yet');
+  }
+  const agentsDir = layout.agents;
   const surfaceAgents = profile.surfaces.map(s => s.agent).filter(Boolean);
 
   const missing = surfaceAgents.filter(a => !exists(path.join(agentsDir, `${a}.md`)));
@@ -109,17 +119,21 @@ function checkAgents(profile, projectRoot) {
       'remove the stale agent file, or add its surface to PIPELINE.md');
   }
   return mk('agents', 'Surfaces ↔ agents', 'ok',
-    `${surfaceAgents.length} surface agent(s) all rendered, no orphans`);
+    `${surfaceAgents.length} surface agent(s) all rendered, no orphans (${layout.label})`);
 }
 
-function checkGate(profile, projectRoot) {
+function checkGate(profile, projectRoot, stateDirs) {
   const gate = profile && profile.gate;
   if (!gate || (!gate.deny && !gate.ask && !gate.ask_on_default_branch && !gate.preflight)) {
     return mk('gate', 'Gate config', 'skip', 'no gate block in the profile');
   }
-  const cfg = readJson(path.join(projectRoot, '.claude', 'gate-config.json'));
+  // One gate config per PROJECT, wherever the installed runtime keeps it. A repo driven from
+  // two agents shares it deliberately — they must not disagree about what is gated.
+  const cfgPath = stateDirs.map(d => path.join(d, 'gate-config.json')).find(exists);
+  const cfg = cfgPath ? readJson(cfgPath) : null;
   if (!cfg) {
-    return mk('gate', 'Gate config', 'bad', '.claude/gate-config.json missing or unreadable',
+    return mk('gate', 'Gate config', 'bad',
+      `gate-config.json missing or unreadable (looked in ${stateDirs.map(rel(projectRoot)).join(', ')})`,
       '/cohorte-init-pipeline   (regenerate gate-config.json from the gate block)');
   }
   const drifted = [];
@@ -139,7 +153,7 @@ function checkGate(profile, projectRoot) {
   if (drifted.length) {
     return mk('gate', 'Gate config', 'warn',
       `gate-config.json drifted from PIPELINE.md gate block (${drifted.join(', ')})`,
-      'regenerate .claude/gate-config.json to mirror the gate block');
+      `regenerate ${rel(projectRoot)(cfgPath)} to mirror the gate block`);
   }
   const branchGated = (gate.ask_on_default_branch || []).length;
   return mk('gate', 'Gate config', 'ok',
@@ -147,15 +161,24 @@ function checkGate(profile, projectRoot) {
     (branchGated ? `, ${branchGated} gated on ${gate.default_branch || 'main'}` : '') + ')');
 }
 
-// Local-only pipeline artifacts. `.claude/preflight.ok` is the one that BREAKS things when
-// versioned rather than merely being noise: the stamp names the tree it verified, committing
-// it moves HEAD past that, and the committed copy then rides into every fresh clone and
-// worktree — the phase gate either blocks a clean tree or greens one it never checked.
-const LOCAL_ARTIFACTS = [
-  { path: '.claude/preflight.ok', why: 'the phase-gate stamp — a versioned one breaks the gate in every clone and worktree' },
-  { path: '.claude/pipeline-metrics.jsonl', why: 'the per-dispatch metrics sink (local, append-only)' },
-  { path: 'specs/reports/', why: 'the /cohorte-review report buffer (derived, regenerated each run)' },
-];
+// Local-only pipeline artifacts, named relative to whichever `<state>` dir the installed
+// runtime uses (`.claude` on a Claude install, `.cohorte` on the others). `preflight.ok` is the
+// one that BREAKS things when versioned rather than merely being noise: the stamp names the tree
+// it verified, committing it moves HEAD past that, and the committed copy then rides into every
+// fresh clone and worktree — the phase gate either blocks a clean tree or greens one it never
+// checked.
+function localArtifacts(stateRels) {
+  const out = [];
+  for (const d of stateRels) {
+    out.push({ path: `${d}/preflight.ok`, stamp: true,
+      why: 'the phase-gate stamp — a versioned one breaks the gate in every clone and worktree' });
+    out.push({ path: `${d}/pipeline-metrics.jsonl`,
+      why: 'the per-dispatch metrics sink (local, append-only)' });
+  }
+  out.push({ path: 'specs/reports/',
+    why: 'the /cohorte-review report buffer (derived, regenerated each run)' });
+  return out;
+}
 
 // Does any .gitignore in play cover `rel`? Deliberately literal — it recognizes the exact
 // path, its basename, a trailing-slash dir prefix and a `*.<ext>` glob, which is every form
@@ -183,60 +206,110 @@ function ignoreCovers(projectRoot, rel) {
   return false;
 }
 
-function checkLocalArtifacts(projectRoot) {
-  const unignored = LOCAL_ARTIFACTS.filter(a => !ignoreCovers(projectRoot, a.path));
+function checkLocalArtifacts(projectRoot, stateRels) {
+  const artifacts = localArtifacts(stateRels);
+  const unignored = artifacts.filter(a => !ignoreCovers(projectRoot, a.path));
   if (!unignored.length) {
     return mk('artifacts', 'Local artifacts', 'ok',
-      `${LOCAL_ARTIFACTS.length} local-only artifact path(s) all gitignored`);
+      `${artifacts.length} local-only artifact path(s) all gitignored`);
   }
-  const stamp = unignored.find(a => a.path === '.claude/preflight.ok');
+  const stamp = unignored.find(a => a.stamp);
   return mk('artifacts', 'Local artifacts', stamp ? 'bad' : 'warn',
     `not gitignored: ${unignored.map(a => a.path).join(', ')} — ${unignored[0].why}`,
     `add ${unignored.map(a => a.path).join(' + ')} to .gitignore`
-    + (stamp ? ', then `git rm --cached --ignore-unmatch .claude/preflight.ok`' : ''));
+    + (stamp ? `, then \`git rm --cached --ignore-unmatch ${stamp.path}\`` : ''));
 }
 
-function gateRegs(settingsPath) {
+// Gate registrations in one config file. Three shapes across the runtimes that host the hook:
+// Claude Code and Codex use the matcher-group form under `PreToolUse`, Gemini the same shape
+// under `BeforeTool`, Cursor a flat `[{command}]` under `beforeShellExecution`. A registration
+// read with the wrong shape looks absent, which is how a healthy install gets reported broken.
+function gateRegs(settingsPath, event) {
   const data = readJson(settingsPath);
-  const pre = data && data.hooks && Array.isArray(data.hooks.PreToolUse) ? data.hooks.PreToolUse : [];
+  const list = data && data.hooks && Array.isArray(data.hooks[event]) ? data.hooks[event] : [];
   // Trailing-quote tolerant, like the installers since 1.3.2: the Windows form is
   // `py "C:\…\gate.py"` — a bare .endsWith() reports every healthy Windows install
   // as "not registered".
-  return pre.filter(e => (e.hooks || []).some(
-    h => typeof h.command === 'string' && h.command.trim().replace(/"+$/, '').endsWith('gate.py')));
+  // Strip the trailing `--runtime <id>` BEFORE the quotes: the registered command is
+  // `python3 "/path/gate.py" --runtime cursor`, so taking the quotes off first leaves
+  // `…gate.py"` and the match fails — a healthy registration read as missing.
+  const isOurs = (c) => typeof c === 'string'
+    && c.trim().replace(/\s+--runtime[= ]\S+$/, '').replace(/"+$/, '').endsWith('gate.py');
+  return list.filter(e => isOurs(e && e.command)
+    || ((e && e.hooks) || []).some(h => isOurs(h && h.command)));
 }
 
-function checkHooks(projectRoot, globalDir, installMode) {
-  // A registration in EITHER scope serves the project: bundled repos get it from
-  // /cohorte-init-pipeline in project settings, but on a machine with the global core the
-  // hook usually lives (correctly, exactly once) in global settings — warning
-  // there would prescribe a re-registration that double-prompts.
-  const scopes = [
-    { label: 'project', path: path.join(projectRoot, '.claude', 'settings.json') },
-    { label: 'global', path: path.join(globalDir, 'settings.json') },
-  ];
-  if (installMode === 'global') scopes.reverse();
-  const found = scopes.map(s => ({ ...s, regs: gateRegs(s.path) })).filter(s => s.regs.length);
+function checkHooks(projectRoot, globalDir, installMode, all) {
+  // A registration can exist without a discoverable core — a repo whose core lives in a global
+  // dir the dashboard was not pointed at, or one predating `runtimes.json`. Falling through to
+  // "no runtime installed" there would hide a real double-registration, so assume the Claude
+  // layout: before the adapter it was the only one, and it is the only one whose hook can be
+  // registered outside its own core dir.
+  const known = all.length ? all : [{
+    id: 'claude', label: 'Claude Code', scope: installMode === 'bundled' ? 'project' : 'global',
+    core: path.join(projectRoot, '.claude'),
+    hooksConfig: path.join(projectRoot, '.claude', 'settings.json'),
+    capabilities: { subagents: true, hooks: true, workflows: true },
+  }];
+  const hosts = known.filter(l => l.capabilities && l.capabilities.hooks && l.hooksConfig);
+  const advisory = known.filter(l => !(l.capabilities && l.capabilities.hooks));
 
-  if (!found.length) {
-    return mk('hooks', 'Gate hook', 'warn', 'gate.py not registered in project or global settings.json',
-      installMode === 'global'
-        ? 'npx cohorte install --global   (re-registers the hook)'
-        : '/cohorte-init-pipeline   (register the PreToolUse gate hook)');
+  if (!hosts.length) {
+    if (advisory.length) {
+      // OpenCode extends via plugins, not a blocking hook. The gate still runs — the rendered
+      // commands call `gate.py --check` — but it is advisory, and saying ✅ here would claim an
+      // enforcement property that genuinely is not there.
+      return mk('hooks', 'Gate hook', 'warn',
+        `${advisory.map(l => l.label).join(', ')} has no blocking hook — the gate runs as an explicit --check the agent must call`,
+        'nothing to fix; run /cohorte-doctor inside that runtime for the full picture');
+    }
+    return mk('hooks', 'Gate hook', 'warn', 'no runtime installed to register the gate hook against',
+      'npx cohorte install   (or --global)');
   }
-  const total = found.reduce((n, s) => n + s.regs.length, 0);
-  if (total > 1) {
-    return mk('hooks', 'Gate hook', 'warn',
-      `gate.py registered ${total}× (${found.map(s => `${s.regs.length} in ${s.label}`).join(', ')}) — it will double-prompt`,
-      'keep exactly one PreToolUse entry (drop the project-level one when the global core is installed)');
+
+  const problems = [];
+  const okLines = [];
+  for (const l of hosts) {
+    const event = (l.id === 'cursor') ? 'beforeShellExecution'
+      : (l.id === 'gemini') ? 'BeforeTool' : 'PreToolUse';
+    // A Claude registration serves the project from EITHER scope: bundled repos get it from
+    // /cohorte-init-pipeline in project settings, but on a machine with the global core it
+    // usually lives (correctly, exactly once) in global settings — warning there would
+    // prescribe a re-registration that double-prompts.
+    const paths = l.id === 'claude'
+      ? (installMode === 'global'
+        ? [path.join(globalDir, 'settings.json'), path.join(projectRoot, '.claude', 'settings.json')]
+        : [path.join(projectRoot, '.claude', 'settings.json'), path.join(globalDir, 'settings.json')])
+      : [l.hooksConfig];
+    const found = paths.map(p2 => ({ path: p2, regs: gateRegs(p2, event) })).filter(f => f.regs.length);
+    if (!found.length) {
+      problems.push(`${l.label}: not registered (${event})`);
+      continue;
+    }
+    const total = found.reduce((n, f) => n + f.regs.length, 0);
+    if (total > 1) {
+      problems.push(`${l.label}: registered ${total}× — it will double-prompt`);
+      continue;
+    }
+    // Only the matcher-group runtimes carry one, and only Claude dispatches subagents through
+    // a `Task` tool — a Bash-only matcher there leaves the preflight phase gate dead.
+    const matcher = String(found[0].regs[0].matcher || '');
+    if (l.id === 'claude' && (!/\bTask\b/.test(matcher) || !/\bBash\b/.test(matcher))) {
+      problems.push(`${l.label}: matcher "${matcher}" must cover both Bash and Task`);
+      continue;
+    }
+    okLines.push(`${l.label} (${event}${matcher ? `, ${matcher}` : ''})`);
   }
-  const matcher = String(found[0].regs[0].matcher || '');
-  if (!/\bTask\b/.test(matcher) || !/\bBash\b/.test(matcher)) {
-    return mk('hooks', 'Gate hook', 'warn',
-      `registered with matcher "${matcher}" — it must cover both Bash (command gating) and Task (preflight phase gate)`,
-      'npx cohorte@latest update --global   (reconciles the matcher to Bash|Task)');
+
+  if (problems.length) {
+    // Name the healthy ones too. With several runtimes installed, "Claude Code: not registered"
+    // alone reads as if the gate were off everywhere, when four of five may be fine.
+    const tail = okLines.length ? ` (ok: ${okLines.join(', ')})` : '';
+    return mk('hooks', 'Gate hook', 'warn', problems.join(' · ') + tail,
+      'npx cohorte@latest update   (re-registers the gate hook for every installed runtime)');
   }
-  return mk('hooks', 'Gate hook', 'ok', `registered once, matcher ${matcher} (${found[0].label} settings.json)`);
+  const tail = advisory.length ? ` · ${advisory.map(l => l.label).join(', ')}: advisory --check only` : '';
+  return mk('hooks', 'Gate hook', 'ok', `registered once for ${okLines.join(', ')}${tail}`);
 }
 
 function checkRetrieval(profile, projectRoot) {
@@ -292,14 +365,17 @@ function checkIsolation(profile, projectRoot) {
 // the conversational commands stay the default path, so nothing here is ever 'bad'.
 // Whether the session has workflows ENABLED needs a live Claude session — /cohorte-doctor
 // in-session checks that; here we only check what's on disk.
-function checkWorkflows(projectRoot, globalDir, installMode) {
+function checkWorkflows(projectRoot, globalDir, installMode, all) {
   if (installMode === 'none') return mk('workflows', 'Workflows', 'skip', 'no core installed');
-  const dir = installMode === 'bundled'
-    ? path.join(projectRoot, '.claude', 'workflows')
-    : path.join(globalDir, 'workflows');
-  const agentsDir = installMode === 'bundled'
-    ? path.join(projectRoot, '.claude', 'agents')
-    : path.join(globalDir, 'agents');
+  // The Workflow engine is Claude Code's; the other runtimes are not shipped the scripts at
+  // all, and reporting them as "missing" would flag a deliberate omission as a defect.
+  const cc = all.find(l => l.id === 'claude');
+  if (!cc) {
+    return mk('workflows', 'Workflows', 'skip',
+      `not available on ${all.map(l => l.label).join(', ') || 'this runtime'} — conversational commands only`);
+  }
+  const dir = path.join(cc.core, 'workflows');
+  const agentsDir = cc.agents;
   const scripts = ['review.js', 'audit.js', 'refactor.js'];
   const missing = scripts.filter(s => !exists(path.join(dir, s)));
   if (missing.length === scripts.length) {
@@ -333,7 +409,8 @@ function scanSpecs(projectRoot) {
     const body = fm ? fm[1] : '';
     const get = k => { const m = body.match(new RegExp(`^${k}:\\s*(.*)$`, 'm')); return m ? m[1].trim() : null; };
     const status = get('status');
-    // The loop driver's resume state, when a /cohorte-loop is (or was) running on this spec.
+    // Legacy resume state from the retired /cohorte-loop driver. Nothing writes it any more;
+    // it is still read so a spec left mid-flight by an older core still shows why on the board.
     const pass = parseInt(get('loop_pass'), 10);
     const phase = get('loop_phase');
     specs.push({
@@ -371,17 +448,25 @@ async function state({ projectRoot, globalDir, cliVersion }) {
   const profile = pipelineMd ? parseProfileBlock(pipelineMd) : null;
   const specs = scanSpecs(projectRoot);
 
+  // Which coding agent(s) this repo is wired for. Every path-dependent check below reads from
+  // this rather than assuming `.claude/` — on a Cursor-only repo that assumption reported the
+  // core, the agents, the artifacts and the hook as all broken, and every one of them was fine.
+  const all = layouts({ projectRoot, globalDir });
+  const main = primary(all);
+  const stateAbs = stateDirs(all, projectRoot);
+  const stateRels = stateAbs.map(rel(projectRoot));
+
   const checks = [
     checkCore(v),
     checkProfile(profile, pipelineMd != null),
-    checkAgents(profile, projectRoot),
-    checkGate(profile, projectRoot),
-    checkLocalArtifacts(projectRoot),
-    checkHooks(projectRoot, globalDir, v.installMode),
+    checkAgents(profile, projectRoot, main),
+    checkGate(profile, projectRoot, stateAbs),
+    checkLocalArtifacts(projectRoot, stateRels),
+    checkHooks(projectRoot, globalDir, v.installMode, all),
     checkRetrieval(profile, projectRoot),
     checkDesign(profile, projectRoot),
     checkIsolation(profile, projectRoot),
-    checkWorkflows(projectRoot, globalDir, v.installMode),
+    checkWorkflows(projectRoot, globalDir, v.installMode, all),
     checkSpecs(specs),
   ];
 
@@ -390,6 +475,8 @@ async function state({ projectRoot, globalDir, cliVersion }) {
 
   return {
     project: projectRoot,
+    runtimes: all.map(l => ({ id: l.id, label: l.label, scope: l.scope,
+      capabilities: l.capabilities, legacy: !!l.legacy })),
     versions: v,
     profile: profile ? {
       name: profile.name,

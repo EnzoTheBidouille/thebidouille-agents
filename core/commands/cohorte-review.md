@@ -10,20 +10,21 @@ You are the **lead**. Dispatch the review for feature **$ARGUMENTS**.
 > _Skip the re-read if it's already in your context this session and unmodified since._
 >
 > **Kanban** (SCHEMA.md §Kanban): run
-> `<core>/pipeline/scripts/kanban-move.sh auto $ARGUMENTS review` (`<core>` = `.claude` bundled /
-> `~/.claude` global — probe with `test -x`). `auto` resolves the board from the config itself and
+> `<core>/pipeline/scripts/kanban-move.sh auto $ARGUMENTS review`. `auto` resolves the board from the config itself and
 > exits 0 with a `kanban: <reason>` line when there is none — so **never decide "no board is
 > configured" without running it**.
 >
+<!-- cohorte:if workflows -->
 > **Workflow variant** (opt-in — SCHEMA.md §Workflows): on Claude Code ≥ 2.1.154 with workflows
 > enabled, the human can ask to "run the review workflow" (`<core>/workflows/review.js`) instead.
 > This conversational path stays the default and the fallback; `/cohorte-doctor` shows which is available.
+<!-- cohorte:endif -->
 
 ## 0. Deterministic pre-flight — no agents while red
 
 Run the profile's mechanical gates in ONE Bash call via the shipped script
-(`<core>/pipeline/scripts/preflight.sh`, `<core>` = `.claude` bundled / `~/.claude` global — probe
-with `test -x`); note the epoch (`date +%s`) in the same call — §3's metrics line needs it:
+(`<core>/pipeline/scripts/preflight.sh`); note the epoch (`date +%s`) in the same call — §3's
+metrics line needs it:
 
 ```
 <core>/pipeline/scripts/preflight.sh specs/reports/$ARGUMENTS.preflight.txt \
@@ -37,8 +38,14 @@ with `test -x`); note the epoch (`date +%s`) in the same call — §3's metrics 
   rather than silence:
   `{"id":"$ARGUMENTS","phase":"review","ts":"<ISO>","aborted":"preflight","verdict":"BLOCK","blocking":null}`
   → `specs/reports/$ARGUMENTS.verdict.json`. One `printf`, in the same Bash call.
-- **Zero exit** ⇒ it stamped `.claude/preflight.ok`, which the gate hook checks before letting
+<!-- cohorte:if hooks -->
+- **Zero exit** ⇒ it stamped `<state>/preflight.ok`, which the gate hook checks before letting
   `review` dispatches through (SCHEMA.md §Preflight). Continue.
+<!-- cohorte:else -->
+- **Zero exit** ⇒ it stamped `<state>/preflight.ok`. Nothing enforces that stamp on this runtime, so
+  §2 does not start until you have seen this line: a review of red code is the one failure mode this
+  step exists to prevent, and here only you can prevent it (SCHEMA.md §Preflight). Continue.
+<!-- cohorte:endif -->
 - Script absent (older core) ⇒ run the three commands yourself, each redirected into
   `specs/reports/$ARGUMENTS.preflight.txt`, aborting on the first failure the same way.
 
@@ -61,7 +68,7 @@ with `test -x`); note the epoch (`date +%s`) in the same call — §3's metrics 
 
 ## 2. Dispatch review agents — one per touched surface, IN PARALLEL
 
-Spawn ONE `review` agent per surface that has changed files, in a **single message** (one Task call
+Spawn ONE `review` agent per surface that has changed files, in a **single message** (one dispatch
 each, like `/cohorte-build`) so they run concurrently — NEVER serially: review wall-clock must be the
 slowest surface, not the sum. A diff touching a single surface ⇒ a single reviewer.
 
@@ -70,12 +77,12 @@ changed lines), touches no contract file, and every open finding it addresses is
 LOW/MEDIUM, skip the dispatch: verify the hunks yourself against the open Remediation items (did the
 prescribed fixes land? — NOT a de-novo audit) and write the same REVIEW REPORT into the §3 flow.
 First-round reviews, contract changes, and security findings always get a full reviewer. For each
-dispatched surface:
+reviewed surface:
 
 Keep the dispatch prompt **byte-identical across features and rounds** except the variable block,
 which sits at the END so every repeat hits the prompt-cache prefix:
 
-> `subagent_type: review` — "Review one feature surface against its frozen spec. Read `PIPELINE.md`
+> `subagent_type: review` (or this runtime's equivalent) — "Review one feature surface against its frozen spec. Read `PIPELINE.md`
 > first (flags + the §Conventions/§Testing slice for your scope). Check spec conformance first, then
 > correctness, security, conventions, RBAC/mobile-first _if the profile enables them_, and TDD
 > coverage. Your dispatch names a staged diff file — read it FIRST; open a full source file only when
@@ -109,7 +116,7 @@ re-ordered by severity, counts summed, duplicates collapsed, verdict = the worst
 (`BLOCK` > `REVISE` > `SHIP`). The `## Deferred` sections merge the same way (dedupe by
 `file` + problem) and stay **out of the severity table and out of the verdict** — see §3.5, which
 routes them. Append ONE metrics line for the batch to the **main checkout's**
-`$(dirname "$(git rev-parse --git-common-dir)")/.claude/pipeline-metrics.jsonl` (rules in
+`$(dirname "$(git rev-parse --git-common-dir)")/<state>/pipeline-metrics.jsonl` (rules in
 `/cohorte-build` §4; never a bare relative path — from a worktree that strands the lines): `{"ts":"<ISO>","feature":"$ARGUMENTS","phase":"review","seconds":<wall-clock>,"surfaces":{"<key>":"<verdict>:<finding count>",…}}`.
 In the same Bash call, chain the opt-in usage ping (`/cohorte-build` §4, `phase: "review"`, results = the
 merged verdict + total finding count, e.g. `"REVISE:3"`).
@@ -118,7 +125,7 @@ merged verdict + total finding count, e.g. `"REVISE:3"`).
 non-recursive `specs/*.md` glob, so it's never mistaken for a spec (no phantom card, no bogus stage).
 **Write the machine-readable verdict** to `specs/reports/$ARGUMENTS.verdict.json` (overwrite) — on
 **every** run, including the small-diff fast path of §2 and a `SHIP`. This file is the ONLY contract
-between the pipeline and an automated driver (`/cohorte-loop`), which parses no prose:
+between the pipeline and any automated driver, which parses no prose:
 
 ```json
 { "id": "$ARGUMENTS", "phase": "review", "ts": "<ISO>", "verdict": "REVISE",
@@ -163,8 +170,8 @@ exactly the leak this step closes. Append each merged `## Deferred` item to
 - [ ] <SEVERITY> · <file:line> · <quality|security|rule> · <concrete fix> · deferred:$ARGUMENTS
 ```
 
-- **Never into the spec's `## Remediation`** — that list is what `/cohorte-fix` re-dispatches and what `/cohorte-loop`
-  waits on, so a deferred item there would re-trigger the very loop it was deferred out of.
+- **Never into the spec's `## Remediation`** — that list is what `/cohorte-fix` re-dispatches, so a
+  deferred item there would re-trigger the very fix round it was deferred out of.
 - **Dedupe before appending:** `grep -F` the backlog for the item's `<file>` + the first words of its
   problem; already there (from a prior round or an `/cohorte-audit`) ⇒ skip it, don't stack duplicates round
   after round.
@@ -197,10 +204,7 @@ would sit in this session's history, re-sent every turn). Then:
   re-trigger the fix loop), keep the SHIP verdict and the freshness stamp, and let the human ship.
 - **REVISE / BLOCK**, or any CRITICAL/HIGH/security finding → tell the human to run
   **`/cohorte-fix $ARGUMENTS`** — it appends the report to the spec's `## Remediation` and re-dispatches ONLY
-  the surfaces with findings. (If they'd rather automate the rounds, the autonomous driver is
-  `disable-model-invocation: true` on purpose: **you cannot start it, they must type it**. Name the
-  exact line for them to type rather than attempting it — an attempt that silently fails reads as a
-  loop that is running when nothing is.) The full path (`/cohorte-spec` Mode B then `/cohorte-build`) remains for findings that
+  the surfaces with findings. The full path (`/cohorte-spec` Mode B then `/cohorte-build`) remains for findings that
   change the contract in ways that ripple into clean surfaces. _The report is staged to
   `specs/reports/$ARGUMENTS.md`, so you can `/clear` before `/cohorte-fix` — it reads the findings back from
   disk._

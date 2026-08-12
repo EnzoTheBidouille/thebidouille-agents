@@ -37,7 +37,7 @@ Gather evidence, then summarize what you found. Look for:
   `graphify`? Is either already registered in this repo's `.mcp.json` or `claude mcp list`? (Feeds
   the retrieval question + Phase 4 wiring — default provider is `serena`.)
 - **VCS:** `git remote -v` → host + `owner/repo`; the default branch (`git symbolic-ref refs/remotes/origin/HEAD` or `git branch`).
-- **Existing `CLAUDE.md`** — read it; it may already state stack/conventions to fold in. **Existing
+- **Existing `<memory>`** — read it; it may already state stack/conventions to fold in. **Existing
   `PIPELINE.md`** — if present, this is a re-run: load it as the starting draft and only reconcile deltas.
 
 Print a compact **Detection Report**: layout, surfaces (with framework + commands), contract, release

@@ -13,8 +13,9 @@
 
 </div>
 
-A **portable, stack-agnostic multi-agent pipeline** for Claude Code. Install it once globally,
-then one command per project (`/cohorte-init-pipeline`) adapts it to that project's stack.
+A **portable, stack-agnostic multi-agent pipeline** for your coding agent — Claude Code, Codex CLI,
+Cursor, Gemini CLI or OpenCode. Install it once globally, then one command per project
+(`/cohorte-init-pipeline`) adapts it to that project's stack.
 
 - **The dev pipeline** — a human **lead** drives feature work through gated commands, dispatching
   **stateless agents** that only communicate through a frozen contract:
@@ -38,6 +39,44 @@ The core never hardcodes stack facts. Two mechanisms keep it generic:
    _first action_ is to read its config.
 2. **Render-at-init** — things that must be in agent frontmatter (name, `tools:`, surface ownership)
    are rendered per **surface** by `/cohorte-init-pipeline` from `implementer.template.md`.
+
+## Which coding agent — [full matrix →](https://thebidouilleagency.github.io/cohorte/reference/runtimes)
+
+The doctrine is one set of source prompts. The installer renders them into whatever your agent
+actually reads, and branches the instructions on what it can actually do:
+
+```sh
+npx cohorte install --runtime=codex,cursor     # pick explicitly
+npx cohorte install --all-runtimes             # every supported one
+npx cohorte install                            # detects what you have and asks
+```
+
+| | Commands | Subagents | Gate | Workflows |
+| --- | --- | --- | --- | --- |
+| **Claude Code** | `.claude/commands/*.md` | ✅ `.claude/agents` | ✅ blocking hook, deny + **ask** | ✅ |
+| **Codex CLI** | `.agents/skills/*/SKILL.md` | ✅ `.codex/agents` (TOML) | ✅ blocking hook, deny only | — |
+| **Cursor** | `.cursor/commands/*.md` | ✅ `.cursor/agents` | ✅ blocking hook, deny + **ask** | — |
+| **Gemini CLI** | `.gemini/commands/*.toml` | ✅ `.gemini/agents` | ✅ blocking hook, deny only | — |
+| **OpenCode** | `.opencode/commands/*.md` | ✅ `.opencode/agents` | advisory `--check` | — |
+
+The same `gate.py` is registered as a real blocking hook on four of the five — it speaks each
+runtime's envelope (`PreToolUse`, `beforeShellExecution`, `BeforeTool`). Codex and Gemini have **no
+confirmation tier**, so a pattern that would be queried elsewhere is **denied** there rather than
+falling through; the rendered prompts say so. OpenCode extends via plugins rather than hooks, so
+there the commands call `gate.py --check` themselves — same config and verdicts, but advisory.
+
+**Real subagents are a requirement, not a capability to degrade around** — the pipeline's isolation
+guarantee is that boundary, so a runtime without them is refused at install rather than rendered
+into a pipeline whose central promise is absent. All five have them.
+`/cohorte-doctor` reports what the runtime you are in can actually enforce.
+
+On Codex the commands ship as **skills** (`$cohorte-build`) rather than custom prompts: prompts are
+deprecated and user-scoped, so a teammate cloning the repo would get the profile but none of the
+commands — `.agents/skills/` is committed with it instead.
+
+One thing does not travel: model pins. The profile names Anthropic aliases, meaningless elsewhere,
+so agents inherit the runtime's own model. Claude Code remains the reference implementation and its
+install is unchanged.
 
 ## Prerequisites
 
@@ -220,7 +259,6 @@ it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.
 | `/cohorte-build <id>`        | Readiness gate on the frozen spec, then the lead authors the contract and dispatches one implementer per surface in parallel. |
 | `/cohorte-review <id>`       | Read-only review agents (one per touched surface, parallel) audit the diff vs the spec; out-of-scope findings go to the refactor backlog. |
 | `/cohorte-fix <id>`          | Apply a review report: remediation into the spec, re-dispatch only the surfaces with findings. |
-| `/cohorte-loop <id>`         | Autonomous `/cohorte-build → /cohorte-review → /cohorte-fix → /cohorte-review …` until no blocking finding is left (see below). |
 | `/cohorte-ship <id>`         | Release agent commits, pushes, opens the PR; watches CI; proposes worktree teardown.  |
 | `/cohorte-audit [path]`      | Prioritized refactor backlog for existing code.                                       |
 | `/cohorte-refactor <domain>` | Apply the backlog for one surface, TDD-first.                                         |
@@ -244,35 +282,6 @@ lever: long sessions (>150k) are expensive even when cached. Each command tells 
 safe to clear. If you'd rather stay in one session, `/compact` mid-task does the lighter version. (Claude
 can't fire `/clear` itself — it's a client-side command; the pipeline just makes it always safe to type.)
 
-### Let it run itself — `/cohorte-loop`
-
-```
-/cohorte-loop feat-x              # /cohorte-build, then /cohorte-review ⇄ /cohorte-fix until clean (max 5 passes)
-/cohorte-loop feat-x --no-build   # already built — just re-run the /cohorte-review ⇄ /cohorte-fix loop
-/cohorte-loop feat-x --max=8
-/cohorte-loop feat-x --resume     # continue a run that died / hit the ceiling, at the pass it reached
-```
-
-It stops when `/cohorte-review` reports **zero blocking findings** (a CRITICAL or a security issue — a LOW
-nit never costs a pass), at the pass ceiling, as soon as two consecutive reviews return the same
-blocking findings (the fix is treading water and more passes won't help), or immediately if `/cohorte-build`'s
-readiness gate says the frozen spec **cannot be built** — that one needs `/cohorte-spec`, not passes. **Each
-fix pass is committed** (`loop(<id>): fix pass <i>`) — that's your way back after N autonomous passes —
-and **no fix runs on the last pass**, since fixing without a review behind it leaves unaudited code.
-
-**It's resumable.** Before each phase the driver stamps `status: in-progress` + `loop_pass` +
-`loop_phase` into the spec's front-matter (plain `awk`, zero tokens), and a terminal `in-review` or
-`blocked` on exit. So `--resume` continues at pass 3 instead of re-paying passes 1 and 2 — and the spec
-itself tells you, `/cohorte-doctor` and the dashboard where the loop got to.
-
-**The loop does not run in your session.** Each phase is a separate `claude -p` child with its own
-fresh context, driven by `pipeline/scripts/loop.sh`; all of their output goes to
-`specs/reports/<id>.loop.log`, which the command is forbidden to read back. Your session sees one
-line per phase and a three-line summary. That's the whole design: a slash command can't `/clear`
-itself, so a conversational loop would pile the diff plus N review reports plus N contracts into a
-history that is re-sent at input price every turn — it would cost more than the loop saves. The
-machine contract is `specs/reports/<id>.verdict.json`, which `/cohorte-review` now writes on every run; no
-prose is ever parsed.
 
 ### Run features in parallel — one session per feature
 

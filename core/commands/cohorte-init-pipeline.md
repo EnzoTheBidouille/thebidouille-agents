@@ -9,13 +9,12 @@ agents. Interactive — confirm inferences with the human.
 
 > **Bootstrap (applies to every step):**
 >
-> **Where the core lives (bundled vs global).** The stack-agnostic source files (`pipeline/`,
-> `templates/`) live in EITHER this repo's `.claude/` (per-project install) OR `~/.claude/`
-> (global install). **Resolve every source path below as: prefer `.claude/<path>`; if it isn't
-> there, use `~/.claude/<path>`.** Detect the mode once at the start (`.claude/pipeline/VERSION`
-> present ⇒ `bundled`; else `~/.claude/pipeline/VERSION` ⇒ `global`) and remember it — Phase 4
-> branches on it. **Everything you GENERATE is always written into THIS repo** (`PIPELINE.md` at the
-> root, agents/config under this repo's `.claude/`), never into `~/.claude/`.
+> **Where the core lives (bundled vs global).** `<core>` above already names it — the adapter
+> resolved the scope at install time, so nothing here probes. Read it once to learn WHICH mode you
+> are in (`<core>` inside this repo ⇒ `bundled`; `<core>` under your home ⇒ `global`) and remember
+> it — Phase 4 branches on it. **Everything you GENERATE is always written into THIS repo**
+> (`PIPELINE.md` at the root, agents under `<agents>/`, config under `<state>/`), never into the
+> global core.
 >
 > Work in phases. Do not write any file until Phase 4.
 
@@ -29,4 +28,4 @@ agents. Interactive — confirm inferences with the human.
 | 04 | `04-write-render` | Write files & render surface agents | after go-ahead |
 | 05 | `05-report` | Print install mode, files, mapping | always |
 
-**Before running a step, read its file** in `.claude/templates/steps/init-pipeline/` (resolves to `~/.claude/templates/steps/init-pipeline/` when the core is installed globally — read whichever exists). This table is a map, not the instructions.
+**Before running a step, read its file** in `<core>/templates/steps/init-pipeline/`. This table is a map, not the instructions.

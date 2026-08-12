@@ -11,9 +11,11 @@ analyze only — no fixes (those go through `/cohorte-refactor`).
 > `specs/_decisions.md` §Live if it exists (SCHEMA.md §Decisions): those standing decisions are part
 > of the rulebook you audit against, and code that contradicts one is a finding like any other.
 >
+<!-- cohorte:if workflows -->
 > **Workflow variant** (opt-in — SCHEMA.md §Workflows): on Claude Code ≥ 2.1.154 with workflows
 > enabled, the human can ask to "run the audit workflow" (`<core>/workflows/audit.js` — one auditor
 > per domain, concurrent). This conversational path stays the default and the fallback.
+<!-- cohorte:endif -->
 
 ## 1. Mechanical gates (you run these — Bash)
 

@@ -10,17 +10,13 @@ You run the **spec** step in the main thread — interactive, with the human. Pa
 > Read `PIPELINE.md` first: `contract` (mechanism/path — so §5 names the right schema types),
 > `design.enabled` (whether §8 matters), and §Conventions. Use `specs/_template.md` as the section list.
 >
-> Template paths below (`.claude/templates/…`) resolve to `~/.claude/templates/…` when the core is
-> installed globally — read whichever exists.
->
 > **Decision journal** (SCHEMA.md §Decisions): read `specs/_decisions.md` §Live if it exists — one
 > line per standing decision, so it is cheap. It is the ONLY place the project's transverse rules
 > live; a spec that contradicts one silently un-decides it. Absent ⇒ nothing to honour yet.
 >
 > **Kanban** (SCHEMA.md §Kanban): when the spec opens, run
 > `<core>/pipeline/scripts/kanban-move.sh auto <feature_id> spec --title "<human title>"`; on freeze
-> (`status: frozen`, Mode A), the same call with `ready`. `<core>` = `.claude` bundled / `~/.claude`
-> global — probe with `test -x`. `auto` resolves the board from the config itself and exits 0 with a
+> (`status: frozen`, Mode A), the same call with `ready`. `auto` resolves the board from the config itself and exits 0 with a
 > `kanban: <reason>` line when there is none — so **never decide "no board is configured" without
 > running it**.
 
@@ -67,7 +63,7 @@ Detect the mode from the pasted content:
    convention, a deliberate non-goal that binds future features). Typical yield: **0–3 lines**; zero
    is a normal, healthy outcome for a feature that decided nothing new — never invent lines to fill
    the section. Append them to `specs/_decisions.md` §Live (create the file from
-   `.claude/templates/decisions.template.md` on first use), each exactly:
+   `<core>/templates/decisions.template.md` on first use), each exactly:
    `- <YYYY-MM-DD> · <area> · <decision> — because <reason> · <feature_id>`
    - **Never** duplicate what §5, `PIPELINE.md` §Conventions or the code already states — the journal
      carries the *non-obvious rule*, not the feature's content. A line that restates a spec section is
@@ -78,7 +74,7 @@ Detect the mode from the pasted content:
    - Append with one `>>` Bash call, not a full-file rewrite (the file is append-only, and reading it
      back to re-write it is the one way to make a bounded file expensive).
 6. Author the **design brief** — `specs/design/<id>.md`, rendered via
-   `.claude/templates/design-brief.md` (resolves to `~/.claude/templates/…` on a global install).
+   `<core>/templates/design-brief.md`.
    _Only if `design.enabled` / the feature has UI; skip entirely for a backend-only feature._
    - **Write it to `specs/design/<id>.md`** (the authored artifact, versioned with the spec; spec §8
      holds the summary + pointer). Create the file — do not ask the human to. Keep it in the

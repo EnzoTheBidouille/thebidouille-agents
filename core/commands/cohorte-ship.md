@@ -12,8 +12,7 @@ You are the **lead**. Ship feature **$ARGUMENTS**. This is the outward-facing ga
 >
 > **Kanban** (SCHEMA.md §Kanban) is mirrored in **explicit steps** below, not as an afterthought:
 > §1 moves the card → **Ship**; §4 moves it → **Shipped** and writes the PR number. Both are one
-> call to `<core>/pipeline/scripts/kanban-move.sh auto …` (`<core>` = `.claude` bundled / `~/.claude`
-> global — probe with `test -x`), which resolves the board from the config itself and exits 0 with a
+> call to `<core>/pipeline/scripts/kanban-move.sh auto …`, which resolves the board from the config itself and exits 0 with a
 > `kanban: <reason>` line when there is none. **Never decide "no board is configured" without running
 > it** — a ship session that inferred that, having opened neither the config nor `PIPELINE.md`, is
 > exactly how a merged feature's card stayed in "Ready to build". Do not skip §4's move either.
@@ -65,17 +64,18 @@ See SCHEMA.md §Release notes.
 - Then say in one line which level you chose and why — this is the human's last chance to correct it
   before it is committed.
 
-> **Why this is its own gate.** The requirement usually lives in the project's `CLAUDE.md`, which this
+> **Why this is its own gate.** The requirement usually lives in the project's `<memory>`, which this
 > flow never reads. Skip it and everything below still "succeeds": commit, push, PR opened, kanban card
 > moved to **Shipped** — and CI red on a job nobody watched. The feature reads as shipped while being
 > unmergeable.
 
 ## 3. Dispatch the `release` agent
 
-Spawn one agent (`subagent_type: release`): "Release feature `$ARGUMENTS` on branch
+Spawn one agent (`subagent_type: release`, or the equivalent dispatch for this runtime):
+"Release feature `$ARGUMENTS` on branch
 `<feature_branch_prefix>$ARGUMENTS`. Read `PIPELINE.md` §vcs first. Spec: `specs/$ARGUMENTS.md` (already
 `status: shipped` — stage it). Write conventional commit(s), push (no force), open the PR (use `gh` if
-`host: github` + available; else emit the compare URL + drafted PR body from `.claude/templates/pr-body.md`).
+`host: github` + available; else emit the compare URL + drafted PR body from `<core>/templates/pr-body.md`).
 Stage **all** the feature's changes including `specs/$ARGUMENTS.md` and, if `release_notes.enabled`, the
 release note at `<release_notes.dir>/<release_notes.filename>` — it is already written, stage it as-is and
 never author or edit one yourself. Never edit source, never force-push, never run migrations."

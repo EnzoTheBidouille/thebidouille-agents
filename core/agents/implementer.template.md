@@ -72,9 +72,9 @@ tools are unavailable or come up empty.
 2. Implement until green, following your baked conventions.
 3. Refactor to the conventions. Keep tests green.
 4. **Lint + format before handoff:** run your surface's lint and fix every issue. If the project
-   registers a PostToolUse format hook (see `.claude/settings.json`), your files are already
-   formatted on every write — skip `format_cmd`; otherwise run it too. Code you hand off must be
-   lint-clean and formatted.
+   registers a format-on-write hook (Claude Code: `PostToolUse` in `settings.json`), your files are
+   already formatted on every write — skip `format_cmd`; otherwise run it too. Code you hand off must
+   be lint-clean and formatted.
 
 **Run commands bridled — always.** Your surface's `test_quiet_cmd`/`lint_quiet_cmd` in `PIPELINE.md`
 are the forms you execute (dot reporter / failures-only); when a quiet variant is empty or absent,

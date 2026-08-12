@@ -353,6 +353,68 @@ console.log("gate.py — worktree awareness");
   }
 }
 
+// ---------------------------------------------------------------------------
+// Runtime dialects. Four runtimes host this hook and none of them agree on the
+// envelope. A verdict emitted in the wrong shape is read as "allow" by every one of
+// them — the gate would look installed, print JSON, and block nothing. Two of them
+// also have no confirmation tier, where an honest `ask` must become a `deny` rather
+// than fall through.
+console.log("gate.py — runtime dialects");
+{
+  const d = scratch();
+  gitRepo(d, "main");
+  writeConfig(d, {
+    deny: ["rm -rf /"], ask: ["git push"], ask_on_default_branch: [],
+    default_branch: "main", preflight: { enabled: true, agents: ["review"] },
+  });
+  const raw = (payload, ...args) => {
+    const r = spawnSync(python, [GATE, ...args], {
+      input: JSON.stringify(payload), encoding: "utf8",
+      env: { ...process.env, CLAUDE_PROJECT_DIR: d },
+    });
+    let json = null;
+    try { json = JSON.parse((r.stdout || "").trim()); } catch { /* no verdict */ }
+    return { json, status: r.status };
+  };
+  const push = { tool_name: "Bash", tool_input: { command: "git push" }, cwd: d };
+
+  const cc = raw(push, "--runtime", "claude");
+  check("claude: ask stays an ask, in the PreToolUse envelope",
+    cc.json?.hookSpecificOutput?.permissionDecision === "ask");
+  check("no --runtime flag behaves exactly as claude (pre-adapter registrations)",
+    raw(push).json?.hookSpecificOutput?.permissionDecision === "ask");
+
+  const cx = raw(push, "--runtime", "codex");
+  check("codex: ask escalates to deny (its `ask` is parsed but never honoured)",
+    cx.json?.hookSpecificOutput?.permissionDecision === "deny");
+  check("…and the reason says why it was refused rather than queried",
+    /no confirmation tier/.test(cx.json?.hookSpecificOutput?.permissionDecisionReason || ""));
+
+  // Cursor sends the command at the top level and names no tool.
+  const cu = raw({ hook_event_name: "beforeShellExecution", command: "git push", cwd: d },
+    "--runtime", "cursor");
+  check("cursor: its own envelope, and the top-level command is found",
+    cu.json?.permission === "ask" && typeof cu.json?.user_message === "string");
+  const cuDeny = raw({ hook_event_name: "beforeShellExecution", command: "rm -rf /", cwd: d },
+    "--runtime", "cursor");
+  check("cursor: a deny also exits 2 (its documented blocking code)",
+    cuDeny.json?.permission === "deny" && cuDeny.status === 2);
+
+  const ge = raw({ tool_name: "run_shell_command", tool_input: { command: "rm -rf /" }, cwd: d },
+    "--runtime", "gemini");
+  check("gemini: BeforeTool envelope, and run_shell_command is recognised as the shell",
+    ge.json?.decision === "deny" && typeof ge.json?.reason === "string");
+
+  // Gemini exposes each subagent as a tool of its own name, so the phase gate has to fire
+  // on `tool_name: review` — not only on Claude's `Task` + subagent_type shape.
+  const geDispatch = raw({ tool_name: "review", tool_input: {}, cwd: d }, "--runtime", "gemini");
+  check("gemini: a subagent-as-tool dispatch still hits the preflight phase gate",
+    geDispatch.json?.decision === "deny"
+      && /preflight/i.test(geDispatch.json?.reason || ""));
+  check("an unrelated tool is never gated on any runtime",
+    raw({ tool_name: "read_file", tool_input: {}, cwd: d }, "--runtime", "gemini").json === null);
+}
+
 for (const d of tmps) { try { rmSync(d, { recursive: true, force: true }); } catch { /* best effort */ } }
 
 console.log("");

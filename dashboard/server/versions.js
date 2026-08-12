@@ -5,6 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { layouts } = require('./runtime.js');
 
 function readTrimmed(file) {
   try { return fs.readFileSync(file, 'utf8').trim(); } catch { return null; }
@@ -106,9 +107,19 @@ function cmpSemver(a, b) {
 
 async function versions({ projectRoot, globalDir, cliVersion }) {
   const global = coreAt(globalDir);
-  const bundled = coreAt(path.join(projectRoot, '.claude'));
+  let bundled = coreAt(path.join(projectRoot, '.claude'));
   const pointer = pointerAt(projectRoot);
   const latest = await latestNpm();
+
+  // A non-Claude runtime keeps its core in `.cohorte/<id>/`, not `.claude/`. Probing only the
+  // Claude path reported a perfectly installed Cursor/Codex/Gemini/OpenCode repo as having no
+  // core at all — and every downstream check keys off `installMode`, so one wrong probe turned
+  // the whole report red.
+  if (!bundled.present) {
+    const projectCore = layouts({ projectRoot, globalDir })
+      .find(l => l.scope === 'project' && l.core.startsWith(projectRoot));
+    if (projectCore) bundled = coreAt(projectCore.core);
+  }
 
   // The core that actually serves this project: bundled wins if present, else global.
   const effective = bundled.present ? bundled : global.present ? global : null;

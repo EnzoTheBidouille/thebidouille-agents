@@ -3,11 +3,11 @@
 ### Phase 4 — Write & render (after go-ahead)
 
 1. **Write `PIPELINE.md`** at the repo root (source: the installer's `pipeline/PIPELINE.template.md`).
-2. **Wire it into `CLAUDE.md`:** if `CLAUDE.md` exists, ensure it references the profile (add a line
+2. **Wire it into `<memory>`:** if `<memory>` exists, ensure it references the profile (add a line
    near the top: `> Project profile & pipeline facts: **@PIPELINE.md**`). If not, create a minimal
-   `CLAUDE.md` with that reference + a one-paragraph project intro.
+   `<memory>` with that reference + a one-paragraph project intro.
 3. **Render one agent per surface** — for each surface, follow SCHEMA.md §"Rendering / reconciling a
-   surface agent" (steps 2–3): render `.claude/agents/<agent>.md` from the installer's
+   surface agent" (steps 2–3): render `<agents>/<agent>.md` from the installer's
    `pipeline/implementer.template.md`, substituting `<SURFACE_AGENT>`, `<SURFACE_LABEL>`, `<SURFACE_PATH>`,
    `<SURFACE_TOOLS>`, `<SURFACE_MODEL>`, `<PROJECT_NAME>`, `<SURFACE_CONVENTIONS>` (the surface's
    baked convention slice — §Shared + its `### Surface:` stanza + its §Testing lines from the
@@ -16,26 +16,24 @@
    only when `uses_design`).
    Leave the fixed agents as-is (generic, shipped by the installer): `review.md`, `release.md`,
    `profile-reader.md`.
-4. **Generate `.claude/gate-config.json`** from the `gate` block — copy all five keys verbatim:
+4. **Generate `<state>/gate-config.json`** from the `gate` block — copy all five keys verbatim:
    `{"deny": [...], "ask": [...], "ask_on_default_branch": [...], "default_branch": "<vcs.default_branch>",
    "preflight": {"enabled": <gate.preflight.enabled>, "agents": [...], "max_age_minutes": <n>}}`
    (profile has no `preflight` block ⇒ omit the key — the hook then skips the phase gate).
+<!-- cohorte:if hooks -->
 5. **Write `.claude/settings.json`** permissions (`ask`/`deny` lists mirroring the gate, **plus an
    `allow` list of the project's read-only / verification commands** so agents don't stall on
    permission prompts — including mid-workflow, where nobody is watching a prompt: the detected
    per-surface `test_cmd`/`lint_cmd`/`typecheck_cmd`/`build_cmd` **and their `*_quiet_cmd`
    variants** and repo-wide `commands.*` equivalents as `Bash(<cmd>:*)` rules, plus read-only git —
    `Bash(git status:*)`, `Bash(git diff:*)`, `Bash(git log:*)`, `Bash(git rev-parse:*)` — plus the
-   shipped pipeline scripts for BOTH cores (`Bash(.claude/pipeline/scripts/:*)` and
-   `Bash(~/.claude/pipeline/scripts/:*)` — preflight, kanban-move, telemetry-send) **plus the
-   `bash`-prefixed form the `/cohorte-loop` driver uses** (`Bash(bash .claude/pipeline/scripts/loop.sh:*)`
-   and `Bash(bash ~/.claude/pipeline/scripts/loop.sh:*)`) — those prefix rules match a command
-   *starting* with the path, so `bash <path>` needs its own entry or `/cohorte-loop` stalls on a permission
-   prompt at every launch, and the
+   shipped pipeline scripts (`Bash(<core>/pipeline/scripts/:*)` — preflight, kanban-move,
+   telemetry-send; a prefix rule matches a command *starting* with that path, so a `bash <path>`
+   invocation would need its own entry), and the
    retrieval provider's MCP tools when wired (e.g. `mcp__serena`). Never allowlist anything matching
    a `gate.ask`/`gate.deny` pattern. Mention the human can widen it later with
    `/fewer-permission-prompts`) + the hooks, **conditioned on the install mode:**
-   - **bundled:** register the PreToolUse hook `.claude/hooks/gate.py` with matcher `Bash|Task`
+   - **bundled:** register the PreToolUse hook `<core>/hooks/gate.py` with matcher `Bash|Task`
      (Task is required — the preflight phase gate keys off Task dispatches; a `Bash`-only matcher
      leaves it dead) and the PostToolUse formatter (detected formatter). Before adding, drop any
      existing PreToolUse entry whose command ends in `gate.py` (here AND in `~/.claude/settings.json`
@@ -47,6 +45,14 @@
      registration serves every repo; you only supply this repo's `gate-config.json`. Still write the
      PostToolUse formatter hook + the permissions.
    Preserve any existing custom keys.
+<!-- cohorte:else -->
+5. **No permissions or hook file to write.** This runtime has neither a PreToolUse hook nor a
+   settings.json permission model the pipeline can generate, so the gate is enforced by the
+   commands calling `<core>/hooks/gate.py --check` at the points the profile marks gated. That
+   means `<state>/gate-config.json` (step 4) is not decoration here — it is the ONLY place the
+   deny/ask patterns live, so fill it from the profile exactly and do not skip it. If this repo is
+   also driven from Claude Code, that install's hook reads the same file; nothing to duplicate.
+<!-- cohorte:endif -->
 6. **Wire the retrieval provider** (skip if `retrieval.provider: none`):
    - **serena:** if the `serena` CLI is missing, have the human install it (`uv tool install -p 3.13
      serena-agent`) — or set the provider to `none` if they decline, and say `/cohorte-update-pipeline` can wire
@@ -74,14 +80,14 @@
    slug, DB pattern, port bases, compose file, branch prefix, install/dev/migrate commands, per-surface
    env stanzas). `chmod +x` them. If isolation is disabled, skip and note features build in the main checkout.
 8. **Ensure `specs/_template.md`** exists (copy from the installer's `templates/spec.template.md` if missing).
-9. **Write the pointer** `.claude/pipeline.json` (committed — this is how a teammate who clones the repo
+9. **Write the pointer** `<state>/pipeline.json` (committed — this is how a teammate who clones the repo
    knows which core to install):
    `{ "pipeline": "cohorte", "mode": "<bundled|global>", "core_version": "<contents of the
    installer's pipeline/VERSION>", "install": "<per mode: bundled ⇒ \"npx cohorte install\"
    note that the core is committed under .claude/; global ⇒ \"npx cohorte install --global\"
    (or, without npm: curl -fsSL https://raw.githubusercontent.com/TheBidouilleAgency/cohorte/main/install.sh | sh -s -- --global;
    Windows: install.ps1 -Global from the same repo)> " }`.
-   In **global** mode also add, near the top of `CLAUDE.md`, a one-liner:
+   In **global** mode also add, near the top of `<memory>`, a one-liner:
    `> Pipeline: global core — run the installer above if /cohorte-brainstorm etc. are missing.`
 10. **CI workflow** (if `vcs.host: github` and no existing workflow already runs the profile's
     checks): with the human's go-ahead, generate `.github/workflows/pipeline-ci.yml` — on
@@ -89,18 +95,18 @@
     `commands.install`, then `commands.lint` · `commands.typecheck` · `commands.test` (+ per-surface
     `build_cmd`s that are non-empty). Derive the setup steps from the detected stack — mirror what a
     sibling workflow does if one exists. `/cohorte-ship` watches these checks before the merge.
-11. **Metrics sink, report buffer & preflight stamp:** add `.claude/pipeline-metrics.jsonl` to
+11. **Metrics sink, report buffer & preflight stamp:** add `<state>/pipeline-metrics.jsonl` to
     `.gitignore` — `/cohorte-build`, `/cohorte-review` and `/cohorte-fix` append per-dispatch evidence
     there (SCHEMA §Specialization reads it).
     Also add `specs/reports/` — `/cohorte-review` stages its last report there so a `/cohorte-fix` (or
     `/cohorte-spec` Mode B) survives a `/clear`; it's a derived buffer, not a versioned artifact.
-    And `.claude/preflight.ok` — a local, per-checkout freshness stamp. Versioning it breaks the phase
+    And `<state>/preflight.ok` — a local, per-checkout freshness stamp. Versioning it breaks the phase
     gate for good (a committed stamp describes the tree *before* its own commit, and it rides into every
-    new worktree as a green nobody earned). If it is already tracked: `git rm --cached .claude/preflight.ok`.
+    new worktree as a green nobody earned). If it is already tracked: `git rm --cached <state>/preflight.ok`.
 12. **Design system:** if `design.enabled` with a snapshot dir, note that `/cohorte-align-ds` is active; else the
     `/cohorte-align-ds` command will no-op with a clear message.
 13. **Kanban** (only if the human opted in at Phase 2): wire it per SCHEMA.md §Kanban, writing into the
-    **global** `~/.claude/cohorte.config.yaml` (never into this repo — the board points at a
+    **global** `<config>` (never into this repo — the board points at a
     personal vault). Create the file from `pipeline/cohorte.config.template.yaml` if absent; set
     `kanban.enabled: true` and `obsidian.vault_path` if it was empty. Add a `kanban.boards[<PIPELINE
     name>]` entry with `board: <folder>/Tasks.md`. Then **create the board file**

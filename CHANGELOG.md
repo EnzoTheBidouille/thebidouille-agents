@@ -7,6 +7,126 @@ short, user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` secti
 > They are history and are deliberately not rewritten — every command gained a `cohorte-` prefix
 > in 2.0.0.
 
+## 2.2.0 — 2026-08-12
+
+- **The pipeline was Claude Code or nothing.** The doctrine — frozen spec, stateless surfaces, a
+  gate you cannot talk your way past — is not Claude-specific, but every artefact that carried it
+  was: `.claude/commands/*.md` with Claude frontmatter, `Task` dispatches, a PreToolUse hook. A
+  Codex or Cursor user could read the ideas and reimplement nothing.
+
+  `core/commands/` and `core/agents/` are now **runtime-neutral sources**, and the installer renders
+  them per coding agent — as slash commands, TOML commands, or **Codex skills**
+  (`.agents/skills/<name>/SKILL.md`, committed with the repo: custom prompts are deprecated *and*
+  user-scoped, so a teammate cloning the repo would have got the profile and none of the commands) —
+  for **Claude Code, Codex CLI, Cursor, Gemini CLI, OpenCode**
+  (`npx cohorte install --runtime=codex,cursor`, or `--all-runtimes`, or nothing and it detects and
+  asks). Rendering rewrites the surface — markdown + the frontmatter keys that runtime understands,
+  or TOML for Gemini — resolves every path through the tokens `<core>` / `<state>` / `<agents>` /
+  `<config>` / `<memory>`, and swaps the argument placeholder (`$ARGUMENTS`, `{{args}}`, or an
+  explicit note where the runtime substitutes nothing, as Cursor does).
+
+  The part that is not cosmetic: the prompts **branch on what the runtime can enforce**, and say so
+  in their own text rather than pretending.
+
+  **The gate really runs on four of the five.** `gate.py` is registered as a blocking hook in each
+  runtime's own format — `PreToolUse` in `settings.json` (Claude) and `.codex/hooks.json` (Codex),
+  `beforeShellExecution` in `.cursor/hooks.json`, `BeforeTool` in `.gemini/settings.json` — and
+  emits that runtime's envelope, selected by `--runtime <id>`. A verdict in the wrong shape is read
+  as *allow* by every one of them, so each dialect is covered by `scripts/test-gate.mjs` rather than
+  trusted. **Codex and Gemini have no confirmation tier**, so an `ask` verdict is escalated to
+  `deny` with the reason attached: the point of that tier is that a human sees the command first,
+  and a runtime that cannot ask cannot deliver it — the same rule unattended headless runs already
+  used. The phase gate also learned Gemini's shape, where a subagent arrives as a tool of its own
+  name rather than as `Task` + `subagent_type`. OpenCode extends via plugins, not hooks, so there
+  the commands call `gate.py --check` themselves: same verdicts, but advisory, and
+  `/cohorte-doctor` says so instead of reporting ✅.
+
+  **Subagents are real everywhere**, in four different file formats — markdown + frontmatter for
+  Claude, Cursor, Gemini and OpenCode, TOML with the body under `developer_instructions` for Codex.
+  Read-only enforcement for the reviewer is derived from the source agent's tool list and re-emitted
+  as each runtime spells it (`readonly: true`, `sandbox_mode = "read-only"`); where there is no
+  equivalent, the rendered reviewer carries an explicit instruction that read-only is on it, and
+  why. Model pins do **not** travel: the profile names Anthropic aliases, which are meaningless
+  elsewhere, so agents inherit the runtime's own model selection.
+
+  **Real subagents are a requirement, not a capability to degrade around.** A sequential-persona
+  fallback shipped mid-development and was removed before release: it asked the lead to simulate the
+  isolation boundary by discipline — adopt one agent file, do that surface, drop it — which is not
+  the same guarantee, and no supported runtime ever took the branch. A runtime declaring
+  `subagents: false` is now refused at install with a named error rather than rendered into a
+  pipeline whose central promise is silently absent.
+
+- **`/cohorte-loop` is removed, on every runtime including Claude Code.** The autonomous
+  build→review→fix driver was the one part of the pipeline tied to a single vendor's headless CLI —
+  it spawned `claude -p` children through two shell scripts, a detached `screen` session, a
+  `caffeinate` assertion and a resume protocol stamped into spec front-matter. That is a lot of
+  surface, on the platform-specific end of the codebase, for a phase the human-driven cycle already
+  covers at a cost the loop was mostly there to hide.
+
+  Gone with it: `scripts/loop.sh`, `scripts/loop-detach.sh`, their test suite, and the
+  `loop_pass`/`loop_phase` front-matter fields (dropped from the spec template; still *read* by the
+  dashboard so a spec left mid-flight by an older core still explains itself). The installer scrubs
+  the command and both scripts on upgrade, in every runtime's layout — copy-over never deletes, and
+  a surviving command file is a decoy the model can still fire against a core that no longer ships
+  its driver.
+
+  **The file contract stays.** `verdict.json`, `readiness.json` and `build.json` are still written
+  on every run, and the `in-progress`/`blocked` spec statuses stay valid: they are what anything
+  automating the cycle from outside reads and writes. Removing the built-in driver does not remove
+  the ability to drive it — it removes cohorte's opinion about how.
+
+  Layout: each runtime gets its own rendered core (`.cohorte/<id>/`), because the same template
+  resolves differently per capability — but the **project state is shared** (`.cohorte/`:
+  gate-config, preflight stamp, metrics), so a repo driven from two agents cannot disagree with
+  itself about what is gated or what has been verified. The user config is shared too; the shipped
+  scripts probe `~/.claude` then `~/.cohorte`, so one kanban board and one telemetry consent.
+
+  **Claude Code is unchanged** — same paths, same frontmatter, same hook, and `scripts/test-adapter.mjs`
+  asserts that as a regression test alongside the per-runtime output. `install.sh` / `install.ps1`
+  now delegate to the Node CLI: there is no shell renderer, and a raw copy would install prompts
+  full of unresolved markers that look installed and instruct the model wrongly.
+
+- **A config dir with a space in it broke every tool call in the session.** The gate-hook
+  registration quoted the script path only on Windows, so a `CLAUDE_CONFIG_DIR` under
+  `~/Library/Application Support/…` — where a desktop host naturally puts it — produced
+  `python3 /Users/x/Library/Application Support/…/gate.py`. The shell split that, python reported
+  `can't open file '/Users/x/Library/Application'`, and *every* Bash and Task call failed —
+  including the ones needed to undo it. Quoted on every platform now, in both the global
+  registration and the per-runtime one, with a test that installs into a path containing a space
+  and asserts the quoting plus that a re-install still reconciles its own entry instead of
+  stacking a second.
+
+- **`CLAUDE_CONFIG_DIR` was only half honoured.** The runtime registry declares Claude's paths as
+  `~/.claude`, and the adapter resolved them from the homedir — so with the variable set, the core
+  was written to the real `~/.claude` while the hook was registered in the overridden dir. A
+  scratch or CI install silently wrote into the user's actual global core. `resolvePaths` now
+  takes a re-rooting override, and the test asserts the core, the commands and the hook all land
+  in the override with nothing written to the home default.
+
+- **The dashboard reported a healthy non-Claude install as broken.** Every path it checked was
+  `.claude/…`, so a repo driven from Cursor came back "no pipeline core installed", "surface with
+  no rendered agent", "artifacts not gitignored", "gate.py not registered" — four findings, all
+  false. A false red is worse than no check: it sends someone fixing what is not broken. The
+  server now resolves paths from `runtimes.json` (`dashboard/server/runtime.js`), reads the gate
+  registration in each runtime's own envelope, names artifacts against the right state dir, reads
+  the metrics sink from every state dir in play, skips workflows where there is no engine instead
+  of reporting them missing, and the reset action backs up every runtime's directory rather than
+  leaving the others behind for the fresh install to land beside.
+
+- **`SCHEMA.md` is the agents' rulebook, read at run time — and it still hardcoded `.claude`.**
+  It ships to `<core>/pipeline/`, so on a non-Claude install it was telling agents to write
+  rendered agents and read the gate config in a directory that runtime never looks at. It and
+  `PIPELINE.template.md` now use the same `<core>`/`<state>`/`<agents>`/`<config>` tokens as the
+  commands, and the installer resolves their capability conditionals like any other prompt.
+
+- **The preflight stamp could green code that had changed.** Both sides of the content digest seed
+  a throwaway git index from the real one, for its stat cache — but the copy is stamped `now`, and
+  git trusts an entry's cached stat data whenever the entry predates the index file. A file edited
+  in the same second as the preflight, at an unchanged size, therefore read as clean: the gate let
+  a `review` dispatch through onto code the preflight never verified. Both `gate.py` and
+  `preflight.sh` now backdate the copy by 5 s, which forces a content check for anything touched
+  inside that window and leaves the fast path intact for every older file.
+
 ## 2.1.0 — 2026-08-09
 
 - **A repo that gates merges on a per-feature release note shipped red PRs, and the flow reported

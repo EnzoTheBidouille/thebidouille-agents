@@ -402,6 +402,76 @@ console.log("index.js — HTTP guards");
   eq("an unknown API route 404s", (await fetch(`${base}/api/nope`)).status, 404);
 }
 
+// ── runtime.js + a non-Claude layout ────────────────────────────────────────
+// Every path-dependent check used to assume `.claude/`. On a repo driven from Cursor that
+// reported a healthy install as three ❌ and a ⚠️ — no core, no rendered agent, artifacts not
+// ignored, hook not registered — and every one was wrong. A false red is worse than no check:
+// it sends a human fixing something that is not broken.
+console.log("doctor.js — a non-Claude runtime layout");
+{
+  const d = scratch();
+  const g = join(d, "global-claude");
+  mkdirSync(g, { recursive: true });
+
+  const core = join(d, ".cohorte", "cursor");
+  mkdirSync(join(core, "pipeline"), { recursive: true });
+  writeFileSync(join(core, "pipeline", "VERSION"), "9.9.9\n");
+  writeFileSync(join(core, "pipeline", "runtimes.json"), JSON.stringify({
+    cursor: {
+      label: "Cursor", scope: "project", core_version: "9.9.9",
+      capabilities: { subagents: true, hooks: true, workflows: false, tool_restriction: true },
+      paths: {
+        core, commands: join(d, ".cursor", "commands"), agents: join(d, ".cursor", "agents"),
+        hooks_config: join(d, ".cursor", "hooks.json"), state: ".cohorte",
+      },
+    },
+  }));
+  mkdirSync(join(d, ".cursor", "agents"), { recursive: true });
+  writeFileSync(join(d, ".cursor", "agents", "api.md"), "---\nname: api\n---\n");
+  writeFileSync(join(d, ".cursor", "hooks.json"), JSON.stringify({
+    version: 1,
+    hooks: { beforeShellExecution: [{ command: `python3 ${core}/hooks/gate.py --runtime cursor` }] },
+  }));
+  mkdirSync(join(d, ".cohorte"), { recursive: true });
+  const gate = { deny: ["rm -rf /"], ask: [], ask_on_default_branch: [], default_branch: "main" };
+  writeFileSync(join(d, ".cohorte", "gate-config.json"),
+    JSON.stringify({ ...gate, preflight: { enabled: false } }));
+  writeFileSync(join(d, ".gitignore"),
+    ".cohorte/preflight.ok\n.cohorte/pipeline-metrics.jsonl\nspecs/reports/\n");
+  writeFileSync(join(d, "PIPELINE.md"), [
+    "```yaml pipeline-profile", "name: demo",
+    "surfaces:", "  - key: api", "    path: src/api", "    agent: api",
+    "gate:", "  deny:", "    - rm -rf /", "  default_branch: main",
+    "  preflight:", "    enabled: false", "```",
+  ].join("\n"));
+
+  const s = await state({ projectRoot: d, globalDir: g, cliVersion: "9.9.9" });
+  const pick = id => s.checks.find(c => c.id === id) || {};
+  const st = id => pick(id).status;
+  const dt = id => pick(id).detail;
+
+  eq("the runtime is discovered from runtimes.json", s.runtimes.map(r => r.id), ["cursor"]);
+  check("the core in .cohorte/<id>/ counts as installed", st("core") === "ok", dt("core"));
+  check("agents are looked for in .cursor/agents", st("agents") === "ok", dt("agents"));
+  check("gate-config is read from .cohorte, not .claude", st("gate") === "ok", dt("gate"));
+  check("artifact paths are named against the right state dir",
+    st("artifacts") === "ok" && !/\.claude/.test(dt("artifacts")), dt("artifacts"));
+  // Cursor's registration is a flat {command} under beforeShellExecution — read with Claude's
+  // matcher-group shape it looks absent, which is exactly the false red this guards.
+  check("the Cursor hook envelope is recognised", st("hooks") === "ok", dt("hooks"));
+  check("workflows are skipped, not reported missing",
+    st("workflows") === "skip" && /Cursor/.test(dt("workflows")), dt("workflows"));
+  check("nothing is reported broken on a healthy non-Claude install",
+    s.summary.bad === 0 && s.summary.warn === 0, JSON.stringify(s.summary));
+
+  // The metrics sink follows `<state>` too.
+  writeFileSync(join(d, ".cohorte", "pipeline-metrics.jsonl"),
+    JSON.stringify({ ts: "2026-01-01T00:00:00Z", feature: "f", phase: "build", seconds: 10,
+      surfaces: { api: "ok" } }) + "\n");
+  check("metrics are read from the runtime's state dir",
+    metrics({ projectRoot: d, globalDir: g }).batches === 1);
+}
+
 for (const d of tmps) { try { rmSync(d, { recursive: true, force: true }); } catch { /* best effort */ } }
 console.log("");
 if (failures) { console.error(`test-dashboard: ${failures} failure(s)`); process.exit(1); }

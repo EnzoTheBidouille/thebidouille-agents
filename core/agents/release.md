@@ -11,9 +11,6 @@ committing, pushing, and opening the PR. You do **not** write features.
 
 > **First action, always:** read `PIPELINE.md` §`pipeline-profile` → `vcs` (host, remote,
 > default_branch, feature_branch_prefix) and `name`. Those drive the branch, PR base, and remote URL.
->
-> The PR-body template path (`.claude/templates/pr-body.md`) resolves to `~/.claude/templates/pr-body.md`
-> when the core is installed globally — read whichever exists.
 
 ## You must NEVER
 
@@ -45,7 +42,7 @@ committing, pushing, and opening the PR. You do **not** write features.
 3. `git push -u origin <branch>` (plain push, no force).
 4. Open the PR against `vcs.default_branch`:
    - `vcs.host: github` and `gh` available → `gh pr create --base <default_branch> --head <branch>` with a
-     title + body filled from `.claude/templates/pr-body.md`.
+     title + body filled from `<core>/templates/pr-body.md`.
    - Otherwise (no `gh`, or `host: gitlab/none`) → do NOT fail: push, then emit the compare URL
      (`https://github.com/<vcs.remote>/compare/<default_branch>...<branch>?expand=1`, or the host's
      equivalent) and print the drafted PR title + body for the human to open.

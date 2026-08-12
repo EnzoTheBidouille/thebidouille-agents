@@ -16,8 +16,14 @@
 #   - Never blocks or fails the pipeline: 2s timeout, all errors swallowed, exit 0 always.
 set -u
 
-cfg="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/cohorte.config.yaml"
-[ -f "$cfg" ] || exit 0
+# Same two-location probe as kanban-move.sh: consent is recorded once per human, in
+# whichever config the runtime that installed the pipeline created.
+cfg=""
+for c in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/cohorte.config.yaml" \
+         "$HOME/.cohorte/cohorte.config.yaml"; do
+  [ -f "$c" ] && { cfg="$c"; break; }
+done
+[ -n "$cfg" ] || exit 0
 
 # read keys scoped to the `telemetry:` block only
 tval() {
@@ -62,7 +68,8 @@ fi
 # bundled repo report an empty core_version.
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd 2>/dev/null) || here=""
 ver=""
-for v in "$here/../VERSION" "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pipeline/VERSION"; do
+for v in "$here/../VERSION" "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/pipeline/VERSION" \
+         "$HOME/.cohorte/pipeline/VERSION"; do
   [ -n "$ver" ] && break
   ver=$(head -1 "$v" 2>/dev/null | tr -d '"\\')
 done

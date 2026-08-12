@@ -54,7 +54,17 @@ while [ $# -gt 0 ]; do
 done
 
 TAB=$(printf '\t')
-CONFIG="${COHORTE_CONFIG:-$HOME/.claude/cohorte.config.yaml}"
+# One config per human, wherever the runtime that installed it put it: `~/.claude` for a
+# Claude Code install (historical, still authoritative), `~/.cohorte` for every other coding
+# agent. Probe both — a repo driven from two agents must resolve ONE board, not two.
+CONFIG="${COHORTE_CONFIG:-}"
+if [ -z "$CONFIG" ]; then
+  for c in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/cohorte.config.yaml" \
+           "$HOME/.cohorte/cohorte.config.yaml"; do
+    [ -f "$c" ] && { CONFIG="$c"; break; }
+  done
+  CONFIG="${CONFIG:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/cohorte.config.yaml}"
+fi
 
 # The nine pipeline stages and their default headings. A stage key given as the
 # target column is mapped through the config (per-board `columns` first, then the

@@ -17,13 +17,10 @@ at Finish, when a board is configured.
 > needs to overturn one must say which line, out loud, so the human decides it here rather than
 > discovering the contradiction at `/cohorte-spec`.
 >
-> Template paths below (`.claude/templates/…`) resolve to `~/.claude/templates/…` when the core is
-> installed globally — read whichever exists.
->
 > **Kanban** (SCHEMA.md §Kanban): every card move below is one call —
 > `<core>/pipeline/scripts/kanban-move.sh auto <feature_id> <stage> [--title "<human title>"]`, with
-> `<core>` = `.claude` bundled / `~/.claude` global (probe with `test -x`). `auto` resolves the
-> board from `~/.claude/cohorte.config.yaml` itself and exits 0 with a `kanban: <reason>` line when
+> `auto` resolves the
+> board from `<config>` itself and exits 0 with a `kanban: <reason>` line when
 > none resolves — so **never decide "no board is configured" without running it**. Reading the Ideas
 > column at Start still needs the board path: get it from a `kanban-move.sh` run, or grep the config
 > for `boards[<PIPELINE name>]`.
@@ -51,7 +48,7 @@ screens, risks, and what's explicitly out.
 ## Finish
 
 When the human is satisfied, produce the **brainstorm return** by filling
-`.claude/templates/brainstorm-return.md` and **staging it to
+`<core>/templates/brainstorm-return.md` and **staging it to
 `specs/reports/<feature_id>-brainstorm.md`** (the gitignored buffer dir — `/cohorte-spec` reads it from there
 when invoked with no paste). In chat print only a 3-line summary + the path. Tell them to run `/cohorte-spec`
 — **recommend a `/clear` first**, the return is staged on disk (pasting it remains a fallback).

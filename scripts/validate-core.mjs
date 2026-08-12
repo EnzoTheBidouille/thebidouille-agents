@@ -24,7 +24,7 @@ const frontmatter = (text) => {
 // Interactive commands must stay unpinned (they inherit on purpose).
 const PINNED = ["cohorte-build", "cohorte-review", "cohorte-fix", "cohorte-ship",
   "cohorte-audit", "cohorte-refactor", "cohorte-doctor", "cohorte-align-ds",
-  "cohorte-update-pipeline", "cohorte-loop"];
+  "cohorte-update-pipeline"];
 const UNPINNED = ["cohorte-brainstorm", "cohorte-spec", "cohorte-init-pipeline"];
 
 // Every command must carry the `cohorte-` prefix. This replaces the old RESERVED

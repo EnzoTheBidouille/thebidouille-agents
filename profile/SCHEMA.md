@@ -79,7 +79,7 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
 - **Commands** (`/cohorte-build`, `/cohorte-review`, …) parse the `yaml pipeline-profile` block to know how
   many surfaces to dispatch, the contract mechanism, the commands, and the capability flags.
 - **Hook** (`gate.py`) reads `gate.deny`/`gate.ask`/`gate.ask_on_default_branch`/`gate.default_branch`
-  from a generated `.claude/gate-config.json`. The last two make git + docker free on feature branches
+  from a generated `<state>/gate-config.json`. The last two make git + docker free on feature branches
   but confirm-gated on the default branch (branch resolved at run time via `git rev-parse`).
 - **Scripts** (`new-feature.sh`) read the `isolation` block (rendered in at init).
 
@@ -169,7 +169,7 @@ the frozen contract as the only cross-surface channel**. So specialization means
 
 Coarse first, specialize on evidence: start with one `frontend` / `backend` surface each; split only a
 surface that's proven slow and cleanly separable. The evidence lives in
-the **main checkout's** `.claude/pipeline-metrics.jsonl` (gitignored) — one JSONL line per phase batch
+the **main checkout's** `<state>/pipeline-metrics.jsonl` (gitignored) — one JSONL line per phase batch
 (`ts`/`feature`/`phase`/`seconds`/`surfaces:{key: result}`), appended by `/cohorte-build`, `/cohorte-review`
 and `/cohorte-fix`.
 **`surfaces` keys are surface keys, nothing else** — run-level facts go in their own top-level
@@ -177,7 +177,7 @@ fields. Anything put inside `surfaces` is read
 as a surface: the dashboard renders it as a row in the per-surface table and scores a non-`ok`
 value as that surface failing. Always the main checkout, never the feature worktree (which dies at teardown while
 metrics must accumulate across features) — resolve from anywhere with
-`$(dirname "$(git rev-parse --git-common-dir)")/.claude/pipeline-metrics.jsonl`. Read it before
+`$(dirname "$(git rev-parse --git-common-dir)")/<state>/pipeline-metrics.jsonl`. Read it before
 proposing a split: split the surface that actually dominates wall-clock, not the one that feels big.
 
 ## Measuring cost — what's slow vs what's expensive
@@ -190,7 +190,7 @@ to log it. For what's EXPENSIVE, use Claude Code's own accounting:
   over the last 24 h / 7 d (e.g. _"Top subagents: frontend 7 %, backend 4 % · Top skills: /cohorte-build 1 %,
   /cohorte-review 1 %"_). That IS the per-phase ledger — approximate (share-of-total, machine-local, not exact
   tokens). Read it to see which surface/command actually dominates the bill before you tune a `model` tier.
-- **OpenTelemetry** (exact numbers + dashboards) — add an `env` block to `~/.claude/settings.json`:
+- **OpenTelemetry** (exact numbers + dashboards) — add an `env` block to `this runtime's settings file`:
   `{"env":{"CLAUDE_CODE_ENABLE_TELEMETRY":"1","OTEL_METRICS_EXPORTER":"otlp","OTEL_EXPORTER_OTLP_PROTOCOL":"http/protobuf","OTEL_EXPORTER_OTLP_ENDPOINT":"http://localhost:4318"}}`
   and point it at a collector. Metrics `claude_code.token.usage` + `claude_code.cost.usage` carry
   `session.id` + model + type (input/output/cacheRead). Subagent tokens roll into the session total;
@@ -226,28 +226,25 @@ Rules for every consumer (implementers, preflight, `/cohorte-audit` gates, workf
 `/cohorte-init-pipeline` **asks** for these variants (detected defaults offered first) instead of silently
 storing a bare `pnpm test` as the thing agents execute; `/cohorte-update-pipeline` tops up older profiles.
 
-## Spec status — the lifecycle state machine (and the loop's resume state)
+## Spec status — the lifecycle state machine
 
 A spec's front-matter `status` is not a label, it is the pipeline's **state**: every command routes on
-it, the dashboard boards on it, the kanban backfill maps it to a column, and `/cohorte-loop --resume` reads it
-back to continue an interrupted autonomous run. Six states, and exactly one writer each:
+it, the dashboard boards on it, and the kanban backfill maps it to a column. Six states:
 
 | status | meaning | written by | who may build it |
 | --- | --- | --- | --- |
 | `draft` | the interview is open, nothing is frozen | `/cohorte-spec` Mode A | no |
 | `frozen` | the contract is frozen — the handoff to `/cohorte-build` | `/cohorte-spec` Mode A freeze | yes |
-| `in-progress` | a `/cohorte-loop` is driving this spec right now (or died doing it) | `scripts/loop.sh`, before each phase | yes |
-| `in-review` | reviewed / awaiting the next round or `/cohorte-ship` | `/cohorte-spec` Mode B, `/cohorte-fix`, `loop.sh` on a clean exit | yes |
-| `blocked` | a loop gave up here (ceiling, non-convergent, no verdict, not implementable) | `loop.sh` on any non-zero exit | yes, with the reason named |
+| `in-progress` | a round is under way on this spec (or died mid-way) | an automated driver, if any | yes |
+| `in-review` | reviewed / awaiting the next round or `/cohorte-ship` | `/cohorte-spec` Mode B, `/cohorte-fix` | yes |
+| `blocked` | a round gave up here (non-convergent, no verdict, not implementable) | an automated driver, if any | yes, with the reason named |
 | `shipped` | the PR is open; the status flip is part of the release commit | `/cohorte-ship` | no |
 
-**The resume contract.** Before every phase, `loop.sh` stamps `status: in-progress` plus `loop_pass`
-(the review pass it is on) and `loop_phase` (`build`/`review`/`fix`) into the spec — deterministically,
-with `awk`, spending **no tokens** on state it will need later. On exit it stamps a terminal status:
-`in-review` + `loop_phase: done` when clean, `blocked` otherwise. `/cohorte-loop <id> --resume` then continues
-at the recorded pass instead of pass 1, so a session killed at pass 3 of 5 does not re-pay passes 1–2.
-The build is still skipped or redone by the build stamp alone (`specs/reports/<id>.built`, written only
-after a build that finished), so an interrupted *build* correctly rebuilds.
+**`in-progress` and `blocked` are for external drivers.** No shipped command writes them: the
+built-in autonomous driver (`/cohorte-loop`) was retired in 2.2.0, and the human-driven cycle moves
+`frozen` → `in-review` → `shipped`. They stay valid states because specs in existing repos carry
+them, and because anything automating the cycle from outside needs somewhere to record "a round is
+under way" and "a round gave up". Every reader still routes on them; nothing produces them.
 
 Corollaries worth knowing:
 
@@ -279,8 +276,8 @@ Non-negotiables, in every phase:
 - **Never speak for a dead agent.** You did not see its work: report what the *tree* says (quiet
   commands, redirected to a file, grepped), not what a handoff would have said.
 - **Never let it reach a driver as clean.** `/cohorte-build` writes `dead[]` into
-  `specs/reports/<id>.build.json`, `/cohorte-review` writes `unreviewed[]` into the verdict; `scripts/loop.sh`
-  aborts on either with **exit 2** *before* it reads `blocking`, since a dead reviewer makes
+  `specs/reports/<id>.build.json`, `/cohorte-review` writes `unreviewed[]` into the verdict; a driver
+  must abort on either *before* it reads `blocking`, since a dead reviewer makes
   `blocking == 0` a statement about code nobody read.
 - **`unreviewed` is separate from `blocking` on purpose.** Faking a count in `blocking` to force a
   driver's hand would corrupt the one field the whole contract rests on; a driver reads them as two
@@ -300,8 +297,8 @@ of the step: a spec that cannot be built does not get cheaper by being built on 
   the design gate. Each maps to `NOT-READY` (a surface would have to invent the answer) or
   `RESERVATIONS` (a surface can proceed on a stated assumption).
 - **`NOT-READY` aborts the build with no agent spawned** and sends the human to `/cohorte-spec`.
-  `scripts/loop.sh` reads the same file and exits **4** (`not implementable`) — the one loop outcome
-  that more passes cannot fix.
+  A driver reads the same file and must stop rather than retry — it is the one outcome more passes
+  cannot fix.
 - **`RESERVATIONS` never blocks.** Each gap is inlined verbatim into the dispatch of the surface it
   affects, as an assumption the implementer must apply *and* flag in its handoff. A gate that stalled a
   sound build on a missing error case would cost more human round-trips than it saves.
@@ -325,7 +322,7 @@ own out-of-scope reason.
   `## Remediation`, which is what `/cohorte-fix` re-dispatches.
 - `/cohorte-audit` **carries open `deferred:` items over** when it rewrites the backlog; overwriting them away
   is the one way they silently vanish.
-- The verdict JSON carries `deferred: <n>` (informational, outside `blocking`), so `/cohorte-loop` can name
+- The verdict JSON carries `deferred: <n>` (informational, outside `blocking`), so a driver can name
   them in its closing line without reading a report.
 
 ## Decisions — the transverse decision journal
@@ -359,14 +356,14 @@ variants) with all output redirected to `specs/reports/<id>.preflight.txt`:
   there: zero agents are spawned.** A reviewer dispatched onto code that doesn't compile burns its
   whole run rediscovering what `tsc` already printed for free — the failure goes straight to the
   human (or `/cohorte-fix`) instead.
-- **All green** ⇒ the script stamps `.claude/preflight.ok` (`<epoch> <HEAD sha> <tree digest>` —
+- **All green** ⇒ the script stamps `<state>/preflight.ok` (`<epoch> <HEAD sha> <tree digest>` —
   local and **gitignored**; a versioned stamp describes the tree *before* its own commit and rides
   into every clone and worktree, which breaks the gate both ways).
 
 `hooks/gate.py` enforces the stamp as a **phase gate** (the `preflight` block of `gate-config.json`,
 generated from `gate.preflight`): a Task dispatch of a listed `subagent_type` (default
 `review`) with a missing/stale stamp — older than `max_age_minutes`, or the digest no longer
-matches the working tree (`.claude` and `specs` excluded, so the pipeline's own writes and a
+matches the working tree (`.claude`, `.cohorte` and `specs` excluded, so the pipeline's own writes and a
 commit of already-verified code do not invalidate it) — gets an
 "ask", so a lead can't accidentally skip the gate but a human can consciously override it. The gate
 hook fires for **every** agent in the session, including subagents spawned by the Workflow runtime
@@ -387,8 +384,9 @@ this exact procedure so a surface is always defined the same way. To add surface
    scaffolding; `inherit` only when the surface makes real design decisions worth the lead's model),
    the five `*_cmd`s (derive from the surface's `package.json` / workspace
    filter, mirroring a sibling surface), and `uses_design`.
-2. **Render the agent file** `.claude/agents/<agent>.md` from `pipeline/implementer.template.md`
-   (resolve bundled `.claude/` vs global `~/.claude/`), substituting `<SURFACE_AGENT>`, `<SURFACE_LABEL>`,
+2. **Render the agent file** `<agents>/<agent>.md` from `<core>/pipeline/implementer.template.md`
+   — the template is already rendered for this runtime, so only the placeholders are yours to fill —
+   substituting `<SURFACE_AGENT>`, `<SURFACE_LABEL>`,
    `<SURFACE_PATH>`, `<SURFACE_TOOLS>`, `<SURFACE_MODEL>`, `<PROJECT_NAME>`, and the surface-specific
    blocks (`<SURFACE_EXTRA_NEVER>`, `<SURFACE_DESIGN_INPUT>`, `<SURFACE_TDD_STEP1>` — leave the design
    ones empty unless `uses_design`). Fill `<SURFACE_CONVENTIONS>` with the surface's convention slice
@@ -467,35 +465,35 @@ files automatically. It works because every generated artifact is a **determinis
    `/cohorte-init-pipeline` Phase 1, and if there is one, ask Phase 2's release-notes question (anchor
    package, language, bump policy, forbidden levels). No tool found ⇒ top up with `enabled: false`.
 2. **Re-render agent frontmatter + body.** For each `surfaces[]` entry, re-render
-   `.claude/agents/<agent>.md` from the current `implementer.template.md` per §Rendering above. Safe by
+   `<agents>/<agent>.md` from the current `implementer.template.md` per §Rendering above. Safe by
    doctrine: rendered agents are regenerable artifacts — hand-written rules belong in `PIPELINE.md`
    §Conventions (which reconcile never touches), NOT in agent files, where they'd be clobbered here.
-3. **Additive settings patch.** Bring `.claude/settings.json` + `gate-config.json` up to the current
-   init spec (missing `allow` entries, hooks per install mode) — add what's missing, never remove or
-   rewrite existing/custom keys.
+3. **Additive settings patch.** Bring `<state>/gate-config.json` — and, on a runtime with a settings
+   file the pipeline generates, that too — up to the current init spec (missing `allow` entries,
+   hooks per install mode): add what's missing, never remove or rewrite existing/custom keys.
 4. **Capability wiring.** If a top-up added a capability needing external setup (e.g. a `retrieval`
    provider whose MCP server isn't registered yet), run its wiring step from `/cohorte-init-pipeline` Phase 4.
    Even when nothing new was added, re-run the provider's health check (§Code retrieval) — wiring
    rots (PATH changes, uninstalls, hand-edits) — and repair whatever fails.
-5. **Global config seed.** If `~/.claude/cohorte.config.yaml` is absent, seed it from the template
+5. **Global config seed.** If `<config>` is absent, seed it from the template
    (`profile/cohorte.config.template.yaml`) so the kanban + shared-vault config has a home. Never
    clobber an existing filled file; report what was seeded.
 6. **Kanban sync.** Run the §Kanban reconcile: link/create the project's board if configured, verify
    its columns, and backfill/sync cards from `specs/*.md`. See §Kanban.
 7. **Spec-template top-up.** `specs/_template.md` is seeded once at install and then **never**
    refreshed, so a repo keeps whatever front-matter the core shipped the day it was installed (a
-   pre-1.6 copy has no `loop_pass`/`loop_phase`, and its `status` comment still lists four states).
-   Top it up the same way as the profile: add the **front-matter fields** the current
-   `templates/spec.template.md` has and the repo's copy lacks, with their documented defaults, and
-   refresh the `status:` comment. Never rewrite its body — the section list is the human's to shape,
+   pre-1.6 copy's `status` comment still lists four states). Top it up the same way as the profile:
+   add the **front-matter fields** the current `templates/spec.template.md` has and the repo's copy
+   lacks, with their documented defaults, drop `loop_pass`/`loop_phase` (retired with
+   `/cohorte-loop` in 2.2.0), and refresh the `status:` comment. Never rewrite its body — the section list is the human's to shape,
    and some repos have deliberately trimmed it. Nothing breaks without this (the fields are written on
    demand when a driver needs them); it just keeps a new spec's front-matter honest about the states
    the pipeline can put it in.
 
 8. **Local-artifact hygiene.** The pipeline's own runtime files must stay out of git:
-   `.claude/preflight.ok`, `.claude/pipeline-metrics.jsonl`, `specs/reports/`. Add any missing entry to
+   `<state>/preflight.ok`, `<state>/pipeline-metrics.jsonl`, `specs/reports/`. Add any missing entry to
    `.gitignore`, and **untrack** what a pre-2.0.0 install let slip in —
-   `git rm --cached --ignore-unmatch .claude/preflight.ok` (repeat per stray path). The stamp is the
+   `git rm --cached --ignore-unmatch <state>/preflight.ok` (repeat per stray path). The stamp is the
    one that actively breaks: it records the tree it verified, the commit carrying it moves HEAD past
    that tree, and the committed copy lands in every clone and worktree — so the phase gate ends up
    blocking clean trees and greening unchecked ones. Report what was untracked; the human commits it.
@@ -507,8 +505,8 @@ itself changes in ways `/cohorte-build` §1.5 can't auto-grow (e.g. package mana
 
 Three phases have a **workflow variant** — a deterministic orchestration script the Claude Code
 Workflow runtime executes instead of the lead reasoning out the fan-out turn by turn:
-`<core>/workflows/review.js`, `audit.js`, `refactor.js` (installed to `.claude/workflows/` bundled or
-`~/.claude/workflows/` global). The conversational commands (`/cohorte-review`, `/cohorte-audit`, `/cohorte-refactor`)
+`<core>/workflows/review.js`, `audit.js`, `refactor.js` (installed to `<core>/workflows/` bundled or
+`<core>/workflows/` global). The conversational commands (`/cohorte-review`, `/cohorte-audit`, `/cohorte-refactor`)
 **remain the default path and the fallback** — a workflow runs only when the human explicitly asks
 for it ("run the review workflow"), and requires Claude Code ≥ **2.1.154** with workflows
 enabled.
@@ -557,7 +555,7 @@ Shared design, all four scripts:
 
 An **optional, user-scoped** mirror of the dev flow: each pipeline stage moves a card across an
 [Obsidian Kanban](https://github.com/mgmeyers/obsidian-kanban) board, one board per project. Config
-lives in the consolidated global config `~/.claude/cohorte.config.yaml` §`kanban` (NOT in
+lives in the consolidated global config `<config>` §`kanban` (NOT in
 `PIPELINE.md` — the board path points at the user's personal vault, so it is machine-specific and must
 not be committed). Everything below **no-ops silently** when the config is absent, `kanban.enabled` is
 false, no board is configured for the current project, or the board file is missing — the pipeline never
@@ -585,12 +583,12 @@ agent's context (find, dedupe, sub-notes carried along, settings block preserved
 <core>/pipeline/scripts/kanban-move.sh auto <id> <stage> [--pr <num>] [--title <title>]
 ```
 
-`<core>` is `~/.claude` (global install) or `.claude` (bundled) — probe with `test -x`. It creates
+It creates
 the card in the target column when none exists, keeps the first and drops duplicates, and appends
 ` — PR #<num>` with `--pr`.
 
 **`auto` is not a convenience, it is the contract.** It reads `name` from `PIPELINE.md`, then
-`kanban.enabled` / `obsidian.vault_path` / `boards[name]` from `~/.claude/cohorte.config.yaml`
+`kanban.enabled` / `obsidian.vault_path` / `boards[name]` from `<config>`
 (override with `COHORTE_CONFIG`, or skip the profile with `--project <name>`), and it maps the
 **stage key** (`ideas` · `brainstorm` · `spec` · `ready` · `building` · `review` · `fix` · `ship` ·
 `shipped`) to that board's heading through `boards[name].columns` → `kanban.columns` → the built-in
@@ -626,15 +624,14 @@ Ideas — so `/cohorte-brainstorm` appends the tag to the picked line before its
 | `/cohorte-build`                                | `building`      |
 | `/cohorte-review`                               | `review`        |
 | `/cohorte-fix`                                  | `fix`           |
-| a `/cohorte-loop` is driving it (`in-progress`) | the current phase's column |
-| a `/cohorte-loop` gave up (`blocked`)            | `fix`           |
+| a round is under way (`in-progress`)    | `building`      |
+| a round gave up (`blocked`)             | `fix`           |
 | `/cohorte-ship` starts                          | `ship`          |
 | PR opened (`status: shipped`)           | `shipped` (+ `PR #<num>` on the card) |
 
 **Backfill / sync from specs (reconcile).** `specs/*.md` is the source of truth. For each spec, read its
 `feature_id` (front-matter or filename) and `status`, map `status`→column — `frozen`→`ready`,
-`in-progress`→the `loop_phase`'s column (`build`→`building`, `review`→`review`, `fix`→`fix`; unset ⇒
-`building`), `in-review`→`review`, `blocked`→`fix`, `shipped`→`shipped`, anything else / a spec with no
+`in-progress`→`building`, `in-review`→`review`, `blocked`→`fix`, `shipped`→`shipped`, anything else / a spec with no
 status→`spec` — then **full
 sync**: card absent ⇒ add it in that column; card present ⇒ **move it** to that column so the board
 always reflects the specs (this repositions cards the human may have moved by hand). Report cards
@@ -650,7 +647,7 @@ per configured column in pipeline order, and the closing `%% kanban:settings %%`
 Cohorte can send the maintainers anonymous usage pings so the pipeline improves where it's actually
 slow. **Nothing is ever sent without explicit consent**: `/cohorte-init-pipeline` (and `/cohorte-update-pipeline` on
 pre-telemetry installs) ask ONE question, once per machine, default **No**, and record the answer in
-`~/.claude/cohorte.config.yaml` §`telemetry` (`enabled`, `install_id`, `consent_date`). The sender —
+`<config>` §`telemetry` (`enabled`, `install_id`, `consent_date`). The sender —
 `pipeline/scripts/telemetry-send.sh` — is a silent no-op unless `enabled: true` AND `install_id` AND
 `endpoint` are all set, times out at 2s, and never fails the pipeline. Callers chain it with
 `|| true`, so a **missing** script is equally silent: `/cohorte-doctor` check 1 verifies `pipeline/scripts/`
@@ -692,7 +689,7 @@ work without revealing what is being built.
 **GDPR rights, concretely:**
 
 - **Consent** — opt-in only, recorded with a date; "No" is also recorded so nothing re-asks.
-- **Withdrawal** — set `telemetry.enabled: false` in `~/.claude/cohorte.config.yaml`; effective on
+- **Withdrawal** — set `telemetry.enabled: false` in `<config>`; effective on
   the next phase, no restart.
 - **Erasure** — `/cohorte-doctor` prints your `install_id`; send
   `curl -X DELETE <endpoint-origin>/v1/install/<install_id>` and the collector drops every event

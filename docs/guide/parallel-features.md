@@ -20,7 +20,7 @@ pipeline enforces:
 More agents only help when they let the *slowest* surface's work run concurrently. Split a
 surface into specialized sub-surfaces (e.g. `web-checkout`, `web-billing`) only when **both**
 hold: it dominates build time, **and** the boundary is clean (feature modules, route groups,
-independent services). The evidence lives in `.claude/pipeline-metrics.jsonl` — one line per
+independent services). The evidence lives in `pipeline-metrics.jsonl` — one line per
 phase batch — read it before splitting; split what actually dominates wall-clock, not what feels
 big. `/cohorte-build` §1.5 proposes and renders the split automatically when a spec warrants it.
 
@@ -55,7 +55,7 @@ confirm the merge — never before.
 ## The real multiplier: one session per feature
 
 While feature A's `/cohorte-build` runs its agents (minutes of wall-clock you'd otherwise spend
-waiting), a second Claude Code session can `/cohorte-spec` or `/cohorte-review` feature B:
+waiting), a second session can `/cohorte-spec` or `/cohorte-review` feature B:
 
 ```
 session 1:   /cohorte-spec feat-a → /cohorte-build feat-a   (agents run…)
@@ -83,5 +83,5 @@ Rules that keep it safe:
 
 `pipeline-metrics.jsonl` always belongs to the **main checkout** — never the worktree, which
 dies at teardown while metrics must accumulate across features. Every command resolves it from
-anywhere via `$(dirname "$(git rev-parse --git-common-dir)")/.claude/pipeline-metrics.jsonl`;
+anywhere via `$(dirname "$(git rev-parse --git-common-dir)")/<state>/pipeline-metrics.jsonl`;
 `/cohorte-doctor` flags a stray copy inside a worktree.

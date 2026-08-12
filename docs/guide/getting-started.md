@@ -2,9 +2,10 @@
 
 ## Prerequisites
 
-- **Claude Code** — any recent version for the conversational pipeline; **≥ 2.1.154 with
-  workflows enabled** if you want the [workflow variants](/guide/workflows) (review /
-  audit / refactor workflows). `/cohorte-doctor` tells you which path your session will take.
+- **A supported coding agent** — Claude Code, Codex CLI, Cursor, Gemini CLI or OpenCode
+  ([matrix](/reference/runtimes)). All five have real subagents, which the pipeline requires.
+  On Claude Code, **≥ 2.1.154 with workflows enabled** additionally unlocks the
+  [workflow variants](/guide/workflows). `/cohorte-doctor` tells you what your runtime can enforce.
 - **Node ≥ 18** for `npx cohorte` (the shell installers work without Node).
 - **Python 3** on PATH — the destructive-command gate hook (`gate.py`) runs through it.
 - Optional: [`uv`](https://docs.astral.sh/uv/) to install **Serena** (the default code-retrieval
@@ -17,6 +18,10 @@
 
 Two modes. Pick one per machine/project — you can mix (a bundled repo and a global core can
 coexist; the bundled one wins inside its repo).
+
+Add `--runtime=codex,cursor` (or `--all-runtimes`) to target coding agents other than Claude
+Code. With no flag the installer detects what you have and asks; with no TTY it installs for
+Claude Code alone.
 
 ### Global (recommended) — one core for every repo on the machine
 
@@ -36,8 +41,8 @@ project.
 npx cohorte install
 ```
 
-Copies the core into `<project>/.claude/`, which you commit — teammates get the exact pipeline
-version with the checkout.
+Copies the core into the project (`<project>/.claude/`, or `.cohorte/<runtime>/` for the other
+agents), which you commit — teammates get the exact pipeline version with the checkout.
 
 ### Without Node
 
@@ -65,7 +70,7 @@ clobbered on update).
 
 ## Initialize a project
 
-Open the project in Claude Code and run:
+Open the project in your coding agent and run:
 
 ```
 /cohorte-init-pipeline
@@ -92,9 +97,9 @@ One-time per project, interactive, in five steps:
      question (default No).
 3. **Draft** — shows you the assembled `PIPELINE.md` for approval.
 4. **Write & render** — writes `PIPELINE.md`, renders one agent file per surface (conventions
-   baked in), generates `.claude/gate-config.json` + `.claude/settings.json` (permissions
+   baked in), generates the project's `gate-config.json` (+ `settings.json` permissions on Claude Code
    allow-list + hooks), wires the retrieval provider (committed `.mcp.json`), renders the
-   isolation scripts, seeds `specs/_template.md`, writes the committed `.claude/pipeline.json`
+   isolation scripts, seeds `specs/_template.md`, writes the committed `pipeline.json`
    pointer, and (optionally) a CI workflow.
 5. **Report** — install mode, files written, surface → agent mapping.
 

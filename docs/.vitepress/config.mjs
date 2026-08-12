@@ -58,6 +58,7 @@ export default defineConfig({
             { text: 'The profile (PIPELINE.md)', link: '/reference/profile' },
             { text: 'Gate & permissions', link: '/reference/gate' },
             { text: 'Shipped scripts', link: '/reference/scripts' },
+            { text: 'Runtimes (Codex, Cursor, Gemini, OpenCode)', link: '/reference/runtimes' },
             { text: 'Installers & updates', link: '/reference/installers' },
             { text: 'Telemetry & privacy', link: '/reference/telemetry' },
             { text: 'Troubleshooting', link: '/reference/troubleshooting' },

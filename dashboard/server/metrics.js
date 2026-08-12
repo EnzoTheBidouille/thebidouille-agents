@@ -1,5 +1,5 @@
 'use strict';
-// Read a project's `.claude/pipeline-metrics.jsonl` (one line per phase batch, appended by
+// Read a project's `pipeline-metrics.jsonl` (one line per phase batch, appended by
 // /cohorte-build, /cohorte-review and /cohorte-fix) and aggregate it per feature: wall-clock per phase, fix
 // rounds, and per-surface results. Dependency-free; a missing file is simply "no data yet".
 //
@@ -10,6 +10,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { layouts, stateDirs } = require('./runtime.js');
 
 // `smoke` and `cycle` are RETIRED phases, kept so metrics files written before their removal
 // still render. Without them in this list their per-surface results parse fine but land in no
@@ -93,11 +94,17 @@ function aggregate(batches) {
   return [...byFeature.values()].sort((a, b) => (b.lastTs || '').localeCompare(a.lastTs || ''));
 }
 
-function metrics({ projectRoot }) {
-  const file = path.join(projectRoot, '.claude', 'pipeline-metrics.jsonl');
-  let raw;
-  try { raw = fs.readFileSync(file, 'utf8'); }
-  catch { return { present: false, phases: PHASES, features: [], batches: 0 }; }
+function metrics({ projectRoot, globalDir }) {
+  // The sink lives in `<state>`, which is `.claude` on a Claude install and `.cohorte` on the
+  // others. A repo driven from both has two, and the phases genuinely split across them — read
+  // every one rather than silently reporting half the spend.
+  const dirs = stateDirs(layouts({ projectRoot, globalDir }), projectRoot);
+  let raw = '';
+  for (const d of dirs) {
+    try { raw += fs.readFileSync(path.join(d, 'pipeline-metrics.jsonl'), 'utf8'); }
+    catch { /* absent in this layout */ }
+  }
+  if (!raw) return { present: false, phases: PHASES, features: [], batches: 0 };
 
   const batches = parseBatches(raw);
   return { present: true, phases: PHASES, features: aggregate(batches), batches: batches.length };

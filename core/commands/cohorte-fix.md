@@ -12,8 +12,7 @@ that change the *contract*; `/cohorte-fix` is for everything else.
 > _Skip the re-read if it's already in your context this session and unmodified since._
 >
 > **Kanban** (SCHEMA.md §Kanban): on ingest, run
-> `<core>/pipeline/scripts/kanban-move.sh auto $ARGUMENTS fix` (`<core>` = `.claude` bundled /
-> `~/.claude` global — probe with `test -x`); the card returns to **Review** when `/cohorte-review`
+> `<core>/pipeline/scripts/kanban-move.sh auto $ARGUMENTS fix`; the card returns to **Review** when `/cohorte-review`
 > re-runs. `auto` resolves the board from the config itself and exits 0 with a `kanban: <reason>`
 > line when there is none — so **never decide "no board is configured" without running it**.
 
@@ -71,7 +70,7 @@ When the agents return:
   needs those checkboxes).
 - Print one status line per surface (`<key> · items fixed <n>/<m> · tests pass/fail`) — do not restate
   handoff content — and append ONE metrics line for the batch to the **main checkout's**
-  `$(dirname "$(git rev-parse --git-common-dir)")/.claude/pipeline-metrics.jsonl` (never a bare
+  `$(dirname "$(git rev-parse --git-common-dir)")/<state>/pipeline-metrics.jsonl` (never a bare
   relative path: from a feature worktree that writes a stray sink whose lines die at teardown)
   (rules in `/cohorte-build` §4, `phase: "fix"`), chaining the opt-in usage ping in the same Bash call
   (results = items fixed over items found across surfaces, e.g. `"5/6"`).

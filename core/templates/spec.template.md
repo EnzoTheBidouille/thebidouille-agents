@@ -4,8 +4,6 @@ title: <Feature title>
 status: draft # draft → frozen → in-progress → in-review → shipped · blocked (see SCHEMA.md §Spec status)
 branch: <feature_branch_prefix><slug>
 created: <YYYY-MM-DD>
-loop_pass: 0 # /cohorte-loop bookkeeping — the review pass it is on; 0 = no loop running. Written by the driver, not by hand
-loop_phase: # /cohorte-loop bookkeeping — build | review | fix | done. With loop_pass, this is what `--resume` reads back
 reviewed_base: # merge-base sha at the last SHIP verdict — freshness-gate anchor (written by /cohorte-review)
 reviewed_digest: # sha256 (16 hex) of the reviewed source diff vs reviewed_base, specs excluded — /cohorte-ship re-checks
 design_files: [] # design page links — full URLs of the form https://claude.ai/design/p/<projectId>?file=<file> (each carries its own project + page); blank until designed; omit if no UI
@@ -64,7 +62,7 @@ design_files: [] # design page links — full URLs of the form https://claude.ai
 
 ## 8. Design brief (the "spec return")
 
-> Only if the project has UI. Standalone; mirrors `.claude/templates/design-brief.md`.
+> Only if the project has UI. Standalone; mirrors `<core>/templates/design-brief.md`.
 
 - **Screens / views:** …
 - **Flows:** …

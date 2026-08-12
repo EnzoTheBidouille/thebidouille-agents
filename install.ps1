@@ -103,6 +103,29 @@ try {
         throw "pipeline source not found (no core/ in $src)"
     }
 
+    # --- delegate to the Node CLI --------------------------------------------
+    # Since 2.2.0 the commands in core/ are runtime-NEUTRAL sources: they carry capability
+    # conditionals (`<!-- cohorte:if subagents -->`) and path tokens (`<core>`, `<state>`)
+    # that the adapter resolves per coding agent. Copying them verbatim, as this script used
+    # to, would install prompts full of unresolved markers — an install that looks successful
+    # and instructs the model with text meant for a different runtime. There is no PowerShell
+    # renderer, so hand the whole job to bin/cli.js, the documented route anyway.
+    $node = Get-Command node -ErrorAction SilentlyContinue
+    if ($node) {
+        $cliArgs = @((Join-Path $src 'bin\cli.js'), $(if ($Update) { 'update' } else { 'install' }))
+        if ($Global) { $cliArgs += '--global' } else { $cliArgs += $Target }
+        & $node.Source @cliArgs
+        exit $LASTEXITCODE
+    }
+    Write-Error @"
+cohorte needs Node >= 18 to install.
+  The pipeline's commands are rendered per coding agent (Claude Code, Codex, Cursor,
+  Gemini CLI, OpenCode) at install time; there is no PowerShell equivalent of that
+  step, and a raw copy would install prompts this runtime cannot follow.
+  Install Node, then:  npx cohorte install$(if ($Global) { ' --global' })
+"@
+    exit 1
+
     # --- resolve the destination .claude dir ---------------------------------
     if ($Global) {
         $dest = $env:CLAUDE_CONFIG_DIR
@@ -151,8 +174,6 @@ try {
         Copy-Item (Join-Path $src 'scripts\kanban-move.sh')       (Join-Path $dest 'pipeline\scripts') -Force
         Copy-Item (Join-Path $src 'scripts\telemetry-send.sh')    (Join-Path $dest 'pipeline\scripts') -Force
         Copy-Item (Join-Path $src 'scripts\preflight.sh')         (Join-Path $dest 'pipeline\scripts') -Force
-        Copy-Item (Join-Path $src 'scripts\loop.sh')              (Join-Path $dest 'pipeline\scripts') -Force
-        Copy-Item (Join-Path $src 'scripts\loop-detach.sh')       (Join-Path $dest 'pipeline\scripts') -Force
         Copy-Item (Join-Path $src 'core\agents\implementer.template.md') (Join-Path $dest 'pipeline') -Force
         if (Test-Path (Join-Path $src 'CHANGELOG.md')) { Copy-Item (Join-Path $src 'CHANGELOG.md') (Join-Path $dest 'pipeline') -Force }
         [System.IO.File]::WriteAllText((Join-Path $dest 'pipeline\VERSION'), "$ver`n", [System.Text.UTF8Encoding]::new($false))

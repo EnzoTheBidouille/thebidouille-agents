@@ -55,8 +55,8 @@ as a clickable link with live open/merged/closed status.
 | `/cohorte-build` | `building` |
 | `/cohorte-review` | `review` |
 | `/cohorte-fix` | `fix` |
-| a `/cohorte-loop` is driving it (`in-progress`) | the current phase's column |
-| a `/cohorte-loop` gave up (`blocked`) | `fix` |
+| a round is under way (`in-progress`) | `building` |
+| a round gave up (`blocked`) | `fix` |
 | `/cohorte-ship` starts | `ship` |
 | PR opened | `shipped` (+ `PR #<num>`) |
 

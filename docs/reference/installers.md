@@ -20,13 +20,18 @@ npx cohorte dashboard [--port=N] [--host=ADDR] [--open]
 npx cohorte version
 ```
 
+Add `--runtime=codex,cursor` (or `--all-runtimes`) to `install`/`update` to target coding agents
+other than Claude Code; with no flag the installer detects what is configured on the machine and
+asks, and with no TTY it targets Claude Code alone. See [Runtimes](/reference/runtimes).
+
 **Update never touches generated files**: `PIPELINE.md`, rendered surface agents,
-`gate-config.json`, `settings.json`, and your filled `~/.claude/cohorte.config.yaml` are always
+`gate-config.json`, `settings.json`, and your filled user config are always
 preserved. Bringing those up to a new core is `/cohorte-update-pipeline`'s reconcile job.
 
 ## What gets copied
 
-Into the destination `.claude/`:
+Into the destination core — `.claude/` on Claude Code, `.cohorte/<runtime>/` on the others,
+with `commands/` and `agents/` redirected to wherever that runtime actually reads them:
 
 ```
 commands/     the slash commands
@@ -41,13 +46,18 @@ pipeline/     PIPELINE.template.md · SCHEMA.md · cohorte.config.template.yaml 
               new-feature.sh.template · remove-feature.sh.template
 ```
 
+The commands and agents are **rendered**, not copied: `core/commands/` and `core/agents/` are
+runtime-neutral sources, and the adapter emits markdown + that runtime's frontmatter keys, a
+Codex skill directory, or TOML, resolving every path and stripping the branches that runtime
+cannot follow.
+
 Plus, at install: the fixed agents, the spec template into `specs/_template.md` (bundled mode),
-the global-config seed, and — global mode — the one-time gate-hook registration. Installers also
+the user-config seed, and the gate-hook registration in that runtime's own config file. Installers also
 **scrub retired artifacts** from older installs (the removed TDD-gate hook and its settings
 registration, the retired research/questionnaire capability) — copy-over never deletes, so the
 scrubs are explicit.
 
-## The pointer — `.claude/pipeline.json`
+## The pointer — `pipeline.json` in the project's state dir
 
 Committed by `/cohorte-init-pipeline`:
 

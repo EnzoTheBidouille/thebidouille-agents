@@ -48,9 +48,6 @@ features:
 /cohorte-ship <id>    →  commit, push, PR, CI watch — the one human-confirmed gate
 ```
 
-`/cohorte-loop <id>` runs `/cohorte-build → /cohorte-review → /cohorte-fix → /cohorte-review …` for you until no blocking finding is left
-— in child sessions, so your own context never sees the diff or the reports.
-
 Three moments of human attention per feature: the brainstorm, the spec freeze, and the ship
 confirmation. Everything in between runs itself — and every stage hands off through files on disk,
 so `/clear` between commands is always safe.

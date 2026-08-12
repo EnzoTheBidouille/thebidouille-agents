@@ -25,9 +25,8 @@ npx cohorte dashboard --port=4400 --open   # custom port, open the browser
   - **Surfaces ↔ agents** map from `PIPELINE.md`.
   - **One board** — the linked Obsidian **kanban** (cards, clickable PR links, live PR status
     via `gh`, ship-date-sorted Shipped column) or, when no board is linked, a **specs board**
-    grouped by `draft · frozen · in-progress · in-review · shipped · blocked`. A card driven by a
-    `/cohorte-loop` shows the pass and phase it reached (`↻ pass 3 · /cohorte-review`), so an interrupted autonomous
-    run is visible — resume it with `/cohorte-loop <id> --resume`.
+    grouped by `draft · frozen · in-progress · in-review · shipped · blocked`, so a spec left
+    mid-flight is visible rather than buried in `specs/`.
   - **Metrics** — the `pipeline-metrics.jsonl` batches (phase durations per feature).
 - **Actions** (output streamed live into the modal):
   - **Install / Update core** — global or bundled, runs the real CLI.

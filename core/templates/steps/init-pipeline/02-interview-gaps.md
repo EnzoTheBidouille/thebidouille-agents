@@ -47,13 +47,13 @@ Prefer sensible defaults from Phase 1 as the first (Recommended) option in each 
 
 - **Kanban** (optional) — mirror this project's pipeline (`/cohorte-brainstorm`…`/cohorte-ship`) onto an Obsidian
   Kanban board? If the human says yes: confirm the shared vault path (`obsidian.vault_path` in
-  `~/.claude/cohorte.config.yaml`; ask if empty) and the board's location inside it (default
+  `<config>`; ask if empty) and the board's location inside it (default
   `<ProjectName>/Tasks.md`). Phase 4 creates the board and records the link. Default: no.
 
 > The **kanban** link is user-scoped (it points at a personal vault, so it never goes in the committed
 > `PIPELINE.md`), but IS wired here because it is per-project — see Phase 4.
 
-- **Telemetry** (optional, machine-scoped — SKIP entirely if `~/.claude/cohorte.config.yaml` already
+- **Telemetry** (optional, machine-scoped — SKIP entirely if `<config>` already
   has a `telemetry:` block with a `consent_date`, i.e. the human already answered on this machine).
   Ask ONE opt-in question, stating exactly: _"Share anonymous usage stats with the cohorte project?
   One ping per pipeline phase, `/cohorte-brainstorm` through `/cohorte-ship`: core version, OS, phase name, duration,

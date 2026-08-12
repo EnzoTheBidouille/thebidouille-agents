@@ -8,7 +8,8 @@ disclosure.
 
 Nothing is ever sent without explicit consent. `/cohorte-init-pipeline` (and `/cohorte-update-pipeline` on
 pre-telemetry installs) ask **one question, once per machine**, default **No**, and record the
-answer — either way — in `~/.claude/cohorte.config.yaml` (`telemetry.enabled`, `install_id`,
+answer — either way — in your user config (`~/.claude/cohorte.config.yaml`, or
+`~/.cohorte/cohorte.config.yaml` on a non-Claude runtime) (`telemetry.enabled`, `install_id`,
 `consent_date`), so you're never re-asked. The sender (`pipeline/scripts/telemetry-send.sh`) is
 a silent no-op unless `enabled: true` **and** `install_id` **and** `endpoint` are all set — all
 three written only by the consent flow.
@@ -48,7 +49,7 @@ counts work without revealing what is being built.
 
 ## Your rights, concretely
 
-- **Withdrawal** — set `telemetry.enabled: false` in `~/.claude/cohorte.config.yaml`; effective
+- **Withdrawal** — set `telemetry.enabled: false` in your user config; effective
   on the next phase, no restart.
 - **Erasure** — `/cohorte-doctor` prints your `install_id`; send
   `curl -X DELETE <endpoint-origin>/v1/install/<install_id>` and the collector drops every event

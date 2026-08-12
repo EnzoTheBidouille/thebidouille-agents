@@ -55,7 +55,7 @@ it's the mandatory phase 0 of all four workflow scripts.
 
 `/cohorte-init-pipeline` (and `/cohorte-build` §1.5 when a spec grows the surface list) renders one agent per
 `surfaces[]` entry from `core/agents/implementer.template.md` into
-`.claude/agents/<agent>.md`, substituting:
+the runtime's agents dir as `<agent>.md`, substituting:
 
 | Placeholder | Filled with |
 | --- | --- |
