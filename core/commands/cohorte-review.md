@@ -165,7 +165,7 @@ exactly the leak this step closes. Append each merged `## Deferred` item to
 `/cohorte-refactor <domain>` picks them up with no extra plumbing):
 
 ```
-- [ ] <SEVERITY> · <file:line> · <quality|security|rule> · <concrete fix> · deferred:$ARGUMENTS
+- [ ] <SEVERITY> · <file:line> · <quality|security|rule|complexity> · <concrete fix> · deferred:$ARGUMENTS
 ```
 
 - **Never into the spec's `## Remediation`** — that list is what `/cohorte-fix` re-dispatches, so a

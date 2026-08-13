@@ -7,6 +7,40 @@ short, user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` secti
 > They are history and are deliberately not rewritten — every command gained a `cohorte-` prefix
 > in 2.0.0.
 
+## 2.4.0 — 2026-08-13
+
+- **The pipeline froze *what* to build, never *how much*.** A spec pins the contract and the
+  acceptance criteria, so the feature was right — but nothing ever asked an implementer whether the
+  helper it was about to write already existed three files over, whether the stdlib shipped it, or
+  whether the abstraction it was wrapping had exactly one caller. The diff came out correct and
+  fatter than it needed to be, and every extra line was then paid twice: once at build, once again at
+  `/cohorte-review`, whose cost is linear in the diff it reads.
+
+  Implementers now walk a **minimality ladder** before inventing anything: does it need to exist at
+  all → already in this repo → stdlib/framework → native platform feature → an already-installed
+  dependency → a few inline lines → only then the minimum the contract requires. It governs the
+  **how**, never the **what** — a contract field, an acceptance criterion, a test, a validation or an
+  authz check is out of its reach, by construction. It is bounded to **one lookup per candidate**, so
+  it costs a symbol search and not an exploration, and a shortcut kept on purpose surfaces in the
+  handoff's `## TODO / not done` with its ceiling and its upgrade trigger, instead of rotting in a
+  comment.
+
+  The `review` agent gains the matching axis — over-engineering, tagged `delete:` / `stdlib:` /
+  `native:` / `yagni:` / `shrink:`, always naming the cheaper replacement. It is deliberately the
+  weakest thing in the report: **5 findings max, MEDIUM ceiling, never a CRITICAL, never a REVISE,
+  never a BLOCK**. A diff whose only findings are `complexity` ships, and they park in the backlog
+  like any other nit. Tests, fixtures and anything the contract mandates are out of bounds — coverage
+  is not bloat. In audit mode the axis widens to the whole target (10 per domain, biggest cut first,
+  closing with `net: -N lines, -M deps possible.`), and `/cohorte-audit` files them under a new
+  `complexity` backlog tag: the cheapest wins in the file, since deleting code needs no new test.
+
+  Doctrine adapted from [ponytail](https://github.com/dietrichgebert/ponytail) (MIT) — the decision
+  ladder and the finding tags are theirs; the subordination to the frozen contract and the
+  can't-block severity ceiling are what make them safe inside a gated pipeline.
+
+  Run `/cohorte-update-pipeline` to re-render your surface agents — the ladder lives in the
+  implementer template, so it only reaches your agents through a reconcile.
+
 ## 2.3.0 — 2026-08-12
 
 - **A bug fix had to pretend to be a feature.** The only way into the pipeline was

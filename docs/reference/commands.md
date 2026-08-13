@@ -135,8 +135,10 @@ CI watch, and — after the confirmed merge — the worktree teardown proposal.
 
 §1 runs the mechanical gates (quiet variants) scoped to the target, redirected to
 `specs/reports/audit-gates.txt`. §2 dispatches `review` in **audit mode** (no spec; conventions +
-TDD coverage + design usage as the rulebook). §3 writes the prioritized
-`specs/refactor-backlog.md` grouped by domain.
+TDD coverage + over-engineering + design usage as the rulebook). §3 writes the prioritized
+`specs/refactor-backlog.md` grouped by domain. Backlog items tagged `complexity` are the
+over-engineering cuts, ranked biggest first inside their domain — the cheapest wins in the file
+(deleting code needs no new tests), but never ahead of a security, correctness or `tdd` item.
 
 ## `/cohorte-refactor <domain…>`
 

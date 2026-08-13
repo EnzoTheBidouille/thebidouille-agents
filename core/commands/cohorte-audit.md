@@ -32,8 +32,9 @@ bulk never sits in your history, then grep it for the `file:line` of every failu
 
 Dispatch `review` (read-only; static prompt first, variable slot last — prompt-cache prefix):
 "Audit a target against `PIPELINE.md` (no spec — **audit mode**). Check conventions (§Conventions
-per surface), TDD coverage (untested entry points / modules per surface), and — if the profile
-enables them — mobile-first + design-system usage. Mechanical findings from the gates: read
+per surface), TDD coverage (untested entry points / modules per surface), over-engineering (§8,
+widened per your audit-mode rules — ranked biggest cut first, closing `net:` line), and — if the
+profile enables them — mobile-first + design-system usage. Mechanical findings from the gates: read
 `specs/reports/audit-gates.txt`. Emit a prioritized refactor backlog (capped finding-line format
 from your instructions), grouped by domain (one group per surface + shared). — Target: `$ARGUMENTS`
 (default: whole repo)."
@@ -42,7 +43,11 @@ from your instructions), grouped by domain (one group per surface + shared). —
 
 Merge mechanical + convention findings into one prioritized backlog and **write
 `specs/refactor-backlog.md`**, grouped by domain, each item:
-`- [ ] <SEVERITY> · <file:line> · <rule|tdd|lint|format|type|security> · <concrete fix>`
+`- [ ] <SEVERITY> · <file:line> · <rule|tdd|lint|format|type|security|complexity> · <concrete fix>`
+
+`complexity` items are the over-engineering cuts, ranked biggest first inside their domain — they are
+the cheapest wins in the backlog (deleting code needs no new tests) but they never outrank a
+security, correctness or `tdd` item.
 
 **Carry over the deferred items** before overwriting: `grep -n 'deferred:' specs/refactor-backlog.md`
 and re-emit every **open** (`- [ ]`) match verbatim under its domain, tag included. Those lines were

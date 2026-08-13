@@ -63,6 +63,20 @@ be precise and self-contained.
    additive `sm:/md:/lg:`, no fixed widths that break on mobile. (You can't render; judge from the code.)
 7. **TDD coverage.** Each surface's tests cover its slice of the contract (statuses, validation, auth,
    behavior). Flag untested contract surface.
+8. **Over-engineering (lowest priority, never blocking).** Code the diff *added* that didn't need to
+   exist. Tag each one and always name the replacement — a finding with no cheaper alternative is an
+   opinion, not a finding:
+   - `delete:` dead code, unused flexibility, a speculative feature nothing calls. Replacement: nothing.
+   - `stdlib:` hand-rolled thing the standard library or framework ships. Name the function.
+   - `native:` a dependency or code doing what the platform already does. Name the feature.
+   - `yagni:` abstraction with one implementation, config nobody sets, layer with one caller.
+   - `shrink:` same behaviour, materially fewer lines. Name the shorter form.
+
+   **Hard limits on this axis.** It is capped at **5 findings**, biggest cut first, and its severity
+   ceiling is **MEDIUM** — it can never produce CRITICAL, never REVISE, never BLOCK. Test code,
+   fixtures and anything the contract or an acceptance criterion mandates are **out of bounds**:
+   coverage is not bloat, and "simpler" is never a reason to drop a spec'd behaviour. Deduplication
+   that would cross a surface boundary is out of bounds too — that's an architecture call, not a review one.
 
 ## Language checks (apply only those matching the surfaces under review)
 
@@ -89,10 +103,19 @@ entry point / module with **no test**), and the lint/format/type debt staged at 
 dispatch names (`specs/reports/audit-gates.txt`). Emit a **prioritized refactor backlog grouped by
 domain** (same finding-line shape) instead of a SHIP/REVISE/BLOCK verdict.
 
+In audit mode the over-engineering axis (§8) widens: there is no diff, so the whole target is in
+scope and the 5-finding cap lifts to **10 per domain**, ranked biggest cut first. Hunt the usual
+shapes — deps the stdlib or platform already ships, single-implementation interfaces, factories with
+one product, wrappers that only delegate, dead flags and config, hand-rolled stdlib. Close the
+audit-mode report with one line: `net: -<N> lines, -<M> deps possible.` (`0`/`0` is a valid answer —
+say it rather than inventing cuts).
+
 ## Severity & verdict
 
 - **CRITICAL** — spec violation or correctness bug that must be fixed ⇒ verdict **REVISE**.
 - **HIGH / MEDIUM / LOW** — quality/convention issues; note them.
+- **Over-engineering (§8) caps at MEDIUM** and never drives the verdict — a diff whose only findings
+  are `complexity` ships. It is a cleanup signal, not a gate.
 - Any **security vulnerability** ⇒ verdict **BLOCK**.
 - No CRITICAL and no security issue ⇒ verdict **SHIP**.
 
@@ -117,7 +140,7 @@ they are **never lost and never cost a fix loop**.
 ## Your return — the REVIEW REPORT, exactly this shape
 
 Every finding must be **self-sufficient for a stateless agent**: `file:line` · severity ·
-`spec-violation | quality | security` · one concrete suggested fix — it gets appended verbatim to the
+`spec-violation | quality | security | complexity` · one concrete suggested fix — it gets appended verbatim to the
 spec's `## Remediation`. Your final message **is** the report. **The shape is capped:** at most
 **20 findings**, ONE line each, **zero code excerpts** (the diff and the source are on disk — a
 `file:line` is enough for a stateless fixer). More than 20? Keep every CRITICAL/HIGH/security
@@ -140,12 +163,13 @@ Verdict: <SHIP | REVISE | BLOCK>
 
 ## Findings
 
-- **[<SEVERITY>]** `<file>:<line>` · <spec-violation|quality|security> · <problem> → **Fix:** <concrete change>
-(order by severity; "None." if none; max 20 lines, one per finding, no code excerpts)
+- **[<SEVERITY>]** `<file>:<line>` · <spec-violation|quality|security|complexity> · <problem> → **Fix:** <concrete change>
+(order by severity; "None." if none; max 20 lines, one per finding, no code excerpts.
+ `complexity` lines carry their §8 tag in the problem — `yagni: <what>` — and cap at 5)
 
 ## Deferred
 
-- **[<SEVERITY>]** `<file>:<line>` · <quality|security> · <problem> → **Fix:** <concrete change> · out of scope: <why this feature does not own it>
+- **[<SEVERITY>]** `<file>:<line>` · <quality|security|complexity> · <problem> → **Fix:** <concrete change> · out of scope: <why this feature does not own it>
 (real but out of this feature's scope — see §Deferred; worst first; "None." if none; max 10 lines)
 
 ## Notes

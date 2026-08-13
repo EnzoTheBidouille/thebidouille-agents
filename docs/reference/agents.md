@@ -24,6 +24,14 @@ default args, bare `except`; Rust: `.unwrap()` outside tests, `unsafe` without `
 Go: discarded errors, un-`ctx`'d goroutines, `defer` in loops; SQL: `UPDATE`/`DELETE` without
 `WHERE`, N+1, unindexed FK joins).
 
+A last, deliberately weak axis is **over-engineering** — code the diff *added* that didn't need to
+exist, tagged `delete:` / `stdlib:` / `native:` / `yagni:` / `shrink:` and always naming the cheaper
+replacement. It is capped at **5 findings**, its severity ceiling is **MEDIUM**, and it can never
+produce a CRITICAL, a REVISE or a BLOCK: a diff whose only findings are `complexity` ships, and they
+park in the backlog like any other nit. Tests, fixtures and anything the contract or an acceptance
+criterion mandates are out of bounds — coverage is not bloat. In audit mode the axis widens to the
+whole target (10 per domain, biggest cut first, closing with `net: -N lines, -M deps possible.`).
+
 Emits the **REVIEW REPORT**: severity table, verdict (`SHIP` = no CRITICAL/security;
 `REVISE` = ≥1 CRITICAL; `BLOCK` = security), findings **capped at 20, one line each, zero code
 excerpts**, every finding self-sufficient (`file:line · severity · type · concrete fix`) — it
@@ -72,6 +80,13 @@ The rendered implementer:
 - **Reads only the machine block** of `PIPELINE.md` at runtime — its conventions are baked in.
   If the bake visibly contradicts the profile, it says so in its handoff (the profile wins; the
   agent needs a re-render via `/cohorte-update-pipeline`).
+- **Walks the minimality ladder** before inventing any helper, wrapper, abstraction or new
+  dependency: does it need to exist at all → already in this repo → stdlib/framework → native
+  platform feature → an already-installed dependency → a few inline lines → only then the minimum
+  implementation the contract requires. It governs the **how**, never the **what**: a contract
+  field, an acceptance criterion, a test, a validation or an authz check is never "trimmed". Bounded
+  to one lookup per candidate, so it costs a symbol search, not an exploration. A shortcut kept
+  deliberately goes in the handoff's `## TODO / not done` with its ceiling and upgrade trigger.
 - **Works strict TDD**: (design pull first for `uses_design` surfaces) → failing tests from the
   contract → implement to green → refactor to conventions → lint + format. Runs **bridled
   commands** (its `*_quiet_cmd`s, or `cmd 2>&1 | tail -40`).

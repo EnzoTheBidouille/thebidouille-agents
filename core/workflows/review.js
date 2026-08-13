@@ -125,7 +125,7 @@ const FINDING = {
   properties: {
     severity: { enum: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] },
     file: { type: 'string' }, line: { type: 'integer' },
-    kind: { enum: ['spec-violation', 'quality', 'security'] },
+    kind: { enum: ['spec-violation', 'quality', 'security', 'complexity'] },
     problem: { type: 'string', description: 'one line, no code excerpts' },
     fix: { type: 'string', description: 'one concrete change, one line' },
   },
@@ -141,7 +141,7 @@ const DEFERRED = {
   properties: {
     severity: { enum: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] },
     file: { type: 'string' }, line: { type: 'integer' },
-    kind: { enum: ['quality', 'security', 'rule'] },
+    kind: { enum: ['quality', 'security', 'rule', 'complexity'] },
     problem: { type: 'string', description: 'one line, no code excerpts' },
     fix: { type: 'string', description: 'one concrete change, one line' },
     outOfScope: { type: 'string', description: 'one line: why this feature does not own it' },
