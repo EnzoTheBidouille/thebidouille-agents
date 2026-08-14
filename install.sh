@@ -42,8 +42,9 @@ install.sh — install the cohorte pipeline core.
   sh install.sh --update --global
 
 Honours $CLAUDE_CONFIG_DIR for the global destination and $PIPELINE_REPO for the
-source when piped through curl. The npm CLI (`npx cohorte install`) does the same
-thing and is the documented route; this script exists for Node-less environments.
+source when piped through curl. The npm CLI (`npm i -g cohorte` then `cohorte install`)
+does the same thing and is the documented route; this script exists for Node-less
+environments.
 USAGE
       exit 0 ;;
     --)       shift; break ;;
@@ -89,7 +90,7 @@ echo "error: cohorte needs Node ≥ 18 to install." >&2
 echo "  The pipeline's commands are rendered per coding agent (Claude Code, Codex, Cursor," >&2
 echo "  Gemini CLI, OpenCode) at install time; there is no shell equivalent of that step," >&2
 echo "  and a raw copy would install prompts this runtime cannot follow." >&2
-echo "  Install Node, then:  npx cohorte install${scope:+ }$([ "$scope" = global ] && echo --global)" >&2
+echo "  Install Node, then:  npm i -g cohorte && cohorte install$([ "$scope" = global ] && echo ' --global')" >&2
 exit 1
 
 # --- resolve the destination .claude dir ------------------------------------
@@ -218,7 +219,7 @@ scrub_research_questionnaire() {
 # pipeline capability config is USER-level (vault, Notion DB, kanban boards) — it lives in
 # ~/.claude regardless of install scope. Seed it only if neither the consolidated nor the
 # legacy copy exists. This piped installer is non-interactive: it seeds disabled defaults;
-# /cohorte-init-pipeline + /cohorte-update-pipeline wire it (npx's installer offers a quick interview instead).
+# /cohorte-init-pipeline + /cohorte-update-pipeline wire it (the npm CLI's installer offers a quick interview instead).
 seed_config() {
   base="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
   cfg="$base/cohorte.config.yaml"

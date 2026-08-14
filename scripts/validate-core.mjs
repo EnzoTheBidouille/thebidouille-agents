@@ -177,7 +177,7 @@ for (const c of KANBAN_STAGES) {
 // Every scripts/*.sh must be copied by BOTH shell installers. Callers chain these
 // with `|| true`, so one an installer forgets is a silent no-op forever — no kanban
 // card moves, no error. CI is the only place this is loud.
-// The third installer, bin/cli.js (what `npx cohorte` runs), copies by rule rather
+// The third installer, bin/cli.js (what the `cohorte` CLI runs), copies by rule rather
 // than by name, so grepping for filenames can't see it — ci.yml dry-runs it into a
 // scratch HOME and asserts the same postconditions instead. Both are needed: this
 // check catches a forgotten name, that one catches a drifted rule.

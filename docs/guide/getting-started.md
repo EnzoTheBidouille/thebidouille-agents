@@ -6,7 +6,7 @@
   ([matrix](/reference/runtimes)). All five have real subagents, which the pipeline requires.
   On Claude Code, **≥ 2.1.154 with workflows enabled** additionally unlocks the
   [workflow variants](/guide/workflows). `/cohorte-doctor` tells you what your runtime can enforce.
-- **Node ≥ 18** for `npx cohorte` (the shell installers work without Node).
+- **Node ≥ 18 + npm** for the `cohorte` CLI (the shell installers work without Node).
 - **Python 3** on PATH — the destructive-command gate hook (`gate.py`) runs through it.
 - Optional: [`uv`](https://docs.astral.sh/uv/) to install **Serena** (the default code-retrieval
   provider): `uv tool install -p 3.13 serena-agent`, and make sure `~/.local/bin` is on PATH
@@ -26,7 +26,8 @@ Claude Code alone.
 ### Global (recommended) — one core for every repo on the machine
 
 ```sh
-npx cohorte install --global
+npm i -g cohorte
+cohorte install --global
 ```
 
 Copies the core into `~/.claude/` and registers the gate hook once in the global
@@ -38,7 +39,7 @@ project.
 
 ```sh
 # from inside the project (or pass its path):
-npx cohorte install
+cohorte install
 ```
 
 Copies the core into the project (`<project>/.claude/`, or `.cohorte/<runtime>/` for the other
@@ -138,7 +139,8 @@ Prefer manual control? The conversational path is the same pipeline, one phase a
 ## Keeping it current
 
 ```sh
-npx cohorte@latest update --global   # refresh the core (never touches generated files)
+npm i -g cohorte@latest              # refresh the CLI first — the core it lays down is its own
+cohorte update --global              # refresh the core (never touches generated files)
 ```
 
 then, inside each project:

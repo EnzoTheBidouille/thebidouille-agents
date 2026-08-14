@@ -38,9 +38,9 @@ const CACHE_MS = 5 * 60 * 1000;
 // this once per tracked project, so the dashboard's 15s poll never finished.
 const FAIL_CACHE_MS = 60 * 1000;
 
-async function fetchRegistry() {
+async function fetchRegistry(timeoutMs = 5000) {
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 5000);
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetch('https://registry.npmjs.org/cohorte/latest', {
       signal: ctrl.signal,
@@ -75,7 +75,12 @@ function npmView() {
 }
 
 let _inflight = null;
-async function latestNpm() {
+// `opts` bounds what a CALLER is willing to pay for the answer. The CLI's staleness
+// notice runs at the tail of an install, where the default 5s fetch + 8s `npm view`
+// fallback would make an OFFLINE install appear to hang for 13 seconds after it had
+// already succeeded — so it asks for a short fetch and no fallback. The cache is
+// shared across callers either way: a cheap lookup still serves an expensive one.
+async function latestNpm({ timeoutMs = 5000, fallback = true } = {}) {
   const age = Date.now() - _cache.at;
   if (_cache.at && age < (_cache.value ? CACHE_MS : FAIL_CACHE_MS)) return _cache.value;
   // /api/fleet resolves N projects concurrently — without this, N lookups race and
@@ -83,7 +88,7 @@ async function latestNpm() {
   if (_inflight) return _inflight;
   _inflight = (async () => {
     try {
-      const v = (await fetchRegistry()) || npmView();
+      const v = (await fetchRegistry(timeoutMs)) || (fallback ? npmView() : null);
       _cache = { value: v || null, at: Date.now() };
       return v || null;
     } finally {
@@ -141,4 +146,4 @@ async function versions({ projectRoot, globalDir, cliVersion }) {
   };
 }
 
-module.exports = { versions };
+module.exports = { versions, latestNpm, cmpSemver };

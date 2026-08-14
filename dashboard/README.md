@@ -1,6 +1,6 @@
 # Dashboard — architecture
 
-A local web cockpit for the pipeline, launched with `npx cohorte dashboard`
+A local web cockpit for the pipeline, launched with `cohorte dashboard`
 (see the [root README](../README.md#dashboard--a-local-web-cockpit) for user-facing docs).
 
 ## Two halves: shipped runtime vs dev build
@@ -12,7 +12,7 @@ dashboard/
   dist/        → app/ built output. Shipped, served by server/. Git-ignored, rebuilt at publish.
 ```
 
-- **`server/`** is plain node (`http`, `fs`, `child_process`) — no deps, so `npx … dashboard`
+- **`server/`** is plain node (`http`, `fs`, `child_process`) — no deps, so `cohorte dashboard`
   needs no install. It serves `dist/` as static files + a small JSON/stream API.
 - **`app/`** is a Vite+React app built to `dist/`. `npm run build:dashboard` (root) runs
   `npm --prefix dashboard/app ci && … run build`; CI does this before `npm pack`/`publish`

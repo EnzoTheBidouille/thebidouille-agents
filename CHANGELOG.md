@@ -7,6 +7,35 @@ short, user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` secti
 > They are history and are deliberately not rewritten — every command gained a `cohorte-` prefix
 > in 2.0.0.
 
+## 2.6.0 — 2026-08-14
+
+- **Two ways to type the same command, and one of them silently doesn't work.** The docs wrote
+  `npx cohorte install`, the Francois extension's manifest names a bare `cohorte` binary, and
+  nothing said why the two could not be the same string. They cannot: `npx` fetches a package
+  into a cache and runs it once, leaving nothing on `PATH`, and a Francois panel may only spawn
+  a **bare binary name resolved on `PATH`**. So the extension's requirement read like a
+  preference the rest of the documentation contradicted.
+
+  Every command is now written one way — `cohorte <verb>`, after `npm i -g cohorte` — across the
+  README, the docs, both shell installers, the CLI's own banners, the `/cohorte-doctor` fix
+  lines, and the `install` string `/cohorte-init-pipeline` writes into a repo's committed
+  `pipeline.json`. `npx cohorte@latest <verb>` still works and is still the right call for a
+  one-off on a machine you don't own; it is named once, as the escape hatch it is.
+
+- **The cost of pinning, removed before it could bite.** `install` and `update` lay down the core
+  carried by the CLI that runs them. `npx cohorte@latest` made that self-correcting; a global
+  install does not, so `cohorte update` on a CLI left at an old version would re-lay an old core
+  and report success — an update that updates nothing.
+
+  Both verbs now compare themselves against the registry when they finish and print exactly what
+  to run (`npm i -g cohorte@latest`) when they are behind. It is never fatal, never blocks a
+  successful install, costs a 2.5s fetch with no `npm view` fallback, and stays silent on any
+  failure — an offline install pays 2.5 seconds and says nothing. `COHORTE_NO_VERSION_CHECK=1`
+  opts out; `CI` opts out already.
+
+  Nothing in the pipeline changed: no new agent, no gate, no template — this release needs no
+  `/cohorte-update-pipeline`.
+
 ## 2.5.0 — 2026-08-14
 
 - **Everything the pipeline knew about your repo, it would only say to a coding agent.**

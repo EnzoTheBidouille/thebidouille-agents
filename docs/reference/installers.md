@@ -6,30 +6,46 @@ check exists).
 
 | Installer | Runs where | Notes |
 | --- | --- | --- |
-| `bin/cli.js` (`npx cohorte …`) | anywhere with Node ≥ 18 | The npm package; copies by *rule* (every non-template agent, every shipped `.sh`) so new files can't be forgotten. Offers a quick TTY interview when seeding the global config. |
+| `bin/cli.js` (the `cohorte` CLI) | anywhere with Node ≥ 18 | The npm package; copies by *rule* (every non-template agent, every shipped `.sh`) so new files can't be forgotten. Offers a quick TTY interview when seeding the global config. |
 | `install.sh` | POSIX sh (dash/bash/zsh) | Works from a checkout or piped via curl (clones itself). |
 | `install.ps1` | Windows PowerShell 5.1+ | Mirrors install.sh; BOM-free JSON writes, Store-alias-proof Python detection. |
 
 ## Commands
 
 ```sh
-npx cohorte install [target]        # bundled: core into <target>/.claude (committable)
-npx cohorte install --global        # global: one shared core in ~/.claude + gate hook registered
-npx cohorte update  [--global]      # refresh the stack-agnostic core ONLY
-npx cohorte dashboard [--port=N] [--host=ADDR] [--open]
-npx cohorte version
+npm i -g cohorte                # once per machine — this is what puts `cohorte` on PATH
 
-# repeated reads — written for a global install (npm i -g cohorte)
+cohorte install [target]        # bundled: core into <target>/.claude (committable)
+cohorte install --global        # global: one shared core in ~/.claude + gate hook registered
+cohorte update  [--global]      # refresh the stack-agnostic core ONLY
+cohorte dashboard [--port=N] [--host=ADDR] [--open]
 cohorte metrics [target] [--days=N] [--since=ISO] [--runs] [--json]
 cohorte specs   [target] [--porcelain | --json | --panel]
 cohorte doctor  [target] [--porcelain | --json | --panel]
+cohorte version
 ```
 
-The install verbs are written `npx` throughout, so installing the pipeline never asks you to
-install something first. The three read verbs are written bare: they are the ones you run
-repeatedly — a CI step, a Francois panel — where paying npm's resolution every invocation is
-the wrong trade. Both forms work for either group, with one exception: a Francois extension
-panel may only spawn a **bare binary name on `PATH`**, so `npx cohorte` is not an option there.
+### Why one form, and why the global one
+
+`npm i -g` and `npx` are different tools, not two spellings: `npm i -g` installs the package and
+leaves a **`cohorte` binary on your `PATH`**, pinned to the version you installed; `npx` fetches
+the package into a cache, runs it **once**, and leaves nothing behind. Everything here is
+documented in the first form, for two reasons:
+
+- A **Francois extension panel** may only spawn a bare binary name resolved on `PATH`. `npx` is
+  not reachable that way, so [francois-plugin-cohorte](https://github.com/TheBidouilleAgency/francois-plugin-cohorte)
+  requires the global install — this is structural, not a preference.
+- One form in the docs is one form to get right. Two spellings of the same command is how a
+  README ends up contradicting the thing it documents.
+
+The price of pinning is that **`install` and `update` lay down the core carried by the CLI that
+runs them**, so a global CLI left at an old version would re-lay an old core and report success.
+That is why both verbs now compare themselves against the registry and print what to run
+(`npm i -g cohorte@latest`) when they are behind — set `COHORTE_NO_VERSION_CHECK=1` to silence
+it, and it is skipped under `CI` already.
+
+`npx cohorte@latest <verb>` still works, and is the right call for a one-off on a machine you
+do not own.
 
 ## Reading a project without a coding agent
 
@@ -97,7 +113,7 @@ scrubs are explicit.
 Committed by `/cohorte-init-pipeline`:
 
 ```json
-{ "pipeline": "cohorte", "mode": "global", "core_version": "1.3.1", "install": "npx cohorte install --global …" }
+{ "pipeline": "cohorte", "mode": "global", "core_version": "1.3.1", "install": "npm i -g cohorte && cohorte install --global …" }
 ```
 
 It's how a teammate cloning the repo knows which core to install, and how `/cohorte-doctor` detects

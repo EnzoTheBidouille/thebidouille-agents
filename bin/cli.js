@@ -2,11 +2,16 @@
 // cohorte — installer CLI for the portable multi-agent pipeline.
 // Cross-platform, dependency-free port of install.sh / install.ps1.
 //
-//   npx cohorte install              # bundle the core into <cwd>/.claude (committable)
-//   npx cohorte install [target]     # same, into another project
-//   npx cohorte install --global     # one shared core in ~/.claude
-//   npx cohorte update [--global]    # refresh the core, keep every generated file
-//   npx cohorte version
+//   npm i -g cohorte                 # once — the CLI, and the `cohorte` binary on PATH
+//   cohorte install                  # bundle the core into <cwd>/.claude (committable)
+//   cohorte install [target]         # same, into another project
+//   cohorte install --global         # one shared core in ~/.claude
+//   cohorte update [--global]        # refresh the core, keep every generated file
+//   cohorte version
+//
+// `npx cohorte <verb>` runs any of these without installing anything — it is the
+// escape hatch, not the documented path: a Francois extension panel can only spawn
+// a bare binary on PATH, and a globally installed CLI is what puts one there.
 
 'use strict';
 
@@ -291,7 +296,7 @@ function copyCore() {
   resolveTemplateConditionals(pipelineDir);
   // Copy the *.template files AND the shipped executables (kanban-move.sh,
   // preflight.sh). Until 1.2.4 this loop took only `.template`, so every
-  // `npx cohorte install/update` produced a core missing both scripts — and since
+  // `cohorte install/update` produced a core missing both scripts — and since
   // every caller chains them with `|| true`, the result was silent: no kanban card
   // moves, no error. The shell installers named them explicitly
   // and this port drifted. The rule below needs no list to keep in sync: a `<x>.sh`
@@ -386,7 +391,7 @@ function renderSurfaces() {
 
   // Every agent in core/agents/ EXCEPT the *.template.md ones, which /cohorte-init-pipeline renders
   // per-surface. Until 1.2.6 this was a hardcoded ['review.md', 'release.md'] that never grew
-  // the agents the shell installers copy, so `npx cohorte install` shipped a command with no
+  // the agents the shell installers copy, so `cohorte install` shipped a command with no
   // agent to dispatch — the run reported the command as not installed.
   // Reading the directory needs no list to keep in sync with the shell installers.
   const agentDir = path.join(src, 'core', 'agents');
@@ -615,7 +620,7 @@ function registerGlobalHook() {
   const file = path.join(dest, 'hooks', 'gate.py');
   const base = path.basename(file);
   // Trailing-quote tolerant: the Windows form is `py "C:\...\gate.py"`, and a
-  // bare .endsWith() missed it — which is how repeat `npx cohorte install`
+  // bare .endsWith() missed it — which is how repeat `cohorte install`
   // runs accumulated a duplicate registration every time (gate.py then ran
   // once per copy on every Bash call).
   const isGate = entry => (entry.hooks || []).some(
@@ -657,7 +662,7 @@ function bumpPointerVersion(ptr) {
 // configured on this machine, and — on a TTY — let the human confirm, because installing
 // into a runtime they don't use litters a config dir they never asked us to touch. With no
 // TTY and no flag we install for Claude Code alone: the behaviour of every version before
-// the adapter, so a scripted `npx cohorte install` keeps doing exactly what it did.
+// the adapter, so a scripted `cohorte install` keeps doing exactly what it did.
 async function selectRuntimes() {
   if (wantRuntimes.length) return wantRuntimes;
   const found = adapter.detectRuntimes();
@@ -673,6 +678,33 @@ async function selectRuntimes() {
   if (!a) return found;
   const picked = a.split(/[,\s]+/).map((n) => found[parseInt(n, 10) - 1]).filter(Boolean);
   return picked.length ? [...new Set(picked)] : found;
+}
+
+// --- staleness notice --------------------------------------------------------
+// `install` and `update` write a core taken from THIS package, so the core is only
+// as fresh as the CLI that ran. `npx cohorte@latest` made that self-correcting; a
+// global install does not — `cohorte update` on a pinned 2.5.0 would re-lay the
+// 2.5.0 core forever and report success, which is an update that updates nothing.
+// So the CLI checks its own version against the registry and says what to run.
+// Never fatal, never blocking a successful install: a short fetch, no `npm view`
+// fallback, and silence on any failure. COHORTE_NO_VERSION_CHECK / CI opt out.
+async function staleVersionNotice() {
+  if (process.env.COHORTE_NO_VERSION_CHECK || process.env.CI) return;
+  let latest = null;
+  try {
+    const v = require('../dashboard/server/versions.js');
+    latest = await v.latestNpm({ timeoutMs: 2500, fallback: false });
+    if (!latest || v.cmpSemver(VERSION, latest) >= 0) return;
+  } catch { return; }
+  // How you got here decides the fix: under npx the package is transient (and may
+  // have come from the cache rather than the registry), so the answer is to pin
+  // @latest; with a global install the answer is to upgrade the global.
+  const viaNpx = /[\\/]_npx[\\/]/.test(pkgRoot);
+  console.log(`
+! You ran cohorte ${VERSION}, but ${latest} is published — the core just written is ${VERSION}.
+  ${viaNpx
+    ? 'Re-run as  npx cohorte@latest <same command>  to lay down the current core.'
+    : 'Upgrade with  npm i -g cohorte@latest  and re-run the same command.'}`);
 }
 
 // --- run ---------------------------------------------------------------------
@@ -693,6 +725,8 @@ if (selected.length > 1) {
   console.log('  The doctrine is identical; what differs is enforcement — run /cohorte-doctor in');
   console.log('  each one to see what it can and cannot guarantee.');
 }
+// Last, so a stale CLI is the final thing on screen rather than scrolled past.
+await staleVersionNotice();
 })();
 
 async function installOne() {
@@ -738,7 +772,7 @@ if (scope === 'global') {
   copyCore();
   // Register on UPDATE too — install.sh and install.ps1 always have, and this
   // port skipping it is why a duplicated or stale-matcher registration could
-  // never be repaired by `npx cohorte update`: the only route that rewrites it
+  // never be repaired by `cohorte update`: the only route that rewrites it
   // was a full re-install, which is not what anyone runs to get a fix. Safe to
   // run every time — registration reconciles only gate.py entries and leaves
   // every other hook and settings key untouched.
@@ -758,7 +792,7 @@ Per repo:
      teammates know to install the global core (${REPO_URL}).
   3. Commit PIPELINE.md + .claude/, then  /cohorte-brainstorm  to start a feature.
 
-Update later with:  npx cohorte@latest update --global
+Update later with:  npm i -g cohorte@latest && cohorte update --global
 
 Global kanban config, user-scoped — optional:
   · One consolidated file: ${path.join(globalDir, 'cohorte.config.yaml')}
@@ -783,7 +817,7 @@ Next:
      PIPELINE.md + renders one implementer agent per surface.
   3. Commit PIPELINE.md, then  /cohorte-brainstorm  to start a feature.
 
-Update later with:  npx cohorte@latest update
+Update later with:  npm i -g cohorte@latest && cohorte update
 Prefer one shared core across all your repos?  Re-run with  --global.`);
 } else {
   console.log(`→ updating pipeline core in ${dest} (keeping your PIPELINE.md + rendered agents)`);

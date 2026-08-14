@@ -83,8 +83,8 @@
 9. **Write the pointer** `<state>/pipeline.json` (committed — this is how a teammate who clones the repo
    knows which core to install):
    `{ "pipeline": "cohorte", "mode": "<bundled|global>", "core_version": "<contents of the
-   installer's pipeline/VERSION>", "install": "<per mode: bundled ⇒ \"npx cohorte install\"
-   note that the core is committed under .claude/; global ⇒ \"npx cohorte install --global\"
+   installer's pipeline/VERSION>", "install": "<per mode: bundled ⇒ \"npm i -g cohorte && cohorte install\"
+   note that the core is committed under .claude/; global ⇒ \"npm i -g cohorte && cohorte install --global\"
    (or, without npm: curl -fsSL https://raw.githubusercontent.com/TheBidouilleAgency/cohorte/main/install.sh | sh -s -- --global;
    Windows: install.ps1 -Global from the same repo)> " }`.
    In **global** mode also add, near the top of `<memory>`, a one-liner:
