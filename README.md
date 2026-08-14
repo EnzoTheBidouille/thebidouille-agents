@@ -234,6 +234,33 @@ source lives in `dashboard/app/`, built to `dashboard/dist/` at publish time). T
 are reimplemented in JS, so the dashboard needs no Claude session to compute state. See
 [`dashboard/README.md`](dashboard/README.md) for the architecture.
 
+## Reading a project without an agent
+
+The two read-only halves of the pipeline, in the shell:
+
+```sh
+npx cohorte specs              # the board: id · status · branch · title, from specs/*.md
+npx cohorte doctor             # the /cohorte-doctor checks — exits 1 when any check is bad
+npx cohorte metrics --days=30  # cost + runtime per command, from Claude Code's transcripts
+```
+
+`doctor`'s exit code makes it a CI step as-is. Add `--porcelain` for one record per line with
+`U+001F` between fields (a spec title with a space in it never misaligns a column), or `--json`
+for the native document. Both reuse the dashboard's own readers, so the board and the CLI can
+never give two answers about one repo.
+
+`--panel` — on `specs`, `doctor` and `metrics` — emits the payload shape a
+[Francois](https://github.com/antoine-gmnz/francois) extension panel expects. It is the one
+Francois-aware surface in the package, and it exists for
+[**francois-plugin-cohorte**](https://github.com/TheBidouilleAgency/francois-plugin-cohorte): a
+manifest-only extension that renders the spec board, the doctor report and the 30-day cost as
+three panels beside your sessions.
+
+```sh
+npm i -g cohorte                              # a Francois extension may only spawn a bare
+francois ext install TheBidouilleAgency/cohorte   # binary on PATH — never npx, never a shell
+```
+
 ## Releasing (maintainers)
 
 Versions are tracked with npm semver — the published package is the release artifact.

@@ -7,6 +7,43 @@ short, user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` secti
 > They are history and are deliberately not rewritten — every command gained a `cohorte-` prefix
 > in 2.0.0.
 
+## 2.5.0 — 2026-08-14
+
+- **Everything the pipeline knew about your repo, it would only say to a coding agent.**
+  `/cohorte-doctor` reads the health of an install and `specs/*.md` holds the board, but both
+  answers cost a session: you opened Claude Code, ran a command, and read prose. There was no
+  way to ask "is this repo's pipeline sound?" from a shell script, a CI job, or anything that
+  isn't an LLM.
+
+  Two read-only commands now answer without an agent in the loop:
+
+  ```sh
+  cohorte specs     # the board: id · status · branch · title, from specs/*.md frontmatter
+  cohorte doctor    # the /cohorte-doctor checks — exits 1 when any check is bad
+  ```
+
+  `doctor` **exits 1 on any bad check**, so it drops into CI as-is. Both reuse the dashboard's
+  own readers, so the board, the dashboard and the CLI can never give three answers about one
+  repo. `--porcelain` gives one record per line with `U+001F` between fields — a spec title
+  with a space in it never misaligns a column — and `--json` gives the native document.
+
+- **The pipeline, in Francois.** A third shape, `--panel` (on `specs`, `doctor` and `metrics`),
+  emits the payload a [Francois](https://github.com/antoine-gmnz/francois) extension panel
+  validates against. It exists for
+  [**francois-plugin-cohorte**](https://github.com/TheBidouilleAgency/francois-plugin-cohorte):
+  a manifest-only extension — no code, no binary — that renders the 30-day cost, the doctor
+  report and the spec board as three panels beside your sessions, on any project with a
+  `PIPELINE.md`.
+
+  ```sh
+  npm i -g cohorte                                   # a Francois extension may only spawn a
+  francois ext install TheBidouilleAgency/cohorte    # bare binary on PATH — never npx, never a shell
+  ```
+
+  This is the only Francois-aware surface in the package, and it is one flag wide. Nothing in
+  the pipeline itself changed: no new agent, no new gate, no template to re-render — this
+  release needs no `/cohorte-update-pipeline`.
+
 ## 2.4.0 — 2026-08-13
 
 - **The pipeline froze *what* to build, never *how much*.** A spec pins the contract and the
