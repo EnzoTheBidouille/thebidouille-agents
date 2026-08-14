@@ -34,7 +34,7 @@ features:
     details: A profile-driven PreToolUse gate hard-denies destructive commands, confirm-gates the risky ones (branch-aware), and enforces a preflight phase gate — for every agent, including workflow subagents.
   - icon: 🖥️
     title: Cockpit included
-    details: npx cohorte dashboard serves a local web cockpit — fleet freshness, /cohorte-doctor health, specs/kanban boards, metrics, and one-click install/update/audit actions.
+    details: cohorte dashboard serves a local web cockpit — fleet freshness, /cohorte-doctor health, specs/kanban boards, metrics, and one-click install/update/audit actions.
 ---
 
 ## The loop, end to end
@@ -55,7 +55,8 @@ so `/clear` between commands is always safe.
 ## Install in one line
 
 ```sh
-npx cohorte install --global    # one shared core for every repo on this machine
+npm i -g cohorte                # once, per machine
+cohorte install --global        # one shared core for every repo on this machine
 # then, inside your project, in Claude Code:
 /cohorte-init-pipeline
 ```

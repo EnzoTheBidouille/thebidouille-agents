@@ -6,9 +6,9 @@ frontmatter, plain markdown, or TOML), resolves every path, registers the gate i
 hook format, and branches the instructions on what it can actually enforce.
 
 ```sh
-npx cohorte install --runtime=codex,cursor     # pick explicitly
-npx cohorte install --all-runtimes             # every supported one
-npx cohorte install                            # detects what you have and asks
+cohorte install --runtime=codex,cursor     # pick explicitly
+cohorte install --all-runtimes             # every supported one
+cohorte install                            # detects what you have and asks
 ```
 
 With no flag and no TTY the installer targets Claude Code alone, which is what every version before

@@ -58,18 +58,18 @@ function mk(id, label, status, detail, fix) {
 function checkCore(v) {
   if (v.installMode === 'none') {
     return mk('core', 'Core & pointer', 'bad', 'no pipeline core installed for this project',
-      'npx cohorte install   (or --global)');
+      'cohorte install   (or --global)');
   }
   if (v.pointer.present && v.pointer.core_version && v.installedVersion &&
       v.pointer.core_version !== v.installedVersion) {
     return mk('core', 'Core & pointer', 'warn',
       `pointer says core ${v.pointer.core_version} but installed core is ${v.installedVersion}`,
-      'npx cohorte update   (reconcile the pointer)');
+      'cohorte update   (reconcile the pointer)');
   }
   if (v.freshness === -1) {
     return mk('core', 'Core & pointer', 'warn',
       `core ${v.installedVersion} installed (${v.installMode}); npm latest is ${v.latest}`,
-      '/cohorte-update-pipeline   (or  npx cohorte update)');
+      '/cohorte-update-pipeline   (or  cohorte update)');
   }
   const tail = v.latest ? `, npm latest ${v.latest}` : ', npm unreachable';
   return mk('core', 'Core & pointer', 'ok', `core ${v.installedVersion} (${v.installMode})${tail}`);
@@ -264,7 +264,7 @@ function checkHooks(projectRoot, globalDir, installMode, all) {
         'nothing to fix; run /cohorte-doctor inside that runtime for the full picture');
     }
     return mk('hooks', 'Gate hook', 'warn', 'no runtime installed to register the gate hook against',
-      'npx cohorte install   (or --global)');
+      'cohorte install   (or --global)');
   }
 
   const problems = [];
@@ -306,7 +306,7 @@ function checkHooks(projectRoot, globalDir, installMode, all) {
     // alone reads as if the gate were off everywhere, when four of five may be fine.
     const tail = okLines.length ? ` (ok: ${okLines.join(', ')})` : '';
     return mk('hooks', 'Gate hook', 'warn', problems.join(' · ') + tail,
-      'npx cohorte@latest update   (re-registers the gate hook for every installed runtime)');
+      'npm i -g cohorte@latest && cohorte update   (re-registers the gate hook for every installed runtime)');
   }
   const tail = advisory.length ? ` · ${advisory.map(l => l.label).join(', ')}: advisory --check only` : '';
   return mk('hooks', 'Gate hook', 'ok', `registered once for ${okLines.join(', ')}${tail}`);
@@ -381,16 +381,16 @@ function checkWorkflows(projectRoot, globalDir, installMode, all) {
   if (missing.length === scripts.length) {
     return mk('workflows', 'Workflows', 'warn',
       'no workflow scripts installed — conversational commands only (the default path)',
-      'npx cohorte update   (ships core/workflows/)');
+      'cohorte update   (ships core/workflows/)');
   }
   if (missing.length) {
     return mk('workflows', 'Workflows', 'warn', `missing script(s): ${missing.join(', ')}`,
-      'npx cohorte update   (half-copied core)');
+      'cohorte update   (half-copied core)');
   }
   if (!exists(path.join(agentsDir, 'profile-reader.md'))) {
     return mk('workflows', 'Workflows', 'warn',
       'scripts present but the profile-reader agent (their phase 0) is missing',
-      'npx cohorte update   (re-copies the fixed agents)');
+      'cohorte update   (re-copies the fixed agents)');
   }
   return mk('workflows', 'Workflows', 'ok',
     'scripts + profile-reader installed — opt-in per run; needs Claude Code ≥ 2.1.154 with ' +

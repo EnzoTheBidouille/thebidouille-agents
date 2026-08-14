@@ -122,7 +122,7 @@ cohorte needs Node >= 18 to install.
   The pipeline's commands are rendered per coding agent (Claude Code, Codex, Cursor,
   Gemini CLI, OpenCode) at install time; there is no PowerShell equivalent of that
   step, and a raw copy would install prompts this runtime cannot follow.
-  Install Node, then:  npx cohorte install$(if ($Global) { ' --global' })
+  Install Node, then:  npm i -g cohorte; cohorte install$(if ($Global) { ' --global' })
 "@
     exit 1
 
@@ -257,7 +257,7 @@ cohorte needs Node >= 18 to install.
     # pipeline capability config is USER-level (vault, Notion DB, kanban boards) — it lives in
     # the user's .claude regardless of install scope. Seed only if neither the consolidated nor
     # the legacy copy exists. Non-interactive here: seeds disabled defaults; /cohorte-init-pipeline +
-    # /cohorte-update-pipeline wire it (npx's installer offers a quick interview instead).
+    # /cohorte-update-pipeline wire it (the npm CLI's installer offers a quick interview instead).
     function Initialize-Config {
         $userClaude = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $HOME '.claude' }
         $cfg = Join-Path $userClaude 'cohorte.config.yaml'

@@ -46,9 +46,9 @@ The doctrine is one set of source prompts. The installer renders them into whate
 actually reads, and branches the instructions on what it can actually do:
 
 ```sh
-npx cohorte install --runtime=codex,cursor     # pick explicitly
-npx cohorte install --all-runtimes             # every supported one
-npx cohorte install                            # detects what you have and asks
+cohorte install --runtime=codex,cursor     # pick explicitly
+cohorte install --all-runtimes             # every supported one
+cohorte install                            # detects what you have and asks
 ```
 
 | | Commands | Subagents | Gate | Workflows |
@@ -82,10 +82,10 @@ install is unchanged.
 
 Only one hard requirement — the rest is optional and independent:
 
-- **Node ≥ 18 + npm** — _required_, for the `npx` installer that lays down the core. Nothing else needs it.
+- **Node ≥ 18 + npm** — _required_, for the `cohorte` CLI that lays down the core. Nothing else needs it.
 - **[`uv`](https://docs.astral.sh/uv/) + the Serena CLI** — _optional_, the default code-retrieval
   provider. Install it separately (`uv tool install -p 3.13 serena-agent && uv tool update-shell`); the
-  `npx` install neither needs nor touches it, so the order between the two is irrelevant. Without Serena
+  cohorte install neither needs nor touches it, so the order between the two is irrelevant. Without Serena
   the pipeline still runs — agents just fall back to Grep/Read. Having it installed **before**
   `/cohorte-init-pipeline` lets init wire it in one pass (otherwise `/cohorte-update-pipeline` wires it later).
 - **On a new machine cloning a repo that's already pipeline-ised:** the Serena registration is committed
@@ -94,15 +94,25 @@ Only one hard requirement — the rest is optional and independent:
 
 ## Install
 
-The pipeline ships as an npm package (`cohorte`), so releases are semver-tagged and
-`npx` always fetches the latest published version — no clone needed, works on macOS/Linux/Windows.
+The pipeline ships as an npm package (`cohorte`), so releases are semver-tagged — no clone
+needed, works on macOS/Linux/Windows. **Install it once, globally**; every command below is
+written as `cohorte …`, and that single form is what the rest of this README, the docs, and the
+[Francois extension](https://github.com/TheBidouilleAgency/francois-plugin-cohorte) all assume:
+
+```sh
+npm i -g cohorte
+```
+
+`npx cohorte <verb>` runs any of them without installing anything, for a one-off on a machine
+you don't own. It is the escape hatch, not the path — see
+[why one form](https://thebidouilleagency.github.io/cohorte/reference/installers).
 
 **Global (recommended)** — install the generic core ONCE into `~/.claude`; it serves every repo on
 your machine. Nothing is copied per project; the gate hook is registered once and reads each repo's
 own `gate-config.json`:
 
 ```sh
-npx cohorte install --global
+cohorte install --global
 ```
 
 The per-project part is NOT the core — it's the **profile** `/cohorte-init-pipeline` generates and you
@@ -116,7 +126,7 @@ repo; each teammate just runs the same global one-liner once, guided by the comm
 
 ```sh
 # inside your project (or pass its path as an argument)
-npx cohorte install
+cohorte install
 ```
 
 Copies the core into `<project>/.claude`, committed with the repo. Choose this when you want
@@ -178,8 +188,9 @@ Sanity-check `PIPELINE.md`, commit it, and run `/cohorte-brainstorm`.
 ## Update
 
 ```sh
-npx cohorte@latest update --global    # the shared core in ~/.claude (recommended setup)
-npx cohorte@latest update             # a repo's bundled core in <project>/.claude
+npm i -g cohorte@latest           # refresh the CLI — the core it lays down is its own
+cohorte update --global           # the shared core in ~/.claude (recommended setup)
+cohorte update                    # a repo's bundled core in <project>/.claude
 ```
 
 (Script equivalents: `sh install.sh --update [--global]` / `.\install.ps1 -Update [-Global]`.)
@@ -200,9 +211,9 @@ maintenance command you ever run (`/cohorte-build` auto-grows surfaces as specs 
 A browser view of pipeline state, for when a checklist beats scanning files:
 
 ```sh
-npx cohorte dashboard          # serves http://localhost:4317 (Ctrl-C to stop)
-npx cohorte dashboard <path>   # start focused on another project
-npx cohorte dashboard --port=4400 --open   # custom port, open the browser
+cohorte dashboard          # serves http://localhost:4317 (Ctrl-C to stop)
+cohorte dashboard <path>   # start focused on another project
+cohorte dashboard --port=4400 --open   # custom port, open the browser
 ```
 
 **Bound to `127.0.0.1` by default** — the dashboard's actions execute code (install/update/reset,
@@ -244,11 +255,8 @@ cohorte doctor             # the /cohorte-doctor checks — exits 1 when any che
 cohorte metrics --days=30  # cost + runtime per command, from Claude Code's transcripts
 ```
 
-`npx cohorte …` runs all three just as well for a one-off — the install commands are written
-that way throughout this README precisely so you never have to install anything to install the
-pipeline. These three are different: they are the ones you run repeatedly, from a CI job or a
-Francois panel, so they are written for `npm i -g cohorte`. The Francois extension below has no
-choice in the matter at all.
+`doctor`'s exit code is what makes it a CI step, and the three of them are what the Francois
+extension below renders.
 
 `doctor`'s exit code makes it a CI step as-is. Add `--porcelain` for one record per line with
 `U+001F` between fields (a spec title with a space in it never misaligns a column), or `--json`
@@ -283,8 +291,10 @@ a version bump just run the sanity checks.
 `npm version patch --no-git-tag-version`), commit, push — CI does the rest (publish + tag +
 release). No local tagging needed.
 
-`npx cohorte@latest …` then serves the new version everywhere; installed cores record
+`npm i -g cohorte@latest` then serves the new version everywhere; installed cores record
 it in `.claude/pipeline/VERSION` and bundled repos in their committed `pipeline.json` pointer.
+`install` and `update` compare themselves against the registry and say so when they are behind,
+so a CLI pinned at an old version cannot quietly re-lay an old core.
 
 ## The commands
 
@@ -417,7 +427,7 @@ profile/
   SCHEMA.md             # field reference
   cohorte.config.template.yaml   # seeds ~/.claude/cohorte.config.yaml (kanban)
 scripts/                # worktree-isolation templates + the shipped preflight/kanban scripts
-dashboard/              # local web cockpit (npx … dashboard) — see dashboard/README.md
+dashboard/              # local web cockpit (cohorte dashboard) — see dashboard/README.md
   server/               # dependency-free node runtime (serves the built app + JSON/stream API)
   app/                  # Vite + React source (built to dashboard/dist/ at publish time)
 ```

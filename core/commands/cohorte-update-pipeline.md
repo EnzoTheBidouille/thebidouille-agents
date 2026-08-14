@@ -35,11 +35,15 @@ the human's choices — so `/cohorte-init-pipeline` never needs re-running for a
 - Otherwise use the published npm package (preferred — installs the latest tagged release):
 
   ```sh
-  npx cohorte@latest update --global   # global core
-  npx cohorte@latest update            # bundled core of the current repo
+  npm i -g cohorte@latest              # the CLI itself, refreshed
+  cohorte update --global              # global core
+  cohorte update                       # bundled core of the current repo
   ```
 
-- If npm/npx is unavailable, fall back to piping the installer from the repo's latest `main`:
+  If `cohorte` is not on PATH, `npx cohorte@latest update [--global]` runs the same thing
+  without installing anything.
+
+- If npm is unavailable, fall back to piping the installer from the repo's latest `main`:
 
   ```sh
   curl -fsSL https://raw.githubusercontent.com/TheBidouilleAgency/cohorte/main/install.sh | sh -s -- --update --global

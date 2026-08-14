@@ -18,8 +18,8 @@ If the pipeline was installed for a runtime you do not use, re-run the installer
 ## Installation & versions
 
 **A command exists but its agent doesn't (or vice-versa).**
-Half-copied or stale core. Re-run the installer (`npx cohorte@latest update --global` or
-`update`). `/cohorte-doctor` check 1 flags a `VERSION` newer than its sibling files — the signature of a
+Half-copied or stale core. Re-run the installer (`npm i -g cohorte@latest && cohorte update --global`, or without
+`--global` for a bundled core). `/cohorte-doctor` check 1 flags a `VERSION` newer than its sibling files — the signature of a
 half-done update.
 
 **Kanban cards stopped moving — with no error anywhere.**

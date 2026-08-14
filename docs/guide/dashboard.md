@@ -3,9 +3,9 @@
 A browser view of pipeline state, for when a checklist beats scanning files.
 
 ```sh
-npx cohorte dashboard                      # http://localhost:4317
-npx cohorte dashboard <path>               # focused on another project
-npx cohorte dashboard --port=4400 --open   # custom port, open the browser
+cohorte dashboard                      # http://localhost:4317
+cohorte dashboard <path>               # focused on another project
+cohorte dashboard --port=4400 --open   # custom port, open the browser
 ```
 
 ## What it shows
