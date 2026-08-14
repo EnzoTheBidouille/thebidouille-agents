@@ -481,6 +481,22 @@ function main(argv) {
     agents: rows.reduce((n, r) => n + r.agents.total, 0),
   };
 
+  // The headline figures as a Francois extension `stat-row` payload — four tiles, no
+  // table. Deliberately ahead of the --json branch: --panel is a shape, not a filter,
+  // and passing both should never print two documents.
+  // See github.com/TheBidouilleAgency/francois-plugin-cohorte.
+  if (flag('panel')) {
+    const window = opt('days') ? `last ${opt('days')} days` : since ? 'since ' + new Date(since).toISOString().slice(0, 10) : 'all time';
+    const top = rows[0];
+    process.stdout.write(JSON.stringify({ tiles: [
+      { label: 'Cost', value: fmtUsd(totals.cost), sublabel: window },
+      { label: 'Runs', value: String(totals.runs), sublabel: `${totals.sessions} sessions` },
+      { label: 'Subagents', value: String(totals.agents) },
+      ...(top ? [{ label: 'Priciest', value: top.command, sublabel: fmtUsd(top.cost.total) }] : []),
+    ] }) + '\n');
+    return 0;
+  }
+
   if (flag('json')) {
     const out = { generatedAt: new Date().toISOString(), projectRoot: root,
                   checkouts: [...checkouts], pricesUpdated: PRICES.updated, totals, commands: rows };

@@ -37,6 +37,8 @@ Usage:
   cohorte update    [target] [--global] [--runtime=a,b | --all-runtimes]
   cohorte dashboard [target] [--port=N] [--host=ADDR] [--open]
   cohorte metrics   [target] [--days=N] [--since=ISO] [--runs] [--json]
+  cohorte specs     [target] [--porcelain | --json | --panel]
+  cohorte doctor    [target] [--porcelain | --json | --panel]
   cohorte version
 
 Commands:
@@ -56,7 +58,17 @@ Commands:
             ~/.claude/projects — nothing to enable, and it covers runs that
             already happened. Worktree-aware, so a feature adds up. --json for
             the raw rollup, --runs to include every individual invocation.
+  specs     The spec board of <target>: id, status, branch, title, read from the
+            frontmatter of specs/*.md. --porcelain for one record per line with
+            U+001F between fields, --json for the list.
+  doctor    The same checks /cohorte-doctor runs (core, pointer, profile, agents,
+            hook, gate, retrieval, design, isolation, specs), without a coding
+            agent in the loop. Exits 1 when any check is bad, 0 otherwise, so it
+            drops into CI. --porcelain / --json as above.
   version   Print the installed CLI version.
+
+  --panel on specs, doctor and metrics emits the payload a Francois extension
+  panel expects (github.com/TheBidouilleAgency/francois-plugin-cohorte).
 
 Runtimes (--runtime=): ${adapter.listRuntimes().join(', ')}
   The pipeline's doctrine is one set of source prompts; the installer renders them into
@@ -86,13 +98,19 @@ const metricsFlags = [];
 const isMetricsFlag = (a) =>
   a === '--json' || a === '--runs' || a.startsWith('--days=') || a.startsWith('--since=');
 
+// How `specs`, `doctor` and `metrics` render. One variable, not one flag per command,
+// so `--porcelain` never means two different things depending on where it sits.
+let format = 'human';
+
 // Which coding agents to install for. Empty ⇒ resolved later (detect, then ask on a TTY,
 // then fall back to claude — the only behaviour that existed before 2.2.0).
 let wantRuntimes = [];
 
 for (const a of args) {
-  if (a === 'install' || a === 'update' || a === 'dashboard' || a === 'metrics') mode = a;
-  else if (isMetricsFlag(a)) metricsFlags.push(a);
+  if (a === 'install' || a === 'update' || a === 'dashboard' || a === 'metrics'
+      || a === 'specs' || a === 'doctor') mode = a;
+  else if (a === '--porcelain' || a === '--panel') format = a.slice(2);
+  else if (isMetricsFlag(a)) { if (a === '--json') format = 'json'; metricsFlags.push(a); }
   else if (a === '--all-runtimes') wantRuntimes = adapter.listRuntimes();
   else if (a === '--runtimes' || a === '--runtime') {
     console.error('error: --runtime needs a value, e.g. --runtime=codex,cursor'); process.exit(2);
@@ -136,10 +154,45 @@ if (mode === 'dashboard') {
   return;
 }
 
+// --- specs / doctor: read-only reports on <target> ---------------------------
+// Both reuse the dashboard's own readers, so the board and the CLI can never drift
+// into two answers about the same repo. Nothing here writes or spawns anything.
+if (mode === 'specs' || mode === 'doctor') {
+  const report = require('./report.js');
+  const { state, scanSpecs } = require('../dashboard/server/doctor.js');
+  const globalDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
+
+  if (mode === 'specs') {
+    const records = report.specRecords(target, scanSpecs);
+    if (format === 'json') console.log(JSON.stringify({ project: target, specs: records }, null, 2));
+    else if (format === 'porcelain') { if (records.length) console.log(report.specsPorcelain(records)); }
+    else if (format === 'panel') console.log(report.specsPanel(records));
+    else console.log(report.specsHuman(records));
+    process.exit(0);
+  }
+
+  // `state` is async (it probes versions), so this branch owns the whole tail.
+  state({ projectRoot: target, globalDir, cliVersion: VERSION }).then((s) => {
+    const records = report.checkRecords(s);
+    if (format === 'json') console.log(JSON.stringify(s, null, 2));
+    else if (format === 'porcelain') { if (records.length) console.log(report.doctorPorcelain(records)); }
+    else if (format === 'panel') console.log(report.doctorPanel(records));
+    else console.log(report.doctorHuman(s, records));
+    // A bad check is a failure the shell can branch on; warn and skip are not.
+    process.exit(s.summary.bad > 0 && format !== 'panel' ? 1 : 0);
+  }).catch((e) => {
+    console.error(`error: ${e && e.message ? e.message : e}`);
+    process.exit(1);
+  });
+  return;
+}
+
 // --- metrics: cost + runtime per command ------------------------------------
 // The collector is ESM and this CLI is CommonJS, so it runs as a child process rather
 // than being required. stdio is inherited so --json stays pipeable.
 if (mode === 'metrics') {
+  // `--panel` is not in isMetricsFlag (it is not metrics-specific), so forward it here.
+  if (format === 'panel') metricsFlags.push('--panel');
   const script = path.join(pkgRoot, 'scripts', 'metrics', 'collect.mjs');
   if (!fs.existsSync(script)) {
     console.error(`error: metrics collector not found at ${script}`);

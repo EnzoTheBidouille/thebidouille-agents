@@ -17,8 +17,34 @@ npx cohorte install [target]        # bundled: core into <target>/.claude (commi
 npx cohorte install --global        # global: one shared core in ~/.claude + gate hook registered
 npx cohorte update  [--global]      # refresh the stack-agnostic core ONLY
 npx cohorte dashboard [--port=N] [--host=ADDR] [--open]
+npx cohorte metrics [target] [--days=N] [--since=ISO] [--runs] [--json]
+npx cohorte specs   [target] [--porcelain | --json | --panel]
+npx cohorte doctor  [target] [--porcelain | --json | --panel]
 npx cohorte version
 ```
+
+## Reading a project without a coding agent
+
+`specs` and `doctor` are the read-only half of the pipeline, out of the agent's mouth and into
+the shell. `specs` prints the board (`id`, `status`, `branch`, `title`) from the frontmatter of
+`specs/*.md`; `doctor` runs the same checks `/cohorte-doctor` runs — core, pointer, profile,
+surfaces↔agents, gate, hook, retrieval, design, isolation, specs — and **exits 1 when any check
+is bad**, so it drops into CI unchanged. Both reuse the dashboard's own readers, so the board and
+the CLI can never give two answers about one repo.
+
+Three machine-readable shapes:
+
+| Flag | Shape |
+| --- | --- |
+| `--porcelain` | one record per line, fields separated by `U+001F` — a spec title with a space in it never misaligns a field |
+| `--json` | the native document (the full doctor state, the spec list) |
+| `--panel` | the payload a [Francois](https://github.com/antoine-gmnz/francois) extension panel validates against — also accepted by `metrics`, which emits the headline tiles |
+
+`--panel` is the one Francois-aware surface in the whole package, and it exists for
+[francois-plugin-cohorte](https://github.com/TheBidouilleAgency/francois-plugin-cohorte): a
+manifest-only Francois extension that renders the spec board, the doctor report and the 30-day
+cost as three panels beside your sessions. Installing it needs `cohorte` on `PATH`
+(`npm i -g cohorte`), because a Francois extension may only spawn a bare binary name.
 
 Add `--runtime=codex,cursor` (or `--all-runtimes`) to `install`/`update` to target coding agents
 other than Claude Code; with no flag the installer detects what is configured on the machine and
