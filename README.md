@@ -239,10 +239,16 @@ are reimplemented in JS, so the dashboard needs no Claude session to compute sta
 The two read-only halves of the pipeline, in the shell:
 
 ```sh
-npx cohorte specs              # the board: id · status · branch · title, from specs/*.md
-npx cohorte doctor             # the /cohorte-doctor checks — exits 1 when any check is bad
-npx cohorte metrics --days=30  # cost + runtime per command, from Claude Code's transcripts
+cohorte specs              # the board: id · status · branch · title, from specs/*.md
+cohorte doctor             # the /cohorte-doctor checks — exits 1 when any check is bad
+cohorte metrics --days=30  # cost + runtime per command, from Claude Code's transcripts
 ```
+
+`npx cohorte …` runs all three just as well for a one-off — the install commands are written
+that way throughout this README precisely so you never have to install anything to install the
+pipeline. These three are different: they are the ones you run repeatedly, from a CI job or a
+Francois panel, so they are written for `npm i -g cohorte`. The Francois extension below has no
+choice in the matter at all.
 
 `doctor`'s exit code makes it a CI step as-is. Add `--porcelain` for one record per line with
 `U+001F` between fields (a spec title with a space in it never misaligns a column), or `--json`
@@ -256,9 +262,13 @@ Francois-aware surface in the package, and it exists for
 manifest-only extension that renders the spec board, the doctor report and the 30-day cost as
 three panels beside your sessions.
 
+A Francois extension may only spawn a **bare binary name resolved on `PATH`** — never `npx`,
+never a shell, never an absolute path. So this one needs the global install, and nothing else
+will do:
+
 ```sh
-npm i -g cohorte                              # a Francois extension may only spawn a bare
-francois ext install TheBidouilleAgency/cohorte   # binary on PATH — never npx, never a shell
+npm i -g cohorte
+francois ext install TheBidouilleAgency/cohorte
 ```
 
 ## Releasing (maintainers)
