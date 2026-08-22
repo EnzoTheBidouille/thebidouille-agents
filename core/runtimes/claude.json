@@ -58,6 +58,7 @@
     "subagents": true,
     "hooks": true,
     "workflows": true,
+    "inline_design": true,
     "mcp": true,
     "tool_restriction": true
   },

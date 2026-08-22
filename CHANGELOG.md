@@ -7,6 +7,45 @@ short, user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` secti
 > They are history and are deliberately not rewritten — every command gained a `cohorte-` prefix
 > in 2.0.0.
 
+## 2.7.0 — 2026-08-22
+
+- **The metrics panel billed Sonnet 5 fifty percent over.** `prices.json` carried $3/$15 because
+  that was the rate scheduled to take effect on 2026-09-01. It never will: Anthropic made the
+  $2/$10 introductory rate the standard one. Every run costed since the entry was written reads
+  high, and the further back a run is, the more confidently wrong the number looks.
+
+  Sonnet 5 is now $2/$10, and the file says in prose why the increase must not be reinstated —
+  the next person to "correct" this back will at least have to argue with a comment first. Sonnet
+  4.6 and earlier stay at $3/$15: same tier, different price, and the longest-prefix lookup keeps
+  them apart on its own.
+
+- **A concurrency ceiling that moved while the comments stood still.** `audit.js` described the
+  runtime as capping concurrent agents at "~16". It is 20, it is named
+  (`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`), and raising it raises the ceiling without changing this
+  script — the queue belongs to the runtime, and a queued domain was never a lost one. Comments
+  only; no dispatch logic moved.
+
+- **The design brief was the one step the pipeline handed back to you.** `/cohorte-spec` freezes a
+  brief to `specs/design/<feature_id>.md` and then said, in effect, paste this somewhere else. With
+  `design.inline: true` it can instead hand that file to `/design`, which reads the codebase,
+  matches the existing UI style, and returns editable artboards without leaving the session.
+
+  The flag is off by default and degrades rather than fails: an unmet floor falls back to the
+  paste-it-yourself path with a note, never an error. It needs `provider: claude-design`, the new
+  `inline_design` runtime capability (Claude Code only), and a CLI ≥ 2.1.234 — a **higher floor than
+  workflows' 2.1.154**, which is why `/cohorte-doctor` grew a separate check `8b` instead of raising
+  the existing one. Raising the shared floor would have made every install between the two versions
+  read as broken while its workflows ran fine.
+
+  Understand what inline does and does not change: it changes who does the pasting. The brief is
+  still written to disk first and is still what `/cohorte-build` reads — artboards are an aid to the
+  human, not an input to the pipeline. And `/design` is a research preview that **does not save them
+  for you**, so check 8b says so on every run, including the runs where everything passes. An
+  artboard nobody exported dies with the session, and there is no way to notice afterwards.
+
+- This release adds a runtime capability, a profile flag, and a command section: run
+  `/cohorte-update-pipeline` after updating.
+
 ## 2.6.0 — 2026-08-14
 
 - **Two ways to type the same command, and one of them silently doesn't work.** The docs wrote
