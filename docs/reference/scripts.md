@@ -66,8 +66,9 @@ prefix, install/dev/migrate commands, per-surface env stanzas).
 - `scripts/test-workflows.mjs` — **behavioural** tests for `core/workflows/*.js`: runs each script
   with stub agents and asserts the returned verdict object. Structural checks cannot see verdict
   logic, and one failure mode needs exactly this — `agent()` returns `null` when a subagent dies,
-  so a crashed reviewer yields zero findings, indistinguishable from a clean surface. Both
-  `review.js` scored that as `SHIP` until this test existed.
+  so a crashed reviewer yields zero findings, indistinguishable from a clean surface.
+  `review.js` scored that as `SHIP` until this test existed; the same suite now pins the
+  loop workflow's reducer (`loop.js`) and the refactor retry round.
 - `scripts/test-gate.mjs` — **behavioural** tests for `hooks/gate.py`, driving its real
   stdin→stdout contract with PreToolUse payloads: the deny/ask tiers, chained-command splitting
   (`&&`, `;`, `|`, `||`, newlines), branch-conditional gating resolved at the *payload's* cwd,

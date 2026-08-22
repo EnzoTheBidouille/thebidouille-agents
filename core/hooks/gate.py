@@ -454,13 +454,19 @@ def check_bash(payload: dict, cfg: dict) -> int:
             branch_cache[directory] = branch is None or branch == default
         return branch_cache[directory]
 
-    for raw in SPLIT.split(command):
-        seg = norm(raw)
-        if not seg:
-            continue
+    segments = [s for s in (norm(raw) for raw in SPLIT.split(command)) if s]
+
+    # Deny wins over ask across the WHOLE chain, not just in segment order. Scanning
+    # segment-by-segment returned on the first match, so `git commit -m x && node ace
+    # migration:fresh` surfaced only the benign `git commit` ask — and the human's one
+    # confirmation ran the hard-denied command behind it. Scan every segment for deny
+    # patterns first; only a fully deny-free chain gets an ask.
+    for seg in segments:
         for pat in deny:
             if norm(pat) in seg:
                 return decide("deny", f"`{pat}` is forbidden by the project's PIPELINE.md gate.")
+
+    for seg in segments:
         for pat in ask:
             if norm(pat) in seg:
                 return decide(ask_decision,

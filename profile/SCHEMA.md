@@ -236,11 +236,15 @@ it, the dashboard boards on it, and the kanban backfill maps it to a column. Six
 | `blocked` | a round gave up here (non-convergent, no verdict, not implementable) | an automated driver, if any | yes, with the reason named |
 | `shipped` | the PR is open; the status flip is part of the release commit | `/cohorte-ship` | no |
 
-**`in-progress` and `blocked` are for external drivers.** No shipped command writes them: the
-built-in autonomous driver (`/cohorte-loop`) was retired in 2.2.0, and the human-driven cycle moves
-`frozen` → `in-review` → `shipped`. They stay valid states because specs in existing repos carry
-them, and because anything automating the cycle from outside needs somewhere to record "a round is
-under way" and "a round gave up". Every reader still routes on them; nothing produces them.
+**`in-progress` and `blocked` are driver states.** No conversational command writes them — the
+human-driven cycle moves `frozen` → `in-review` → `shipped`. Their producer is the **loop
+workflow** (`core/workflows/loop.js`, `/cohorte-loop` — the successor of the 2.2.0-retired
+conversational driver): it stamps `in-progress` at each round, `in-review` when a run ends at
+zero blocking findings, and `blocked` when a round gives up (non-convergent, unreviewed
+surfaces, dead implementers, a contract-change finding), with the reason in
+`specs/reports/<id>.loop.json`. External drivers may write them too. Every reader routes on
+them either way, and a stamp on a spec with no front-matter stays a silent no-op — no driver
+dies over a status line.
 
 **`kind` — feature (default) or `patch`.** Orthogonal to `status`, and the only other front-matter
 field commands route on. `/cohorte-patch` freezes `specs/patch-<slug>.md` with `kind: patch` from
@@ -524,16 +528,21 @@ itself changes in ways `/cohorte-build` §1.5 can't auto-grow (e.g. package mana
 
 ## Workflows — deterministic multi-agent runs (opt-in)
 
-Three phases have a **workflow variant** — a deterministic orchestration script the Claude Code
-Workflow runtime executes instead of the lead reasoning out the fan-out turn by turn:
-`<core>/workflows/review.js`, `audit.js`, `refactor.js` (installed to `<core>/workflows/` bundled or
-`<core>/workflows/` global). The conversational commands (`/cohorte-review`, `/cohorte-audit`, `/cohorte-refactor`)
+Four scripts run under the Claude Code Workflow runtime instead of the lead reasoning out the
+fan-out turn by turn: `<core>/workflows/review.js`, `audit.js`, `refactor.js` — each the
+**workflow variant** of its same-named conversational command — plus `loop.js`
+(`/cohorte-loop`), which has **no conversational form at all** (below). For the variant pairs,
+the conversational commands (`/cohorte-review`, `/cohorte-audit`, `/cohorte-refactor`)
 **remain the default path and the fallback** — a workflow runs only when the human explicitly asks
 for it ("run the review workflow"), and requires Claude Code ≥ **2.1.154** with workflows
 enabled.
 `/cohorte-doctor` reports which path a session will take. The interactive commands (`/cohorte-init-pipeline`,
 `/cohorte-brainstorm`, `/cohorte-spec`) and the dispatch-only ones (`/cohorte-build`, `/cohorte-ship`) have **no** workflow variant on
 purpose: they're interviews or already a single parallel dispatch — a script adds nothing.
+`/cohorte-loop` does not change that: it **consumes** `/cohorte-build`'s outputs (the frozen
+spec, `readiness.json`, the lead-authored contract, `build.json`) — it is not a build variant,
+and adding one would put the lead-only steps (§1.5 reconcile, §2 contract authoring) inside a
+script that cannot ask.
 
 Shared design, all four scripts:
 
@@ -563,10 +572,24 @@ Shared design, all four scripts:
 - **`refactor.js`** — big domains only (it skips domains with a handful of open items — the
   conversational `/cohorte-refactor` is cheaper there): `shared` first and alone, then the other domains'
   implementers in parallel, each verified per-domain.
+- **`loop.js`** (`/cohorte-loop`) — build → review → [fix → review]* for ONE feature, unattended and
+  resumable. Preconditions it verifies and refuses to work around: frozen/`in-review` spec, a fresh
+  `readiness.json` at `READY`/`RESERVATIONS`, the contract on disk, every readiness surface owned by
+  the profile. Round exits, in order: child abort relayed → `unreviewed` non-empty → `blocking == 0`
+  ⇒ ship → same blocking-item identity two consecutive rounds ⇒ treading water → `maxRounds`
+  (default 5). A blocking finding on the contract file aborts (`contract-change` — lead-only, per
+  `/cohorte-fix` §1). It calls the review **workflow** per round and reads the same `verdict.json`
+  contract the conversational `/cohorte-review` §3 writes; it stamps `in-progress` while running,
+  `in-review` on ship, `blocked` on a give-up. **Workflow-only, no command file, ever**
+  (`validate-core.mjs` pins it): if the runtime is unavailable it refuses explicitly rather than
+  degrading to a lead re-reasoning the fan-out every round at session-model prices.
 - **No input mid-run.** A workflow runs to completion without questions; anything interactive
   (contract changes, human decisions) belongs to the conversational path. The gate hook still
   fires on workflow subagents (see
-  §Preflight) — in unattended runs its asks become denies.
+  §Preflight) — in unattended runs its asks become denies. Know what that means for edits:
+  workflow subagents run in **`acceptEdits` whatever the session mode**, so for the length of a
+  run — and `loop.js` runs long, unattended stretches — `hooks/gate.py` is the only brake on
+  what agents write. That is stated here rather than discovered.
 - **Permissions:** `/cohorte-init-pipeline` and `/cohorte-update-pipeline` extend the generated `settings.json`
   `allow` list with what workflow agents need (the quiet commands, the shipped
   `pipeline/scripts/*.sh`, read-only git incl. `git rev-parse`, and the retrieval provider's MCP

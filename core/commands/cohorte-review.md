@@ -136,9 +136,11 @@ between the pipeline and any automated driver, which parses no prose:
 
 - **`blocking` = CRITICAL findings + `security` findings, deduplicated** (a finding that is both
   counts once). That is exactly the agent's existing verdict rule restated as a number, so
-  `blocking == 0` ⟺ `verdict == SHIP`. HIGH/MEDIUM/LOW quality findings are **not** blocking —
-  they follow the `deferred:<id>` backlog route below, and must never cost a driver an iteration.
-- **`blocking_items`** — one normalized string per blocking finding, `<surface>|<file>|<problem>`:
+  `blocking == 0` ⟺ `verdict == SHIP`. HIGH/MEDIUM/LOW quality findings are **not** blocking and
+  must never cost a driver an iteration — a *human* routes them in the verdict branch below
+  (a `/cohorte-fix` pass, or a deliberate park in the backlog); a driver ignores them.
+- **`blocking_items`** — one normalized string per **distinct** blocking finding (deduplicated —
+  two findings sharing surface, file and problem head are one identity), `<surface>|<file>|<problem>`:
   the file path **without the `:line`** (a fix that inserts lines shifts every line below it — a
   line-bearing identity would change every pass and the drift detection would never fire), and the
   **problem**, not the fix, cut to its first 8 words, lowercased, every run of non-alphanumerics
@@ -181,25 +183,33 @@ In chat print ONLY: the verdict, the severity-count table, a one-line digest of 
 finding, and `Full report: specs/reports/$ARGUMENTS.md` — never echo the findings body into chat (it
 would sit in this session's history, re-sent every turn). Then:
 
-- **SHIP** → only reachable with `unreviewed` empty (the roll call above forbids it otherwise). A SHIP
-  verdict *is* the pipeline's statement that the feature meets its Definition of
-  Done, so **tick the DoD**: in `specs/$ARGUMENTS.md` §`Acceptance criteria / DoD`, flip each `- [ ]`
-  → `- [x]` for the criteria the pipeline has actually verified — spec conformance + `ui_language`
-  copy (this review), tests · lint · typecheck (a green `/cohorte-build`), mobile-first as far as the code
-  shows it (this review). **Leave `- [ ]` (and say which) any item no stage actually verified** —
-  nothing in the pipeline *runs* the feature, so any criterion that needs the app up (runtime flows,
-  a visual check against the design) stays open unless the human says they exercised it by hand and
-  it held. Ticking is the lead's job
-  (the reviewer is read-only). **Then stamp the freshness gate** so `/cohorte-ship` can refuse to ship code
-  edited after this verdict: compute `BASE=$(git merge-base <default_branch> HEAD)` and write into the
-  spec front-matter `reviewed_base: $BASE` plus
-  `reviewed_digest: $(git diff $BASE -- . ':(exclude)specs/' | sha256sum | cut -c1-16)` — the fingerprint
-  of exactly the source you just reviewed (specs excluded, so DoD ticks + the ship status flip don't
-  trip it). Then tell the human they can `/cohorte-ship` — **recommend a `/clear` first**, the handoff is
-  fully on disk. **SHIP with leftover LOW findings** (or LOW+MEDIUM at the human's call) does NOT
-  force a fix cycle for nits: park them through §3.5's exact route (the backlog, under their surface's
-  domain heading, tagged `deferred:$ARGUMENTS` — never as open `## Remediation` items, which would
-  re-trigger the fix loop), keep the SHIP verdict and the freshness stamp, and let the human ship.
+- **SHIP** → only reachable with `unreviewed` empty (the roll call above forbids it otherwise).
+  **Split on what survived — the DoD tick and the freshness stamp are earned by a clean bill, not
+  by the verdict alone** (the workflow variant enforces the same rule; certifying surviving
+  HIGH/MEDIUM findings for `/cohorte-ship` would ship known defects):
+  - **Nothing above LOW survived** — the clean bill. **Tick the DoD**: in `specs/$ARGUMENTS.md`
+    §`Acceptance criteria / DoD`, flip each `- [ ]` → `- [x]` for the criteria the pipeline has
+    actually verified — spec conformance + `ui_language` copy (this review), tests · lint ·
+    typecheck (a green `/cohorte-build`), mobile-first as far as the code shows it (this review).
+    **Leave `- [ ]` (and say which) any item no stage actually verified** — nothing in the pipeline
+    *runs* the feature, so any criterion that needs the app up (runtime flows, a visual check
+    against the design) stays open unless the human says they exercised it by hand and it held.
+    Ticking is the lead's job (the reviewer is read-only). **Then stamp the freshness gate** so
+    `/cohorte-ship` can refuse to ship code edited after this verdict: compute
+    `BASE=$(git merge-base <default_branch> HEAD)` and write into the spec front-matter
+    `reviewed_base: $BASE` plus `reviewed_digest: $(git diff $BASE -- . ':(exclude)specs/' | sha256sum | cut -c1-16)`
+    (`shasum -a 256` then the first 16 hex chars where there is no `sha256sum` — macOS) — the
+    fingerprint of exactly the source you just reviewed (specs excluded, so DoD ticks + the ship
+    status flip don't trip it). Park the leftover LOWs through §3.5's exact route (the backlog,
+    under their surface's domain heading, tagged `deferred:$ARGUMENTS` — never as open
+    `## Remediation` items, which would re-trigger the fix loop). Then tell the human they can
+    `/cohorte-ship` — **recommend a `/clear` first**, the handoff is fully on disk.
+  - **HIGH or MEDIUM findings survived** — the verdict stays SHIP (they are not blocking), but
+    **no DoD tick and no freshness stamp**. Route them: `/cohorte-fix $ARGUMENTS` for what should
+    be fixed now; MEDIUMs the human *explicitly* chooses to live with go through §3.5's park
+    instead — and once everything left is LOW, apply the clean-bill branch above (tick, stamp,
+    ship). The stamp is the pipeline certifying what ships; it is never written over known
+    HIGH/MEDIUM defects.
 - **REVISE / BLOCK**, or any CRITICAL/HIGH/security finding → tell the human to run
   **`/cohorte-fix $ARGUMENTS`** — it appends the report to the spec's `## Remediation` and re-dispatches ONLY
   the surfaces with findings. The full path (`/cohorte-spec` Mode B then `/cohorte-build`) remains for findings that

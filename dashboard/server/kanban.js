@@ -4,6 +4,7 @@
 // stays local + dependency-free. The kanban mirror is Obsidian-only by design.
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { parse, parseProfileBlock } = require('./yaml');
@@ -37,9 +38,16 @@ function fetchPRs(repo) {
 }
 
 function readConfig(globalDir) {
-  // cohorte.config.yaml, then the pre-rename legacy names (read-only fallback).
-  for (const n of ['cohorte.config.yaml', 'thebidouille.config.yaml']) {
-    try { return parse(fs.readFileSync(path.join(globalDir, n), 'utf8')); } catch { /* try next */ }
+  // cohorte.config.yaml under the Claude global dir first, then `~/.cohorte/` — where the
+  // installer seeds it for every non-Claude runtime (the shipped scripts probe the same two,
+  // in the same order) — then the pre-rename legacy name (read-only fallback).
+  const candidates = [
+    path.join(globalDir, 'cohorte.config.yaml'),
+    path.join(os.homedir(), '.cohorte', 'cohorte.config.yaml'),
+    path.join(globalDir, 'thebidouille.config.yaml'),
+  ];
+  for (const p of candidates) {
+    try { return parse(fs.readFileSync(p, 'utf8')); } catch { /* try next */ }
   }
   return null;
 }
@@ -78,7 +86,10 @@ function parseBoard(md, repo) {
       const prs = [...src.matchAll(/#(\d+)\b/g)].map(m => ({
         num: m[1], url: repo ? `https://github.com/${repo}/pull/${m[1]}` : null,
       }));
-      const tags = [...src.matchAll(/#([A-Za-zÀ-ɏ][\wÀ-ɏ/-]*)/g)].map(m => m[1]);
+      // A tag is any #-word that is not a bare number (`#123` = PR ref) — feature ids
+      // may start with a digit (`#2fa-login`), which a letter-first pattern dropped
+      // from tags while the text-strip below still removed it: the card lost its join key.
+      const tags = [...src.matchAll(/#(?!\d+\b)([\wÀ-ɏ][\wÀ-ɏ/-]*)/g)].map(m => m[1]);
       const text = src
         .replace(/#[\wÀ-ɏ/-]+/g, '')   // strip tags + PR refs
         .replace(/\bPR\b/g, '')         // and the leftover "PR" label

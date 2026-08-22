@@ -85,7 +85,7 @@ fix only with the human's go-ahead (or hand them the command).
    check: CLI resolvable from PATH, `.mcp.json` entry present in PATH-proof launcher form,
    `.serena/` gitignored, server actually connects.
 5. **Design** (if `design.enabled`). `snapshot_dir` exists and is committed; `ui_kit_path` +
-   `tokens_path` exist; if `provider: claude-design`, `DesignSync` responds (`list_projects`) and
+   `tokens_path` exist; if `provider: claude-design`, `DesignSync` responds (`list_files` on the `design_system_project`) and
    `design_system_project` is reachable. Recall: spec `design_files` are full
    `…/design/p/<projectId>?file=<file>` links that carry their own project + page; `design_project` is
    only a legacy fallback for old bare-filename specs (default `none`).
@@ -111,8 +111,10 @@ fix only with the human's go-ahead (or hand them the command).
    take and why:
    - **Claude Code version** ≥ 2.1.154 (`claude --version 2>/dev/null | head -1`) — older or no CLI
      on PATH ⇒ conversational only.
-   - **Scripts present:** `<core>/workflows/review.js` + `audit.js` + `refactor.js` —
-     missing on a current core ⇒ half-done install, re-run install/update.
+   - **Scripts present:** `<core>/workflows/review.js` + `audit.js` + `refactor.js` + `loop.js` —
+     missing on a current core ⇒ half-done install, re-run install/update. (`/cohorte-loop` is
+     **workflow-only** — no command file exists on purpose; without this runtime it refuses
+     rather than degrading to a conversational loop.)
    - **Phase-0 agent present:** `<agents>/profile-reader.md` — the workflows abort without it.
    - **Workflows enabled in this session** — the `Workflow` tool is in your own toolset right now;
      absent ⇒ disabled for this session (a setting or an old client), conversational path.

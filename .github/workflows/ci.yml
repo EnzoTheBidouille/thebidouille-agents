@@ -99,6 +99,7 @@ jobs:
           test -f "$scratch/.claude/workflows/review.js"
           test -f "$scratch/.claude/workflows/audit.js"
           test -f "$scratch/.claude/workflows/refactor.js"
+          test -f "$scratch/.claude/workflows/loop.js"
           test -f "$scratch/.claude/agents/profile-reader.md"
           # A template a command renders from must ship, or the command silently
           # falls back to inventing the format (validate-core proves the reference
@@ -155,6 +156,11 @@ jobs:
           # while HOME is ignored on Windows (os.homedir reads USERPROFILE there).
           CLAUDE_CONFIG_DIR="$scratch/.claude" node bin/cli.js install --global
           test -f "$scratch/.claude/pipeline/VERSION"
+          # The user config must be seeded WHERE THE READERS PROBE — under
+          # CLAUDE_CONFIG_DIR, never the runner's real HOME (which this run
+          # must not touch; seedConfig once wrote there and nothing noticed).
+          test -f "$scratch/.claude/cohorte.config.yaml"
+          test ! -e "$HOME/.claude/cohorte.config.yaml"
           test -f "$scratch/.claude/commands/cohorte-build.md"
           # The command is useless without the agent it dispatches: until 1.2.6 this
           # port copied a hardcoded review+release and shipped a command with no
@@ -176,6 +182,7 @@ jobs:
           test -f "$scratch/.claude/workflows/review.js"
           test -f "$scratch/.claude/workflows/audit.js"
           test -f "$scratch/.claude/workflows/refactor.js"
+          test -f "$scratch/.claude/workflows/loop.js"
           test -f "$scratch/.claude/templates/decisions.template.md"
           # The per-project rendered scripts must NOT ship — only their templates.
           test ! -e "$scratch/.claude/pipeline/scripts/new-feature.sh"

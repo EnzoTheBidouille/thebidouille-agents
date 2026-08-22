@@ -15,7 +15,9 @@ function fmtSeconds(s) {
 // A surface result reads as a failure when it isn't ok/ship/pass ("error", "REVISE:2", "BLOCK:1"…).
 function resultClass(result) {
   const head = String(result).split(':')[0].trim().toLowerCase();
-  if (head === '' ) return 'neutral';
+  // "skipped" is neutral, matching the server's isFailure() (metrics.js) — rendering
+  // it as a red pill scored a deliberately skipped surface as a failure.
+  if (head === '' || head === 'skipped') return 'neutral';
   if (head === 'ok' || head === 'ship' || head === 'pass') return 'ok';
   if (head === 'revise') return 'warn';
   return 'bad';

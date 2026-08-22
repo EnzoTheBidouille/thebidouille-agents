@@ -115,7 +115,11 @@ try {
         $cliArgs = @((Join-Path $src 'bin\cli.js'), $(if ($Update) { 'update' } else { 'install' }))
         if ($Global) { $cliArgs += '--global' } else { $cliArgs += $Target }
         & $node.Source @cliArgs
-        exit $LASTEXITCODE
+        # `exit` under `irm … | iex` terminates the user's interactive PowerShell
+        # session (there is no script file to exit from) — closing the console that
+        # just ran the documented one-liner. Exit only when running as a file.
+        if ($PSCommandPath) { exit $LASTEXITCODE }
+        return
     }
     Write-Error @"
 cohorte needs Node >= 18 to install.
@@ -124,7 +128,8 @@ cohorte needs Node >= 18 to install.
   step, and a raw copy would install prompts this runtime cannot follow.
   Install Node, then:  npm i -g cohorte; cohorte install$(if ($Global) { ' --global' })
 "@
-    exit 1
+    if ($PSCommandPath) { exit 1 }
+    return
 
     # --- resolve the destination .claude dir ---------------------------------
     if ($Global) {

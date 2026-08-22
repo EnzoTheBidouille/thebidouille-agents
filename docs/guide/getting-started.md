@@ -59,7 +59,7 @@ curl -fsSL https://raw.githubusercontent.com/TheBidouilleAgency/cohorte/main/ins
 Both mirror the npm CLI exactly (same files, same scrub of retired artifacts, same config seeding).
 
 ::: tip What lands where
-Either mode installs: `commands/` (the slash commands), `agents/` (the four fixed agents —
+Either mode installs: `commands/` (the slash commands), `agents/` (the three fixed agents —
 review, release, profile-reader), `hooks/gate.py`, `templates/`, `workflows/` (the four
 workflow scripts), and `pipeline/` (the profile templates, `SCHEMA.md`,
 `implementer.template.md` — the surface-agent template lives here, *not* in `agents/`, so it is
@@ -129,12 +129,18 @@ comes with its exact fix command.
 /clear
 /cohorte-spec                ← freeze specs/<id>.md — the single source of truth
 /clear
+/cohorte-build <id>          ← contract authored, one implementer per surface in parallel
+/clear
+/cohorte-review <id>         ← one reviewer per touched surface → SHIP / REVISE / BLOCK
+/clear                          (REVISE/BLOCK → /cohorte-fix <id>, then re-review)
 /cohorte-ship <id>           ← commit, push, PR (the one human-confirmed step)
 ```
 
-Prefer manual control? The conversational path is the same pipeline, one phase at a time:
-`/cohorte-build <id>` → `/cohorte-review <id>` → `/cohorte-fix <id>` → `/cohorte-ship <id>`. See
-[The feature cycle](/guide/feature-cycle).
+Every handoff lands on disk, which is why the `/clear` between phases is always safe — and
+always worth it (the lead's history is re-sent at input price on every turn). See
+[The feature cycle](/guide/feature-cycle). On Claude Code with workflows enabled, the middle of
+that loop can also run unattended: ask to *"run the loop workflow for `<id>`"* after the first
+`/cohorte-build` — see [Workflows](/guide/workflows).
 
 ## Keeping it current
 

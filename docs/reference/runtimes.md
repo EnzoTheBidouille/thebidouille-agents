@@ -89,7 +89,7 @@ have no equivalent the adapter can safely generate, so the rendered reviewer ins
 explicit instruction that read-only is on it, and says why: a reviewer that fixes what it finds
 destroys the evidence the fix loop runs on.
 
-**Workflows.** The deterministic orchestration scripts (`review.js`, `audit.js`, `refactor.js`) need
+**Workflows.** The deterministic orchestration scripts (`review.js`, `audit.js`, `refactor.js`, `loop.js`) need
 Claude Code's Workflow engine. They are not installed elsewhere and the workflow-variant notes are
 stripped from the rendered commands — the conversational path is the default everywhere anyway.
 

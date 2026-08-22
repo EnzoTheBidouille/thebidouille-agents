@@ -1,8 +1,9 @@
 # The feature cycle
 
 This page walks one feature through the whole pipeline, conversationally — what each command
-does, what lands on disk, and where the human decisions sit. (The autonomous alternative for the
-middle of this loop is run command by command.)
+does, what lands on disk, and where the human decisions sit. (On Claude Code with workflows
+enabled, the middle of this loop — build → review → fix → review — can also run unattended via
+the [loop workflow](/guide/workflows); the conversational path below is the default everywhere.)
 
 ```
 /cohorte-brainstorm → /cohorte-spec → /cohorte-build → /cohorte-review → (/cohorte-fix → /cohorte-review)* → /cohorte-ship

@@ -145,7 +145,9 @@ const walk = (dir) => readdirSync(join(root, dir), { withFileTypes: true }).flat
 for (const dir of ["core/commands", "core/agents", "core/templates", "core/workflows"])
   for (const rel of walk(dir)) {
     if (!/\.(md|js)$/.test(rel) || rel === TELEMETRY_SCRUBBER) continue;
-    if (NO_TELEMETRY.test(read(rel)))
+    // Collapse whitespace first: prose wraps mid-phrase, and "usage\n  ping" sat in a
+    // command file for two releases because this regex only saw one line at a time.
+    if (NO_TELEMETRY.test(read(rel).replace(/\s+/g, " ")))
       fail(rel, "mentions telemetry — it was removed in 2.3.0; nothing may ping or ask for consent");
   }
 // …and the exempt file may only REMOVE it: naming a send/ping/consent path there is still a bug.
@@ -223,6 +225,34 @@ else for (const f of readdirSync(workflowsDir)) {
     fail(path, `does not parse as a workflow body: ${e.message}`);
   }
 }
+// Workflow meta.names and command names share one mental namespace — both are the
+// "/cohorte-…" way a human asks for a phase. A meta.name that MATCHES a
+// core/commands/<name>.md is a declared variant pair (same phase, two execution paths —
+// review/audit/refactor, on purpose). A meta.name matching neither a command nor the
+// deliberate command-less list below is a typo'd variant: the human asks for "the
+// review workflow", the lead resolves the name, and a mismatched name runs nothing.
+// cohorte-loop is command-less BY DECISION (SCHEMA.md §Workflows): when the Workflow
+// runtime is unavailable it must refuse explicitly, never degrade to a conversational
+// loop — so a core/commands/cohorte-loop.md appearing later is a regression, not an
+// addition, and the check below this one pins that too.
+const COMMANDLESS = ["cohorte-loop"];
+if (existsSync(workflowsDir)) for (const f of readdirSync(workflowsDir)) {
+  if (!f.endsWith(".js")) continue;
+  const path = `core/workflows/${f}`;
+  const m = read(path).match(/name:\s*'([^']+)'/);
+  if (!m) { fail(path, "meta has no parseable `name: '…'`"); continue; }
+  const name = m[1];
+  if (!name.startsWith(PREFIX))
+    fail(path, `meta.name '${name}' lacks the \`${PREFIX}\` prefix`);
+  else if (!existsSync(join(root, "core/commands", `${name}.md`)) && !COMMANDLESS.includes(name))
+    fail(path, `meta.name '${name}' matches no core/commands/${name}.md and is not in the ` +
+      `deliberate command-less list — a variant pair must share the name exactly, or the ` +
+      `workflow-only decision must be recorded in COMMANDLESS`);
+}
+if (existsSync(join(root, "core/commands/cohorte-loop.md")))
+  fail("core/commands/cohorte-loop.md", "must not exist — /cohorte-loop is workflow-only " +
+    "(no conversational fallback, by decision; see core/workflows/loop.js header)");
+
 // Both shell installers must copy the workflows dir (bin/cli.js copies by rule,
 // covered by the ci.yml dry-run).
 if (!installSh.includes("core/workflows"))

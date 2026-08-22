@@ -121,6 +121,21 @@ when the change ripples into clean surfaces). §2 maps open items to surfaces by
 re-dispatches **only those**, items verbatim in the dispatch. §3 ticks `- [x]` per handoff,
 collapses fully-fixed rounds to one line, metrics, routes to `/cohorte-review`.
 
+## `/cohorte-loop <id>` — workflow-only
+
+Not a command file: **the loop exists only as a workflow script** (`core/workflows/loop.js`,
+Claude Code ≥ 2.1.154 with workflows enabled — ask *"run the loop workflow for `<id>`"*, args
+`{feature, maxRounds?}`). If the runtime is unavailable it refuses; there is deliberately no
+conversational fallback (a lead re-reasoning the fan-out every round at session prices is the
+cost the script exists to avoid). It runs build → review → [fix → review]* unattended for one
+feature: verifies `/cohorte-build`'s outputs as preconditions (frozen spec, fresh
+`readiness.json`, contract on disk), skips its build phase when a fresh `build.json` shows the
+work already landed, calls the review workflow each round, and exits on zero blocking findings
+(ship), identical blocking findings two rounds running (treading water), `maxRounds` (default
+5), an unreviewed surface, dead implementers, or a finding that would change the frozen
+contract (lead-only). State lives in `specs/reports/<id>.loop.json`; re-invoking resumes.
+See the [workflows guide](../guide/workflows.md).
+
 ## `/cohorte-ship <id>`
 
 Pre-flight: SHIP verdict confirmed; **freshness gate** (recompute the digest — mismatch ⇒

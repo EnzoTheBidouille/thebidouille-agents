@@ -91,7 +91,7 @@ Detect the mode from the pasted content:
    `specs/reports/<id>.md`, where `/cohorte-review` stages its last report. Identify `feature_id` from its
    header; open `specs/<id>.md`.
 2. Append each finding to the spec's **`## Remediation`**, one per line:
-   `- [ ] <severity> · <file:line> · <spec-violation|quality|security> · <concrete fix>`
+   `- [ ] <severity> · <file:line> · <spec-violation|quality|security|complexity> · <concrete fix>`
    (Keep prior items; add the new round under a dated/numbered subheading.)
 3. If a finding implies the **contract** must change, update §5 and flag it so the lead re-authors the
    contract file.

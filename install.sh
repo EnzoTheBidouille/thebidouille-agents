@@ -43,8 +43,9 @@ install.sh — install the cohorte pipeline core.
 
 Honours $CLAUDE_CONFIG_DIR for the global destination and $PIPELINE_REPO for the
 source when piped through curl. The npm CLI (`npm i -g cohorte` then `cohorte install`)
-does the same thing and is the documented route; this script exists for Node-less
-environments.
+does the same thing and is the documented route; this script exists for npm-less
+setups (curl straight from the repo). Node itself is still required — the commands
+are rendered per coding agent at install time and there is no shell renderer.
 USAGE
       exit 0 ;;
     --)       shift; break ;;
@@ -84,7 +85,10 @@ if command -v node >/dev/null 2>&1; then
   [ "$mode" = "update" ] && set -- update
   [ "$scope" = "global" ] && set -- "$@" --global
   [ "$scope" = "project" ] && set -- "$@" "$target"
-  exec node "$src/bin/cli.js" "$@"
+  # Not `exec`: exec replaces this shell, so the curl-path EXIT trap (rm -rf "$tmp")
+  # never fires and every piped install leaks the shallow clone in $TMPDIR.
+  node "$src/bin/cli.js" "$@"
+  exit $?
 fi
 echo "error: cohorte needs Node ≥ 18 to install." >&2
 echo "  The pipeline's commands are rendered per coding agent (Claude Code, Codex, Cursor," >&2

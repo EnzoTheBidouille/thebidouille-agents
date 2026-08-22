@@ -64,10 +64,29 @@ function layouts({ projectRoot, globalDir }) {
       seen.add(key);
       const rec = (registry && registry[id]) || {};
       const p = rec.paths || {};
+      // runtimes.json records ABSOLUTE install-time paths. For a bundled (committed)
+      // core, a clone or a moved checkout still carries the ORIGINAL machine's paths —
+      // taken verbatim, every doctor check goes red on a healthy install ("no rendered
+      // agent", "gate not registered"). Recover the install-time project root from the
+      // recorded core path (its tail must match this core's path relative to the
+      // current project root — '.claude', '.cohorte/<rt>') and re-root anything under
+      // it onto the current projectRoot. Global cores sit outside the project and are
+      // machine-local by definition — their absolute paths pass through untouched.
+      const rel = path.relative(projectRoot, dir);
+      let recordedRoot = null;
+      if (p.core && rel && !rel.startsWith('..') && !path.isAbsolute(rel)
+          && (p.core === rel || p.core.endsWith(path.sep + rel))) {
+        recordedRoot = p.core.slice(0, p.core.length - rel.length - 1) || null;
+      }
       const abs = (v, fallback) => {
         const raw = v || fallback;
         if (!raw) return null;
-        return path.isAbsolute(raw) ? raw : path.join(projectRoot, raw);
+        if (!path.isAbsolute(raw)) return path.join(projectRoot, raw);
+        if (recordedRoot && recordedRoot !== projectRoot
+            && (raw === recordedRoot || raw.startsWith(recordedRoot + path.sep))) {
+          return path.join(projectRoot, raw.slice(recordedRoot.length + 1) || '.');
+        }
+        return raw;
       };
       found.push({
         id,

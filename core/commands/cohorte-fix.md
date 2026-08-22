@@ -31,8 +31,8 @@ that change the *contract*; `/cohorte-fix` is for everything else.
   re-author the contract file yourself now (lead-only, per `/cohorte-build` §2) — agents never edit it. If
   the contract change ripples into surfaces *without* findings, fall back to full `/cohorte-build` instead
   and say so.
-- **Note the epoch** (`date +%s`) in the first Bash call you make here — §3's metrics line and usage
-  ping both carry `seconds`, and there is no separate timing call.
+- **Note the epoch** (`date +%s`) in the first Bash call you make here — §3's metrics line carries
+  `seconds`, and there is no separate timing call.
 
 ## 2. Scope the re-dispatch — only surfaces with findings
 
@@ -42,10 +42,11 @@ that change the *contract*; `/cohorte-fix` is for everything else.
   to the most relevant surface — say which.
 - Re-dispatch **ONLY the surfaces owning ≥1 item**, in parallel, in a **single message** — the exact
   dispatch template from `/cohorte-build` §3 (one byte-stable template for builds and fix loops; you do NOT
-  paste a diff — the agent computes its own, scoped to its tree). Fill the template's final variable
-  slot with that surface's open `- [ ]` item lines **verbatim**, so the agent needs no spec re-read to
+  paste a diff — the agent computes its own, scoped to its tree). Fill the template's **Remediation
+  slot** with that surface's open `- [ ]` item lines **verbatim**, so the agent needs no spec re-read to
   find its work; fill the design slot with `none` when a `uses_design` surface's open items are all
-  non-visual (no DesignSync re-fetch for a type fix). Surfaces without findings are NOT re-dispatched —
+  non-visual (no DesignSync re-fetch for a type fix), and the readiness-gaps slot with `none` (a fix
+  loop has no fresh §1.6 verdict). Surfaces without findings are NOT re-dispatched —
   that is the point.
 
 ## 3. Integrate & check off what's fixed

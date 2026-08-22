@@ -7,7 +7,64 @@ short, user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` secti
 > They are history and are deliberately not rewritten — every command gained a `cohorte-` prefix
 > in 2.0.0.
 
-## 2.6.0 — 2026-08-14
+## 2.7.0 — 2026-08-22
+
+- **`/cohorte-loop` is back — as a workflow, which is the whole point.** The 2.2.0 driver was
+  retired because it spawned headless child processes it could not supervise: it stalled on a
+  permission prompt it could not see, read a missing `build.json` as an empty one, and had a
+  session killed mid-write with nothing noticing. `core/workflows/loop.js` runs
+  build → review → [fix → review]* for one feature inside the Workflow runtime instead — the
+  runtime holds control flow, a dead agent resolves to `null` rather than to silence, and there
+  is no prompt to stall on.
+
+  What it will not do is as designed as what it does: it *verifies* `/cohorte-build`'s outputs
+  (frozen spec, fresh `readiness.json`, the lead-authored contract) as preconditions and aborts —
+  naming the gap — on anything that is a human's call: a `NOT-READY` spec, a surface the profile
+  doesn't own, a blocking finding on the contract file itself. A dead reviewer's zero findings
+  can never read as ship (`unreviewed` is checked before `blocking`, in that order on purpose);
+  identical blocking findings two rounds running abort as treading water instead of burning the
+  remaining rounds; `maxRounds` (default 5) is the last net, never the first. State is four files
+  in `specs/reports/` — re-invoking resumes, and every file older than the spec is treated as
+  absent. There is **no** `core/commands/cohorte-loop.md` and `validate-core.mjs` now fails if
+  one appears: without the Workflow runtime the loop refuses explicitly rather than degrading to
+  a lead re-reasoning the fan-out every round at session prices. It stamps `in-progress` /
+  `in-review` / `blocked` on the spec — the driver states SCHEMA.md kept alive since 2.2.0 have
+  a producer again.
+
+  To serve it, the review workflow now writes the same `specs/reports/<id>.verdict.json` the
+  conversational `/cohorte-review` §3 guarantees (blocking count, normalized `blocking_items`,
+  sha256 fingerprint, the degraded `aborted: "preflight"` form) — one machine contract, two
+  producers.
+
+- **A deny behind an ask was reachable with one click.** `gate.py` scanned command segments in
+  order and returned on the first match, so `git commit -m x && node ace migration:fresh`
+  surfaced only the benign `git commit` confirm — and the human's single "yes" ran the
+  hard-denied migration behind it. Deny patterns are now matched across the whole chain before
+  any ask is offered. Global installs pick this up with `cohorte update`; bundled repos via
+  `/cohorte-update-pipeline`.
+
+- **The SHIP stamp is now earned, not implied.** The conversational `/cohorte-review` ticked the
+  DoD and wrote the freshness stamp on every SHIP — including one carrying HIGH findings, which
+  `/cohorte-ship`'s gates then happily certified, while the workflow variant refused the same
+  state. Both paths now agree: tick + stamp only when nothing above LOW survived; surviving
+  HIGH/MEDIUM routes to `/cohorte-fix` (or an explicit park) first.
+
+- **A dozen bugs the release audit surfaced**, the sharper ones being: `cohorte install` seeded
+  `cohorte.config.yaml` under `~/.claude` even when `CLAUDE_CONFIG_DIR` pointed elsewhere — a
+  config no reader ever probed (CI now asserts the seed lands where the readers look);
+  the refactor workflow's retry round discarded the items its first verify had already cleared,
+  so the backlog re-dispatched finished work — and invoked with a bare `"backend"` it silently
+  refactored *every* big domain; the dashboard trusted the absolute paths in a committed
+  `runtimes.json`, going all-red on any cloned or moved checkout; `preflight.sh` fed a UTC
+  timestamp to a local-time `touch -t`, future-dating the throwaway index west of UTC (and an
+  all-empty command list stamped a green preflight that had verified nothing);
+  `new-feature.sh` branched worktrees off the *local* default branch its own fetch never
+  updated; a CRLF kanban board failed with "column not found" on a column that exists; and a
+  dead mechanical-gates agent read as "0 failures" in the audit workflow. Plus a sweep of doc
+  drift (the first-feature walkthrough skipped build *and* review; "Node-less" installers that
+  require Node; stale counts of agents, scripts and board columns).
+
+
 
 - **Two ways to type the same command, and one of them silently doesn't work.** The docs wrote
   `npx cohorte install`, the Francois extension's manifest names a bare `cohorte` binary, and

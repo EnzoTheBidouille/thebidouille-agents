@@ -143,7 +143,9 @@ _Only if `contract.enabled`._ From §5 of the spec, write/update the feature's c
 `<contract.path>/$ARGUMENTS.<contract.ext>` in the profile's `mechanism` (e.g. Zod v4 schemas + inferred
 types for `shared-types-zod`). Export it from `contract.index` if set. This is the ONLY file the agents
 share; they import it read-only and must not edit it. If `contract.enabled` is false, the spec prose is
-the sync channel — say so and skip. **Postcondition (if `contract.enabled`):**
+the sync channel — say so and skip, but still run `date +%s` on its own (same as the patch skip
+above: §4's wall-clock start comes from here, and a build with no start epoch writes a metrics
+line with no duration). **Postcondition (if `contract.enabled`):**
 `test -f <contract.path>/$ARGUMENTS.<contract.ext> && date +%s` — the contract file must exist before
 you dispatch §3, or the stateless agents have nothing to build against (the epoch output is §4's
 wall-clock start — no separate timing call).

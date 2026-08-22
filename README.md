@@ -229,8 +229,8 @@ those actions.
   ✅/⚠️/❌ checklist (each failure with its fix), the **Surfaces ↔ agents** map from `PIPELINE.md`,
   and one board: a **Kanban** if the project has a linked Obsidian board (columns + cards from the
   vault, with clickable PR links + live open/merged/closed status and a ship-date-sorted Shipped
-  column, via `gh`), otherwise a **Specs board** from `specs/*.md` (by `draft · frozen · in-review ·
-  shipped`). The Kanban supersedes the Specs board when both would apply.
+  column, via `gh`), otherwise a **Specs board** from `specs/*.md` (by `draft · frozen · in-progress ·
+  in-review · blocked · shipped`). The Kanban supersedes the Specs board when both would apply.
 - **Actions** (stream their output live) — **Update / Install core** (the shared global core, or a
   repo's bundled core); **Init-pipeline / Update-pipeline / Audit**, which run those Claude Code
   commands **headless** (`claude -p`, autonomous — Init skips the interactive interview, so review
@@ -276,7 +276,7 @@ will do:
 
 ```sh
 npm i -g cohorte
-francois ext install TheBidouilleAgency/cohorte
+francois ext install TheBidouilleAgency/francois-plugin-cohorte
 ```
 
 ## Releasing (maintainers)
@@ -365,15 +365,17 @@ Rules that make it safe:
 
 ### Workflows — deterministic multi-agent runs (opt-in)
 
-Four phases also ship as **workflow scripts** for the Claude Code Workflow runtime — the same
-fan-out the commands orchestrate, but driven by a deterministic script instead of the lead reasoning
-it out turn by turn:
+Four **workflow scripts** ship for the Claude Code Workflow runtime — the same fan-out the
+commands orchestrate, but driven by a deterministic script instead of the lead reasoning it out
+turn by turn. Three are opt-in variants of their same-named commands; the fourth, `loop.js`,
+exists **only** as a workflow:
 
 | Script                  | What it runs                                                                              |
 | ----------------------- | ----------------------------------------------------------------------------------------- |
 | `workflows/review.js`   | Preflight gate (aborts while red — zero agents), one reviewer per touched surface, adversarial cross-check of CRITICAL/security findings, merged verdict only. |
 | `workflows/audit.js`    | One auditor per domain (every surface + shared) concurrently, prioritized `specs/refactor-backlog.md`. |
 | `workflows/refactor.js` | Big domains only: `shared` first and alone, then parallel surface implementers, per-domain verify + one retry. |
+| `workflows/loop.js`     | `/cohorte-loop` — build → review → [fix → review]* for one feature, unattended and resumable; exits on zero blocking findings, treading water, maxRounds, or anything that needs a human (contract change, unreviewed surface). No conversational fallback, on purpose. |
 
 The essentials:
 
@@ -413,15 +415,15 @@ See `profile/SCHEMA.md` for every field in `PIPELINE.md` and how the pipeline us
 
 ```
 package.json            # npm package (cohorte) — semver source of truth
-bin/cli.js              # the npm CLI: install / update / dashboard / version (cross-platform, no deps)
-install.sh              # script installer (fresh + --update) for no-Node environments
+bin/cli.js              # the npm CLI: install / update / dashboard / specs / doctor / metrics / version (cross-platform, no deps)
+install.sh              # script installer (fresh + --update) for npm-less setups — still needs Node
 install.ps1             # same installer for Windows PowerShell (fresh + -Update)
 core/                   # copied verbatim into ~/.claude (global) or <project>/.claude (bundled)
   agents/               # implementer.template.md (rendered per surface) + review / release / profile-reader
   commands/             # init-pipeline + the pipeline commands + /cohorte-update-pipeline
   hooks/                # gate.py (destructive-command gate; branch-aware; preflight phase gate)
   templates/            # handoff / brainstorm-return / design-brief / review-feedback / pr-body / spec
-  workflows/            # opt-in Workflow-runtime scripts: review.js / audit.js / refactor.js
+  workflows/            # Workflow-runtime scripts: review.js / audit.js / refactor.js (opt-in variants) + loop.js (workflow-only)
 profile/
   PIPELINE.template.md  # the profile skeleton /cohorte-init-pipeline fills
   SCHEMA.md             # field reference
