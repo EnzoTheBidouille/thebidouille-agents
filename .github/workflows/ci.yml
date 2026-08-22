@@ -101,6 +101,10 @@ jobs:
           test -f "$scratch/.claude/workflows/refactor.js"
           test -f "$scratch/.claude/workflows/loop.js"
           test -f "$scratch/.claude/agents/profile-reader.md"
+          test -f "$scratch/.claude/agents/review.md"
+          test -f "$scratch/.claude/agents/release.md"
+          # A compiled bytecode cache in the source checkout must never ride along.
+          test ! -e "$scratch/.claude/hooks/__pycache__"
           # A template a command renders from must ship, or the command silently
           # falls back to inventing the format (validate-core proves the reference
           # resolves in-repo; only this proves it reaches a user's machine).

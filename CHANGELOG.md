@@ -64,6 +64,19 @@ short, user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` secti
   drift (the first-feature walkthrough skipped build *and* review; "Node-less" installers that
   require Node; stale counts of agents, scripts and board columns).
 
+- **The shell installers are now the thin delegators they already were.** Since 2.2.0 both
+  scripts handed everything to `bin/cli.js` and then carried ~300 lines of unreachable legacy
+  copy code below the hand-off — dead text that `validate-core`'s "does the installer copy X"
+  checks were vacuously matching, which is worse than no check: it reads as coverage. The dead
+  code is gone; the checks now assert CI's install dry-run postconditions — tests against the
+  copy that actually runs. Along the way: `sh install.sh` from inside a checkout silently
+  *cloned the remote* instead of installing the local tree (`$0` arrives with no slash and the
+  self-locate case missed it); both installers now refuse a Node older than 18 up front instead
+  of half-installing before `fs.cpSync` crashes; and the review agent's `tools:` names both
+  retrieval providers (`mcp__serena`, `mcp__graphify`) — one fixed agent file, shared across
+  projects, only the wired provider is live in a session, and graphify projects' reviewers were
+  silently cut off from their own index.
+
 
 
 - **Two ways to type the same command, and one of them silently doesn't work.** The docs wrote
