@@ -1,0 +1,292 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 3b14c3c..9849a39 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -7,6 +7,45 @@ short, user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` secti
+ > They are history and are deliberately not rewritten — every command gained a `cohorte-` prefix
+ > in 2.0.0.
+ 
++## 2.7.0 — 2026-08-22
++
++- **The metrics panel billed Sonnet 5 fifty percent over.** `prices.json` carried $3/$15 because
++  that was the rate scheduled to take effect on 2026-09-01. It never will: Anthropic made the
++  $2/$10 introductory rate the standard one. Every run costed since the entry was written reads
++  high, and the further back a run is, the more confidently wrong the number looks.
++
++  Sonnet 5 is now $2/$10, and the file says in prose why the increase must not be reinstated —
++  the next person to "correct" this back will at least have to argue with a comment first. Sonnet
++  4.6 and earlier stay at $3/$15: same tier, different price, and the longest-prefix lookup keeps
++  them apart on its own.
++
++- **A concurrency ceiling that moved while the comments stood still.** `audit.js` described the
++  runtime as capping concurrent agents at "~16". It is 20, it is named
++  (`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`), and raising it raises the ceiling without changing this
++  script — the queue belongs to the runtime, and a queued domain was never a lost one. Comments
++  only; no dispatch logic moved.
++
++- **The design brief was the one step the pipeline handed back to you.** `/cohorte-spec` freezes a
++  brief to `specs/design/<feature_id>.md` and then said, in effect, paste this somewhere else. With
++  `design.inline: true` it can instead hand that file to `/design`, which reads the codebase,
++  matches the existing UI style, and returns editable artboards without leaving the session.
++
++  The flag is off by default and degrades rather than fails: an unmet floor falls back to the
++  paste-it-yourself path with a note, never an error. It needs `provider: claude-design`, the new
++  `inline_design` runtime capability (Claude Code only), and a CLI ≥ 2.1.234 — a **higher floor than
++  workflows' 2.1.154**, which is why `/cohorte-doctor` grew a separate check `8b` instead of raising
++  the existing one. Raising the shared floor would have made every install between the two versions
++  read as broken while its workflows ran fine.
++
++  Understand what inline does and does not change: it changes who does the pasting. The brief is
++  still written to disk first and is still what `/cohorte-build` reads — artboards are an aid to the
++  human, not an input to the pipeline. And `/design` is a research preview that **does not save them
++  for you**, so check 8b says so on every run, including the runs where everything passes. An
++  artboard nobody exported dies with the session, and there is no way to notice afterwards.
++
++- This release adds a runtime capability, a profile flag, and a command section: run
++  `/cohorte-update-pipeline` after updating.
++
+ ## 2.6.0 — 2026-08-14
+ 
+ - **Two ways to type the same command, and one of them silently doesn't work.** The docs wrote
+diff --git a/core/commands/cohorte-doctor.md b/core/commands/cohorte-doctor.md
+index 6f1b5a8..5742eea 100644
+--- a/core/commands/cohorte-doctor.md
++++ b/core/commands/cohorte-doctor.md
+@@ -110,7 +110,10 @@ fix only with the human's go-ahead (or hand them the command).
+    stay the default, so failures here are ⚠️ at most, never ❌). Report which path this machine will
+    take and why:
+    - **Claude Code version** ≥ 2.1.154 (`claude --version 2>/dev/null | head -1`) — older or no CLI
+-     on PATH ⇒ conversational only.
++     on PATH ⇒ conversational only. This is the **workflow** floor and the only one that gates this
++     check; do NOT raise it to match a newer feature's floor, or every install between the two
++     versions reads as broken while its workflows run fine. When `design.inline` is on, report the
++     design floor (≥ 2.1.234) as its own line under check 8b — separate prerequisite, separate verdict.
+    - **Scripts present:** `<core>/workflows/review.js` + `audit.js` + `refactor.js` —
+      missing on a current core ⇒ half-done install, re-run install/update.
+    - **Phase-0 agent present:** `<agents>/profile-reader.md` — the workflows abort without it.
+@@ -121,6 +124,24 @@ fix only with the human's go-ahead (or hand them the command).
+    End the check with ONE summary line, e.g.
+    `workflows: available (opt-in — ask to "run the review workflow")` or
+    `workflows: unavailable (<first failing prerequisite>) — conversational commands (the default)`.
++<!-- cohorte:if inline_design -->
++8b. **Inline design** (`design.inline: true` — the `/design` artboard step between spec and build).
++   A research preview, so every failure here is ⚠️, never ❌: the design brief still exists on disk
++   at `specs/design/<feature_id>.md` and can be carried to the design tool by hand, which is what
++   every install did before this flag. Report:
++   - **Claude Code version** ≥ 2.1.234 — `/design` ships as a skill and is simply absent below it.
++     Older CLI ⇒ say so and name `npm i -g cohorte@latest`'s sibling, `claude update`.
++   - **The `/design` skill resolves in this session** — absent ⇒ the preview is off for this account
++     or plan (Pro/Max/Team/Enterprise are the eligible ones), not a cohorte defect.
++   - **`design.enabled` is true and `provider` is `claude-design`** — `inline` on top of a `figma` or
++     `none` provider is a profile contradiction; name it and point at `/cohorte-update-pipeline`.
++   - **Artboards are not persisted for you.** State it every run, unconditionally, even when all
++     three checks pass: the preview hands designs to the build step but does not save them, so an
++     artboard nobody exported dies with the session. This is the single thing most likely to lose
++     work, and it is not detectable after the fact.
++   One summary line: `inline design: available (preview — export artboards yourself)` or
++   `inline design: unavailable (<first failing prerequisite>) — design brief on disk, carry it over by hand`.
++<!-- cohorte:endif -->
+ <!-- cohorte:else -->
+ 8. **Preflight wiring.** `<core>/pipeline/scripts/preflight.sh` is executable and
+    `gate-config.json` carries the `preflight` block — mismatch ⇒ regenerate from the profile.
+diff --git a/core/runtimes/claude.json b/core/runtimes/claude.json
+index 964562c..bd88b32 100644
+--- a/core/runtimes/claude.json
++++ b/core/runtimes/claude.json
+@@ -58,6 +58,7 @@
+     "subagents": true,
+     "hooks": true,
+     "workflows": true,
++    "inline_design": true,
+     "mcp": true,
+     "tool_restriction": true
+   },
+diff --git a/core/runtimes/codex.json b/core/runtimes/codex.json
+index 2ce9b58..5f8c7fc 100644
+--- a/core/runtimes/codex.json
++++ b/core/runtimes/codex.json
+@@ -74,6 +74,7 @@
+     "subagents": true,
+     "hooks": true,
+     "workflows": false,
++    "inline_design": false,
+     "mcp": true,
+     "tool_restriction": true
+   },
+diff --git a/core/runtimes/cursor.json b/core/runtimes/cursor.json
+index 6137804..fac36b3 100644
+--- a/core/runtimes/cursor.json
++++ b/core/runtimes/cursor.json
+@@ -67,6 +67,7 @@
+     "subagents": true,
+     "hooks": true,
+     "workflows": false,
++    "inline_design": false,
+     "mcp": true,
+     "tool_restriction": true
+   },
+diff --git a/core/runtimes/gemini.json b/core/runtimes/gemini.json
+index 22a3054..ba8c0e0 100644
+--- a/core/runtimes/gemini.json
++++ b/core/runtimes/gemini.json
+@@ -67,6 +67,7 @@
+     "subagents": true,
+     "hooks": true,
+     "workflows": false,
++    "inline_design": false,
+     "mcp": true,
+     "tool_restriction": false
+   },
+diff --git a/core/runtimes/opencode.json b/core/runtimes/opencode.json
+index da91ccd..e4b50c2 100644
+--- a/core/runtimes/opencode.json
++++ b/core/runtimes/opencode.json
+@@ -63,6 +63,7 @@
+     "subagents": true,
+     "hooks": false,
+     "workflows": false,
++    "inline_design": false,
+     "mcp": true,
+     "tool_restriction": false
+   },
+diff --git a/core/templates/design-brief.md b/core/templates/design-brief.md
+index 4b1f3d1..54ff35e 100644
+--- a/core/templates/design-brief.md
++++ b/core/templates/design-brief.md
+@@ -1,8 +1,17 @@
+ # DESIGN BRIEF — <feature title> (`<feature_id>`)
+ 
+-> The "spec return". Paste into the design tool (see `PIPELINE.md` §design). This is §8 of the frozen
+-> spec, standalone — `/cohorte-spec` writes it to `specs/design/<feature_id>.md` on freeze. Omit entirely if
+-> the project has no UI.
++> The "spec return". This is §8 of the frozen spec, standalone — `/cohorte-spec` writes it to
++> `specs/design/<feature_id>.md` on freeze. Omit entirely if the project has no UI.
++>
++> **Getting it into the design tool.** By default: paste it there yourself (see `PIPELINE.md` §design).
++> With `design.inline: true`, `/cohorte-spec` instead offers to hand this file straight to `/design`,
++> which reads the codebase, matches the existing UI style, and returns editable artboards in-session.
++>
++> Inline changes who does the pasting, and nothing else. This file is still written to disk first and
++> is still what `/cohorte-build` reads — the artboards are an aid to the human, not an input to the
++> pipeline, and `/design` is a research preview that does not save them for you. Export anything worth
++> keeping before the session ends. If the design floor is unmet, the flag degrades to the paste-it-
++> yourself path with a note, never to an error: a brief that exists is worth more than a step that ran.
+ 
+ **Goal:** <one line — what the user accomplishes>
+ 
+diff --git a/core/workflows/audit.js b/core/workflows/audit.js
+index b235ff7..ccff250 100644
+--- a/core/workflows/audit.js
++++ b/core/workflows/audit.js
+@@ -6,7 +6,8 @@
+ // Shape (SCHEMA.md §Workflows): profile via profile-reader (phase 0), the
+ // mechanical gates staged to disk by one haiku agent, then ONE auditor per
+ // domain (each surface + `shared`) running concurrently — the runtime caps
+-// concurrency at ~16, extra domains queue — and a merge phase that writes the
++// concurrency at 20 (CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS since 2026-08), extra
++// domains queue — and a merge phase that writes the
+ // prioritized specs/refactor-backlog.md. Only the summary comes back.
+ 
+ export const meta = {
+@@ -16,7 +17,7 @@ export const meta = {
+   phases: [
+     { title: 'Profile', detail: 'PIPELINE.md → JSON via profile-reader', model: 'haiku' },
+     { title: 'Gates', detail: 'format/lint/typecheck/tests → specs/reports/audit-gates.txt', model: 'haiku' },
+-    { title: 'Audit', detail: 'one review-in-audit-mode agent per domain (concurrent, runtime-capped ~16)' },
++    { title: 'Audit', detail: 'one review-in-audit-mode agent per domain (concurrent, runtime-capped 20)' },
+     { title: 'Backlog', detail: 'merge + write specs/refactor-backlog.md', model: 'haiku' },
+   ],
+ }
+@@ -161,7 +162,9 @@ log(`Mechanical failures: ${mech.length}${gates && gates.overflow ? ` (+${gates.
+ 
+ // ── Phase 2 — one auditor per domain, concurrent ─────────────────────────────
+ // Domains = every surface + `shared` (contract package + anything outside the
+-// surface trees). The runtime caps concurrent agents (~16); more domains queue.
++// surface trees). The runtime caps concurrent agents at 20 by default; more domains
++// queue. Raising CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS raises the ceiling, it does not
++// change this script — the queue is the runtime's, and a queued domain is not a lost one.
+ phase('Audit')
+ const domains = surfaces.map(s => ({ key: s.key, path: s.path }))
+   .concat([{ key: 'shared', path: (profile.contract && profile.contract.path) || '(everything outside the surface trees)' }])
+diff --git a/dashboard/server/doctor.js b/dashboard/server/doctor.js
+index cd63dfb..479e906 100644
+--- a/dashboard/server/doctor.js
++++ b/dashboard/server/doctor.js
+@@ -394,7 +394,9 @@ function checkWorkflows(projectRoot, globalDir, installMode, all) {
+   }
+   return mk('workflows', 'Workflows', 'ok',
+     'scripts + profile-reader installed — opt-in per run; needs Claude Code ≥ 2.1.154 with ' +
+-    'workflows enabled (run /cohorte-doctor in-session to check the live half)');
++    'workflows enabled (run /cohorte-doctor in-session to check the live half). Inline design ' +
++    '(design.inline) has its own, higher floor of ≥ 2.1.234 — it is a separate prerequisite and ' +
++    'does not gate this check either way');
+ }
+ 
+ function scanSpecs(projectRoot) {
+diff --git a/package.json b/package.json
+index ac1f8b9..607e698 100644
+--- a/package.json
++++ b/package.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "cohorte",
+-  "version": "2.6.0",
++  "version": "2.7.0",
+   "description": "Portable, stack-agnostic multi-agent development pipeline for Claude Code, Codex CLI, Cursor, Gemini CLI and OpenCode — install the core, run /cohorte-init-pipeline, and it adapts to your project's stack.",
+   "bin": {
+     "cohorte": "bin/cli.js"
+diff --git a/profile/SCHEMA.md b/profile/SCHEMA.md
+index bc5957c..b1dc6e0 100644
+--- a/profile/SCHEMA.md
++++ b/profile/SCHEMA.md
+@@ -49,6 +49,7 @@ generic pipeline uses it, so a stateless agent can read/regenerate the profile c
+ | `rbac.hierarchy`                     | list         | review                            | Highest→lowest role list.                                     |
+ | `design.enabled`                     | bool         | build, frontend, align-ds         | `false` ⇒ design steps are no-ops.                            |
+ | `design.provider`                    | enum         | frontend, align-ds                | `claude-design`/`figma`/`none`.                               |
++| `design.inline`                      | bool         | spec, build, doctor               | Default `false`. `true` ⇒ `/cohorte-spec` offers the `/design` artboard step after freezing the brief, instead of ending at "paste this into the design tool". Requires `provider: claude-design`, the `inline_design` runtime capability, and Claude Code ≥ 2.1.234. **A research preview: artboards are not persisted for you.** The brief on disk stays the source of truth either way, so `false` loses nothing but the round trip. |
+ | `design.design_system_project`       | id           | align-ds, frontend                | UI-kit source of truth.                                       |
+ | `design.design_project`              | id           | build, frontend                   | Legacy fallback for bare-filename `design_files` only; default `none`. New specs use full `…/design/p/<projectId>?file=<file>` links that carry their own project + page (nothing to go stale on a DS rebuild). |
+ | `design.snapshot_dir`                | path         | align-ds                          | Committed DS snapshot for diffing.                            |
+diff --git a/scripts/metrics/prices.json b/scripts/metrics/prices.json
+index cbe9324..f4e24e2 100644
+--- a/scripts/metrics/prices.json
++++ b/scripts/metrics/prices.json
+@@ -7,9 +7,12 @@
+     "TTL, 2x for 1h, read 0.1x) rather than restated per model, so a price change",
+     "is a one-line edit. `fast` is the fast-mode premium (usage.speed === 'fast').",
+     "Model lookup is longest-prefix, so dated ids (claude-haiku-4-5-20251001) hit",
+-    "their base entry without needing a row of their own."
++    "their base entry without needing a row of their own.",
++    "Sonnet 5 is $2/$10: the introductory rate became the standard rate on 2026-08-20.",
++    "The $3/$15 increase once scheduled for 2026-09-01 was cancelled and must not",
++    "be reinstated. Sonnet 4.6 and earlier stay at $3/$15 — same tier, different price."
+   ],
+-  "updated": "2026-07-31",
++  "updated": "2026-08-22",
+   "multipliers": {
+     "cacheWrite5m": 1.25,
+     "cacheWrite1h": 2.0,
+@@ -31,7 +34,7 @@
+     "claude-opus-4-7": { "input": 5, "output": 25 },
+     "claude-opus-4-6": { "input": 5, "output": 25 },
+     "claude-opus-4-5": { "input": 5, "output": 25 },
+-    "claude-sonnet-5": { "input": 3, "output": 15 },
++    "claude-sonnet-5": { "input": 2, "output": 10 },
+     "claude-sonnet-4-6": { "input": 3, "output": 15 },
+     "claude-sonnet-4-5": { "input": 3, "output": 15 },
+     "claude-haiku-4-5": { "input": 1, "output": 5 }
+diff --git a/scripts/test-metrics.mjs b/scripts/test-metrics.mjs
+index 0af6f01..d46f464 100644
+--- a/scripts/test-metrics.mjs
++++ b/scripts/test-metrics.mjs
+@@ -144,8 +144,8 @@ check('…and keeps its own spend', retired && retired.tokens.output, 90);
+ // opus-5 $5 in / $25 out per MTok; 5m cache write 1.25x input, cache read 0.1x input.
+ //   m1  100*5 + 1000*25 + 1000*6.25 + 10000*0.5 = 36750
+ //   m3  500*25                                   = 12500
+-//   s1  sonnet-5 2000*15                         = 30000   (subagent)
+-check('cost sums the cache tiers at their own rates', Number(build.cost.total.toFixed(6)), 0.07925);
++//   s1  sonnet-5 2000*10                         = 20000   (subagent, $2/$10 since 2026-08)
++check('cost sums the cache tiers at their own rates', Number(build.cost.total.toFixed(6)), 0.06925);
+ check('the unpriced list stays empty for known models', build.unpriced, []);
+ 
+ const detail = out.runs.find((r) => r.command === '/cohorte-build');

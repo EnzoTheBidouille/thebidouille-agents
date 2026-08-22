@@ -63,6 +63,7 @@
     "subagents": true,
     "hooks": false,
     "workflows": false,
+    "inline_design": false,
     "mcp": true,
     "tool_restriction": false
   },

@@ -144,8 +144,8 @@ check('…and keeps its own spend', retired && retired.tokens.output, 90);
 // opus-5 $5 in / $25 out per MTok; 5m cache write 1.25x input, cache read 0.1x input.
 //   m1  100*5 + 1000*25 + 1000*6.25 + 10000*0.5 = 36750
 //   m3  500*25                                   = 12500
-//   s1  sonnet-5 2000*15                         = 30000   (subagent)
-check('cost sums the cache tiers at their own rates', Number(build.cost.total.toFixed(6)), 0.07925);
+//   s1  sonnet-5 2000*10                         = 20000   (subagent, $2/$10 since 2026-08)
+check('cost sums the cache tiers at their own rates', Number(build.cost.total.toFixed(6)), 0.06925);
 check('the unpriced list stays empty for known models', build.unpriced, []);
 
 const detail = out.runs.find((r) => r.command === '/cohorte-build');

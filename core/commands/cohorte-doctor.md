@@ -110,7 +110,10 @@ fix only with the human's go-ahead (or hand them the command).
    stay the default, so failures here are ⚠️ at most, never ❌). Report which path this machine will
    take and why:
    - **Claude Code version** ≥ 2.1.154 (`claude --version 2>/dev/null | head -1`) — older or no CLI
-     on PATH ⇒ conversational only.
+     on PATH ⇒ conversational only. This is the **workflow** floor and the only one that gates this
+     check; do NOT raise it to match a newer feature's floor, or every install between the two
+     versions reads as broken while its workflows run fine. When `design.inline` is on, report the
+     design floor (≥ 2.1.234) as its own line under check 8b — separate prerequisite, separate verdict.
    - **Scripts present:** `<core>/workflows/review.js` + `audit.js` + `refactor.js` + `loop.js` —
      missing on a current core ⇒ half-done install, re-run install/update. (`/cohorte-loop` is
      **workflow-only** — no command file exists on purpose; without this runtime it refuses
@@ -123,6 +126,24 @@ fix only with the human's go-ahead (or hand them the command).
    End the check with ONE summary line, e.g.
    `workflows: available (opt-in — ask to "run the review workflow")` or
    `workflows: unavailable (<first failing prerequisite>) — conversational commands (the default)`.
+<!-- cohorte:if inline_design -->
+8b. **Inline design** (`design.inline: true` — the `/design` artboard step between spec and build).
+   A research preview, so every failure here is ⚠️, never ❌: the design brief still exists on disk
+   at `specs/design/<feature_id>.md` and can be carried to the design tool by hand, which is what
+   every install did before this flag. Report:
+   - **Claude Code version** ≥ 2.1.234 — `/design` ships as a skill and is simply absent below it.
+     Older CLI ⇒ say so and name `npm i -g cohorte@latest`'s sibling, `claude update`.
+   - **The `/design` skill resolves in this session** — absent ⇒ the preview is off for this account
+     or plan (Pro/Max/Team/Enterprise are the eligible ones), not a cohorte defect.
+   - **`design.enabled` is true and `provider` is `claude-design`** — `inline` on top of a `figma` or
+     `none` provider is a profile contradiction; name it and point at `/cohorte-update-pipeline`.
+   - **Artboards are not persisted for you.** State it every run, unconditionally, even when all
+     three checks pass: the preview hands designs to the build step but does not save them, so an
+     artboard nobody exported dies with the session. This is the single thing most likely to lose
+     work, and it is not detectable after the fact.
+   One summary line: `inline design: available (preview — export artboards yourself)` or
+   `inline design: unavailable (<first failing prerequisite>) — design brief on disk, carry it over by hand`.
+<!-- cohorte:endif -->
 <!-- cohorte:else -->
 8. **Preflight wiring.** `<core>/pipeline/scripts/preflight.sh` is executable and
    `gate-config.json` carries the `preflight` block — mismatch ⇒ regenerate from the profile.

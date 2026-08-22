@@ -6,7 +6,8 @@
 // Shape (SCHEMA.md §Workflows): profile via profile-reader (phase 0), the
 // mechanical gates staged to disk by one haiku agent, then ONE auditor per
 // domain (each surface + `shared`) running concurrently — the runtime caps
-// concurrency at ~16, extra domains queue — and a merge phase that writes the
+// concurrency at 20 (CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS since 2026-08), extra
+// domains queue — and a merge phase that writes the
 // prioritized specs/refactor-backlog.md. Only the summary comes back.
 
 export const meta = {
@@ -16,7 +17,7 @@ export const meta = {
   phases: [
     { title: 'Profile', detail: 'PIPELINE.md → JSON via profile-reader', model: 'haiku' },
     { title: 'Gates', detail: 'format/lint/typecheck/tests → specs/reports/audit-gates.txt', model: 'haiku' },
-    { title: 'Audit', detail: 'one review-in-audit-mode agent per domain (concurrent, runtime-capped ~16)' },
+    { title: 'Audit', detail: 'one review-in-audit-mode agent per domain (concurrent, runtime-capped 20)' },
     { title: 'Backlog', detail: 'merge + write specs/refactor-backlog.md', model: 'haiku' },
   ],
 }
@@ -168,7 +169,9 @@ log(gatesCovered
 
 // ── Phase 2 — one auditor per domain, concurrent ─────────────────────────────
 // Domains = every surface + `shared` (contract package + anything outside the
-// surface trees). The runtime caps concurrent agents (~16); more domains queue.
+// surface trees). The runtime caps concurrent agents at 20 by default; more domains
+// queue. Raising CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS raises the ceiling, it does not
+// change this script — the queue is the runtime's, and a queued domain is not a lost one.
 phase('Audit')
 const domains = surfaces.map(s => ({ key: s.key, path: s.path }))
   .concat([{ key: 'shared', path: (profile.contract && profile.contract.path) || '(everything outside the surface trees)' }])
