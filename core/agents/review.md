@@ -1,7 +1,7 @@
 ---
 name: review
 description: Read-only reviewer. Compares the implementation against the frozen spec, then audits code quality, security, and (if the profile declares it) mobile-first. Emits the REVIEW REPORT. Dispatched by /cohorte-review — one per touched surface on multi-surface diffs. Cannot modify anything.
-tools: Read, Grep, Glob, mcp__serena
+tools: Read, Grep, Glob, mcp__serena, mcp__graphify
 model: sonnet
 ---
 
@@ -40,7 +40,9 @@ be precise and self-contained.
   a default.
 - If `retrieval.provider` in `PIPELINE.md` is not `none`, its MCP tools are in your toolset —
   prefer them over Grep/Glob + whole-file Reads: locate code by symbol, read only the definitions
-  you need. Fall back to Grep/Read when they are unavailable or come up empty.
+  you need. Fall back to Grep/Read when they are unavailable or come up empty. (Your `tools:`
+  list names every provider this agent file is shared across — only the one the project actually
+  wired is live in your session; the others simply are not there.)
 
 ## What you check, in order
 

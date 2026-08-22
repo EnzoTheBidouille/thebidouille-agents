@@ -112,6 +112,12 @@ console.log("gate.py — Bash command gating");
     run(bash("node   ace    migration:run"), at()).decision === "ask");
   check("deny wins over ask on the same segment",
     run(bash("node ace migration:fresh"), at()).decision === "deny");
+  // Deny must win ACROSS segments too: with segment-order scanning, the benign ask
+  // surfaced first and the human's one confirm ran the hard-denied command behind it.
+  check("deny in a LATER segment wins over an earlier ask segment",
+    run(bash("node ace migration:run && node ace migration:fresh"), at()).decision === "deny");
+  check("deny in a later segment wins over an earlier branch-gated ask",
+    run(bash("git commit -m x && node ace db:wipe"), at()).decision === "deny");
   // Matching is substring-on-the-whole-pattern, so a partial overlap is NOT a
   // match — `migration:run` alone does not trigger `node ace migration:run`.
   check("a partial overlap of a pattern does not gate",

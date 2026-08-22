@@ -106,7 +106,13 @@ function checkAgents(profile, projectRoot, layout) {
   let files = [];
   try { files = fs.readdirSync(agentsDir).filter(f => f.endsWith('.md')).map(f => f.slice(0, -3)); }
   catch { /* dir absent → handled by `missing` */ }
-  const orphans = files.filter(f => !FIXED_AGENTS.has(f) && !surfaceAgents.includes(f));
+  // Orphan detection only makes sense against a PROJECT agents dir. A global install's
+  // agents dir (~/.claude/agents) is the user's shared Claude Code space — their personal
+  // agents and other cohorte projects' surface agents live there legitimately, and
+  // flagging them sent humans deleting files that were not this project's to judge.
+  const orphans = layout.scope === 'global'
+    ? []
+    : files.filter(f => !FIXED_AGENTS.has(f) && !surfaceAgents.includes(f));
 
   if (missing.length) {
     return mk('agents', 'Surfaces ↔ agents', 'bad',
@@ -376,7 +382,7 @@ function checkWorkflows(projectRoot, globalDir, installMode, all) {
   }
   const dir = path.join(cc.core, 'workflows');
   const agentsDir = cc.agents;
-  const scripts = ['review.js', 'audit.js', 'refactor.js'];
+  const scripts = ['review.js', 'audit.js', 'refactor.js', 'loop.js'];
   const missing = scripts.filter(s => !exists(path.join(dir, s)));
   if (missing.length === scripts.length) {
     return mk('workflows', 'Workflows', 'warn',

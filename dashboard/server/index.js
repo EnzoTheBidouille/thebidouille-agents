@@ -116,7 +116,12 @@ function runAction(req, res, body, { pkgRoot }) {
   // target — so an unchecked path silently creates a pipeline tree in a directory
   // that does not exist (a typo in the fleet registry lands a phantom project on
   // disk). The other two runners already validate; this one never did.
-  if (scope !== 'global' && project && !fs.existsSync(path.resolve(project))) {
+  if (scope !== 'global' && !project) {
+    // Without a target, cli.js would run against its own cwd — the cohorte package
+    // checkout itself, which is never the project the caller meant.
+    return sendJson(res, 400, { error: 'a project path is required for a project-scope action' });
+  }
+  if (scope !== 'global' && !fs.existsSync(path.resolve(project))) {
     return sendJson(res, 400, { error: `project path not found: ${project}` });
   }
 

@@ -56,13 +56,17 @@ for (const f of readdirSync(join(root, "core/commands"))) {
 }
 
 // ── fixed agents ────────────────────────────────────────────────────────────
-// Every non-template agent needs name/tools/model, and must be shipped by
-// both installers (a new agent that install.sh doesn't copy never reaches
-// a global install — the exact bug that motivated this check).
+// Every non-template agent needs name/tools/model, and every one must be
+// ASSERTED by the ci.yml install dry-run (a new agent the CLI's copy rules miss
+// would otherwise never reach an install and nothing would notice — the exact
+// bug that motivated this check). The old form grepped install.sh/install.ps1
+// for copy commands, but those scripts have been thin delegators to bin/cli.js
+// since 2.2.0 — the text being matched was unreachable dead code, so the check
+// passed vacuously. CI postconditions test the copy that actually runs.
 const AGENT_MODEL = { review: "sonnet", release: "haiku",
   "profile-reader": "haiku" };
-const installSh = read("install.sh");
-const installPs1 = read("install.ps1");
+const ciYmlText = existsSync(join(root, ".github/workflows/ci.yml"))
+  ? read(".github/workflows/ci.yml") : "";
 
 for (const f of readdirSync(join(root, "core/agents"))) {
   const path = `core/agents/${f}`;
@@ -84,10 +88,8 @@ for (const f of readdirSync(join(root, "core/agents"))) {
     fail(path, `frontmatter must pin \`model: ${want}\``);
   if (text.includes("<SURFACE_"))
     fail(path, "unrendered <SURFACE_*> placeholder in a non-template agent");
-  if (!installSh.includes(`core/agents/${f}`))
-    fail("install.sh", `does not copy core/agents/${f} (copy_fixed_agents)`);
-  if (!installPs1.includes(`core\\agents\\${f}`))
-    fail("install.ps1", `does not copy core\\agents\\${f} (Copy-FixedAgents)`);
+  if (ciYmlText && !ciYmlText.includes(`agents/${f}`))
+    fail(".github/workflows/ci.yml", `install dry-run never asserts .claude/agents/${f} — a fixed agent the CLI's copy rules miss would ship silently`);
 }
 
 // ── cross-references ────────────────────────────────────────────────────────
@@ -145,7 +147,9 @@ const walk = (dir) => readdirSync(join(root, dir), { withFileTypes: true }).flat
 for (const dir of ["core/commands", "core/agents", "core/templates", "core/workflows"])
   for (const rel of walk(dir)) {
     if (!/\.(md|js)$/.test(rel) || rel === TELEMETRY_SCRUBBER) continue;
-    if (NO_TELEMETRY.test(read(rel)))
+    // Collapse whitespace first: prose wraps mid-phrase, and "usage\n  ping" sat in a
+    // command file for two releases because this regex only saw one line at a time.
+    if (NO_TELEMETRY.test(read(rel).replace(/\s+/g, " ")))
       fail(rel, "mentions telemetry — it was removed in 2.3.0; nothing may ping or ask for consent");
   }
 // …and the exempt file may only REMOVE it: naming a send/ping/consent path there is still a bug.
@@ -173,22 +177,28 @@ for (const c of KANBAN_STAGES) {
     fail(path, "no instruction to run the resolver before concluding there is no board");
 }
 
-// ── shipped scripts ─────────────────────────────────────────────────────────
-// Every scripts/*.sh must be copied by BOTH shell installers. Callers chain these
-// with `|| true`, so one an installer forgets is a silent no-op forever — no kanban
-// card moves, no error. CI is the only place this is loud.
-// The third installer, bin/cli.js (what the `cohorte` CLI runs), copies by rule rather
-// than by name, so grepping for filenames can't see it — ci.yml dry-runs it into a
-// scratch HOME and asserts the same postconditions instead. Both are needed: this
-// check catches a forgotten name, that one catches a drifted rule.
+// ── shipped scripts + thin installers ───────────────────────────────────────
+// Every shipped scripts/*.sh must be asserted by the ci.yml install dry-run —
+// bin/cli.js copies by rule rather than by name, so only a postcondition on the
+// copy that actually runs can catch a rule that misses a new script. Callers
+// chain these with `|| true`, so a missing one is a silent no-op forever.
 // A `<name>.sh` with a `<name>.sh.template` sibling is a locally-rendered artifact
 // (this repo dogfoods its own /cohorte-init-pipeline), not a core asset — skip those.
-const installers = { "install.sh": read("install.sh"), "install.ps1": read("install.ps1") };
 const shipped = readdirSync(join(root, "scripts"));
 for (const f of shipped.filter((f) => f.endsWith(".sh") && !shipped.includes(`${f}.template`)))
-  for (const [name, src] of Object.entries(installers))
-    if (!src.includes(`scripts/${f}`) && !src.includes(`scripts\\${f}`))
-      fail(name, `never copies scripts/${f} into pipeline/scripts/ (silent no-op at runtime)`);
+  if (ciYmlText && !ciYmlText.includes(`pipeline/scripts/${f}`))
+    fail(".github/workflows/ci.yml", `install dry-run never asserts pipeline/scripts/${f} (a copy rule that misses it is a silent no-op at runtime)`);
+// The shell installers are THIN DELEGATORS to bin/cli.js — their legacy copy-verbatim
+// path was unreachable dead code from 2.2.0 (removed in 2.7.0), and its text was what
+// this file's copy checks used to vacuously match. Pin the shape: both must hand off
+// to the CLI and neither may grow its own copy logic back.
+for (const [name, marker] of [["install.sh", "cp -R \"$src/core"], ["install.ps1", "Copy-Tree"]]) {
+  const text = read(name);
+  if (!text.includes("bin/cli.js") && !text.includes("bin\\cli.js"))
+    fail(name, "no longer delegates to bin/cli.js — the only renderer of runtime-neutral sources");
+  if (text.includes(marker))
+    fail(name, "carries its own core-copy logic again — installs must go through bin/cli.js (no shell renderer exists)");
+}
 
 // ── workflow scripts ────────────────────────────────────────────────────────
 // core/workflows/*.js run inside the Claude Code Workflow runtime: an async
@@ -223,12 +233,36 @@ else for (const f of readdirSync(workflowsDir)) {
     fail(path, `does not parse as a workflow body: ${e.message}`);
   }
 }
-// Both shell installers must copy the workflows dir (bin/cli.js copies by rule,
-// covered by the ci.yml dry-run).
-if (!installSh.includes("core/workflows"))
-  fail("install.sh", "does not copy core/workflows (copy_core)");
-if (!installPs1.includes("core\\workflows"))
-  fail("install.ps1", "does not copy core\\workflows (Copy-Core)");
+// Workflow meta.names and command names share one mental namespace — both are the
+// "/cohorte-…" way a human asks for a phase. A meta.name that MATCHES a
+// core/commands/<name>.md is a declared variant pair (same phase, two execution paths —
+// review/audit/refactor, on purpose). A meta.name matching neither a command nor the
+// deliberate command-less list below is a typo'd variant: the human asks for "the
+// review workflow", the lead resolves the name, and a mismatched name runs nothing.
+// cohorte-loop is command-less BY DECISION (SCHEMA.md §Workflows): when the Workflow
+// runtime is unavailable it must refuse explicitly, never degrade to a conversational
+// loop — so a core/commands/cohorte-loop.md appearing later is a regression, not an
+// addition, and the check below this one pins that too.
+const COMMANDLESS = ["cohorte-loop"];
+if (existsSync(workflowsDir)) for (const f of readdirSync(workflowsDir)) {
+  if (!f.endsWith(".js")) continue;
+  const path = `core/workflows/${f}`;
+  const m = read(path).match(/name:\s*'([^']+)'/);
+  if (!m) { fail(path, "meta has no parseable `name: '…'`"); continue; }
+  const name = m[1];
+  if (!name.startsWith(PREFIX))
+    fail(path, `meta.name '${name}' lacks the \`${PREFIX}\` prefix`);
+  else if (!existsSync(join(root, "core/commands", `${name}.md`)) && !COMMANDLESS.includes(name))
+    fail(path, `meta.name '${name}' matches no core/commands/${name}.md and is not in the ` +
+      `deliberate command-less list — a variant pair must share the name exactly, or the ` +
+      `workflow-only decision must be recorded in COMMANDLESS`);
+}
+if (existsSync(join(root, "core/commands/cohorte-loop.md")))
+  fail("core/commands/cohorte-loop.md", "must not exist — /cohorte-loop is workflow-only " +
+    "(no conversational fallback, by decision; see core/workflows/loop.js header)");
+
+// The workflows dir reaching installs is covered per-file by the ci.yml dry-run
+// assertions checked just below (the shell installers delegate to bin/cli.js).
 
 // A new workflow script must also be KNOWN to the things that check for it, or it
 // ships and nothing notices when an installer stops copying it. This check exists
@@ -286,11 +320,10 @@ const pkg = JSON.parse(read("package.json"));
 for (const negation of ["!core/hooks/__pycache__", "!**/*.pyc"])
   if (!(pkg.files || []).includes(negation))
     fail("package.json", `\`files\` must carry the ${negation} negation (.npmignore cannot do this)`);
-for (const [name, src] of Object.entries(installers))
-  if (!src.includes("__pycache__"))
-    fail(name, "never scrubs hooks/__pycache__ — cp -R would carry it into the user's .claude");
 if (!read("bin/cli.js").includes("__pycache__"))
   fail("bin/cli.js", "copyCore() never excludes __pycache__ from the hooks copy");
+if (ciYmlText && !ciYmlText.includes("hooks/__pycache__"))
+  fail(".github/workflows/ci.yml", "install dry-run never asserts hooks/__pycache__ is absent — a compiled cache would ride into the user's .claude unnoticed");
 
 // ── report ──────────────────────────────────────────────────────────────────
 if (errors.length) {

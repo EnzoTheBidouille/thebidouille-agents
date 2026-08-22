@@ -43,6 +43,9 @@ for cmd in "$@"; do
     exit 1
   fi
 done
+# All-empty arguments verified nothing — stamping green here would gate reviews on a
+# check that never ran. Same failure as zero arguments, and the same exit.
+[ "$n" -gt 0 ] || { echo "preflight: every command argument was empty — nothing was verified" >&2; exit 2; }
 
 # Stamp for the gate.py phase gate: epoch + HEAD sha of the checkout we verified.
 # The stamp MUST land where gate.py reads it: <main checkout>/.claude. CLAUDE_PROJECT_DIR
@@ -75,8 +78,13 @@ if [ -n "$tmpidx" ]; then
     # same window or they compute different trees for the same content. `date -d` is GNU and
     # `date -v` is BSD — try both, and if neither exists just skip the touch (the digest is
     # still correct for anything not edited in the last few seconds).
-    stamp=$(date -u -d '5 seconds ago' +%Y%m%d%H%M.%S 2>/dev/null \
-         || date -u -v-5S +%Y%m%d%H%M.%S 2>/dev/null || echo "")
+    # LOCAL time on purpose: `touch -t` interprets its stamp as local time, so a
+    # UTC-formatted stamp future-dates the index anywhere west of UTC — which makes
+    # git trust the stat cache of files edited THIS second, the exact race the
+    # backdate exists to prevent. (gate.py's side uses os.utime with an epoch, which
+    # has no timezone to get wrong.)
+    stamp=$(date -d '5 seconds ago' +%Y%m%d%H%M.%S 2>/dev/null \
+         || date -v-5S +%Y%m%d%H%M.%S 2>/dev/null || echo "")
     [ -n "$stamp" ] && touch -t "$stamp" "$tmpidx" 2>/dev/null || true
   else
     rm -f "$tmpidx"                       # a 0-byte index is a corrupt index

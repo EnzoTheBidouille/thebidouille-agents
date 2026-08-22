@@ -70,9 +70,41 @@ are disjoint by construction), each followed by a per-domain verification (gates
 `file:line` check) and **one bounded retry** round. Cleared items are ticked off the backlog; the
 leftovers return.
 
+## `loop.js` — one feature, unattended
+
+Ask: *"run the loop workflow for `<id>`"* (args `{feature, maxRounds?: 1..10}`, default 5).
+Build → review → [fix → review]* for one feature, no human at the keyboard, resumable by
+re-invoking. Unlike the other three, `/cohorte-loop` has **no conversational command at all** —
+without the Workflow runtime it refuses explicitly instead of degrading to a lead re-reasoning
+the fan-out every round at session-model prices.
+
+The human's decisions happen *before* the loop, and it verifies them rather than working
+around them: `/cohorte-spec` froze the spec; `/cohorte-build` ran once (§1.5 reconciled the
+surfaces, §2 authored the contract — lead-only — and §1.6 wrote `readiness.json`). The loop
+aborts, naming the gap, on: a missing/stale/`NOT-READY` readiness verdict, a missing contract,
+a surface the profile doesn't own, an unreviewed surface (a dead reviewer's zero findings must
+never read as clean), implementers dead after their one retry, the same blocking findings two
+rounds running (treading water — the fix rounds aren't converging), `maxRounds` exhausted, or
+a blocking finding on the contract file itself (a loop that rewrites its own contract between
+rounds has no frozen contract). A fresh `build.json` with no dead surfaces skips the build
+phase — re-entering after a conversational `/cohorte-build` never rebuilds finished work.
+
+On zero blocking findings it exits `ship`, relaying the review's `next` line — which tells you
+whether the freshness stamp landed (all leftovers LOW) or `/cohorte-ship` still needs a
+`/cohorte-fix` pass for surviving HIGH/MEDIUM findings. Deferred findings never cost a round;
+they ride to `specs/refactor-backlog.md` as always. Round history and the outcome live in
+`specs/reports/<id>.loop.json`.
+
+**Unattended means unattended:** workflow subagents run in `acceptEdits` regardless of your
+session mode, so for the whole run `hooks/gate.py` is the only brake on file edits — and in
+`bypassPermissions` its asks become hard denies. Know that before you start a ten-round run
+and walk away.
+
 ## Why not workflow-ize everything?
 
 `/cohorte-init-pipeline`, `/cohorte-brainstorm`, and `/cohorte-spec` are interviews — their value *is* the back-and-forth,
 and a workflow cannot ask. `/cohorte-build` is already a single parallel dispatch; `/cohorte-ship` is the human
-gate. A script would add nothing to those; the four scripts cover exactly the phases where
+gate. A script would add nothing to those — and `loop.js` does not change it: the loop
+*consumes* build's outputs (readiness verdict, contract, `build.json`), it never authors a
+contract or reconciles a surface. The four scripts cover exactly the phases where
 deterministic fan-out, cross-checking, and looping pay.

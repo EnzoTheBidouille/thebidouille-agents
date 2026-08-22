@@ -174,7 +174,7 @@ const profile = unwrapProfile(await agent(
   { agentType: 'profile-reader', label: 'profile', schema: PROFILE, effort: 'low' },
 ))
 if (!profile || profile.error) {
-  return { verdict: 'ABORTED', reason: `profile unreadable: ${(profile && profile.error) || 'profile-reader returned nothing'}` }
+  return { verdict: 'ABORTED', aborted: 'profile', reason: `profile unreadable: ${(profile && profile.error) || 'profile-reader returned nothing'}` }
 }
 const cmds = profile.commands || {}
 const base = (profile.vcs && profile.vcs.default_branch) || 'main'
@@ -183,7 +183,7 @@ const surfaces = Array.isArray(profile.surfaces) ? profile.surfaces : []
 // guard compares against `surfaces` — an empty list makes them all vacuously
 // pass. Fail loudly here instead of finishing with nothing done.
 if (!surfaces.length) {
-  return { verdict: 'ABORTED', reason: 'profile has no surfaces — nothing would be reviewed. the `yaml pipeline-profile` block in PIPELINE.md is empty or unparseable, or the profile-reader mis-returned; run /cohorte-doctor' }
+  return { verdict: 'ABORTED', aborted: 'profile', reason: 'profile has no surfaces — nothing would be reviewed. the `yaml pipeline-profile` block in PIPELINE.md is empty or unparseable, or the profile-reader mis-returned; run /cohorte-doctor' }
 }
 const quiet = (q, full) => (q && !String(q).startsWith('<') ? q : full ? `${full} 2>&1 | tail -40` : '')
 const checks = [cmds.typecheck, quiet(cmds.lint_quiet, cmds.lint), quiet(cmds.test_quiet, cmds.test)]
@@ -197,12 +197,16 @@ const pre = await agent(
   checks.map(c => JSON.stringify(c)).join(' ') + '\n' +
   '(<core> = .claude if .claude/pipeline/scripts/preflight.sh exists, else ~/.claude — probe with test -x. ' +
   'Script absent on both: run the quoted commands yourself, each appended to the same report file, stopping at the first failure.) ' +
-  'Return pass=true only on a fully green run. On failure set pass=false and put the raw last 40 lines of the report in `tail` — verbatim, no summarizing.',
+  'Return pass=true only on a fully green run. On failure set pass=false, put the raw last 40 lines of the report ' +
+  'in `tail` — verbatim, no summarizing — and in the same Bash call write the degraded machine verdict the ' +
+  `conversational /cohorte-review §0 writes, so an automated driver gets a diagnosis rather than silence: ` +
+  `printf '{"id":"${feature}","phase":"review","ts":"%s","aborted":"preflight","verdict":"BLOCK","blocking":null}' ` +
+  `"$(date -u +%Y-%m-%dT%H:%M:%SZ)" > specs/reports/${feature}.verdict.json`,
   { model: 'haiku', label: 'preflight', schema: PREFLIGHT, effort: 'low' },
 )
 if (!pre || !pre.pass) {
   return {
-    verdict: 'ABORTED',
+    verdict: 'ABORTED', aborted: 'preflight',
     reason: 'preflight red — fix the mechanical failures (or run /cohorte-fix) before any review; no reviewer was spawned',
     failures: (pre && pre.tail) || 'preflight agent returned nothing',
   }
@@ -224,13 +228,34 @@ const staged = await agent(
 // feature nobody had looked at. Distinguish them.
 if (!staged) {
   return {
-    verdict: 'ABORTED',
+    verdict: 'ABORTED', aborted: 'stage-diff',
     reason: 'the diff-staging agent died — no reviewer was spawned and nothing was reviewed',
     next: `re-run the review workflow, or /cohorte-review ${feature} conversationally`,
   }
 }
 const touched = staged.surfaces || []
-if (!touched.length) return { verdict: 'SHIP', reason: `no diff against ${base} — nothing to review`, findings: 0 }
+if (!touched.length) {
+  // Nothing was reviewed, so nothing was certified: no DoD tick, no freshness stamp.
+  // `next` must say so — a driver relaying a bare "/cohorte-ship" here would point at
+  // a gate that (rightly) refuses. And verdict.json is written on EVERY run
+  // (cohorte-review.md §3) — leaving last round's REVISE on disk here would hand any
+  // driver reading the file a stale verdict.
+  await agent(
+    `Write EXACTLY this to specs/reports/${feature}.verdict.json (overwrite), substituting <ISO now> ` +
+    'with `date -u +%Y-%m-%dT%H:%M:%SZ`, then return the single word done:\n' +
+    JSON.stringify({
+      id: feature, phase: 'review', ts: '<ISO now>', verdict: 'SHIP', findings: 0, blocking: 0,
+      security: 0, deferred: 0, unreviewed: [], severity: { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 },
+      surfaces: {}, blocking_items: [], fingerprint: '',
+    }),
+    { model: 'haiku', label: 'stage-verdict', effort: 'low' },
+  )
+  return {
+    verdict: 'SHIP', reason: `no diff against ${base} — nothing to review`,
+    findings: 0, blocking: 0, blockingItems: [], deferred: 0, unreviewedSurfaces: [],
+    next: `nothing to ship: the diff against ${base} is empty, so no review ran and no freshness stamp was written — check the branch/base (was the feature actually built here?)`,
+  }
+}
 log(`Touched surfaces: ${touched.map(s => s.key).join(', ')}`)
 
 // ── Phases 3+4 — review each surface, cross-check its hard findings ─────────
@@ -287,6 +312,17 @@ const refuted = results.flatMap(r => r.refuted.map(f => ({ ...f, surface: r.key 
 const deferredAll = results.flatMap(r => (r.deferred || []).map(f => ({ ...f, surface: r.key })))
 const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }
 for (const f of kept) counts[f.severity] = (counts[f.severity] || 0) + 1
+// blocking = CRITICAL + security findings, each counted once — the conversational
+// /cohorte-review §3's contract restated as a number, so blocking == 0 ⟺ verdict SHIP.
+// blocking_items carry the finding's IDENTITY, not its wording: surface | file without
+// `:line` (a fix that inserts lines shifts every line below it — a line-bearing identity
+// would change every pass and drift detection would never fire) | the problem's first 8
+// words, lowercased, runs of non-alphanumerics collapsed. Sorted, so two rounds with the
+// same findings compare equal however the reviewers ordered them.
+const blockingFindings = kept.filter(f => f.severity === 'CRITICAL' || f.kind === 'security')
+const normProblem = p => String(p).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').slice(0, 8).join(' ')
+const blockingItems = [...new Set(blockingFindings.map(f =>
+  `${f.surface}|${String(f.file).replace(/:\d+$/, '')}|${normProblem(f.problem)}`))].sort()
 // Verdict from the findings that SURVIVED the cross-check (a refuted CRITICAL
 // must not force a fix loop): security ⇒ BLOCK, CRITICAL ⇒ REVISE, else SHIP —
 // but never SHIP while a surface went unreviewed (absence of evidence, not
@@ -318,15 +354,46 @@ const reportBody = [
   ...(refuted.length ? ['', '## Refuted by cross-check (no action needed)', '',
     refuted.map(f => `- ${f.file}:${f.line} · ${f.problem} — refuted: ${f.reason}`).join('\n')] : []),
 ].join('\n')
+// The machine-readable verdict the conversational /cohorte-review §3 guarantees — the
+// ONLY contract between the pipeline and an automated driver (the loop workflow), which
+// parses no prose. Composed HERE so the staging agent substitutes two tokens and can
+// invent nothing; the sha256 fingerprint is computed in its Bash (scripts have no crypto).
+const verdictJson = JSON.stringify({
+  id: feature, phase: 'review', ts: '<ISO now>', verdict,
+  findings: kept.length, blocking: blockingFindings.length,
+  security: kept.filter(f => f.kind === 'security').length,
+  deferred: deferredAll.length, unreviewed,
+  severity: counts,
+  surfaces: Object.fromEntries(results.map(r => [r.key, {
+    verdict: r.report.verdict, findings: r.kept.length,
+    blocking: r.kept.filter(f => f.severity === 'CRITICAL' || f.kind === 'security').length,
+  }])),
+  blocking_items: blockingItems, fingerprint: '<FP>',
+})
 const staging = await agent(
   `Stage a cohorte review report and its metrics, mechanically:\n` +
   `1. Write EXACTLY this content to specs/reports/${feature}.md (overwrite):\n<<<REPORT\n${reportBody}\nREPORT\n` +
-  `2. Append one line to $(dirname "$(git rev-parse --git-common-dir)")/.claude/pipeline-metrics.jsonl: ` +
-  `{"ts":"<ISO now>","feature":"${feature}","phase":"review","seconds":0,"surfaces":{${results.map(r => `"${r.key}":"${verdict}:${r.kept.length}"`).join(',')}}}\n` +
+  `2. Write EXACTLY this to specs/reports/${feature}.verdict.json (overwrite), substituting <ISO now> with ` +
+  '`date -u +%Y-%m-%dT%H:%M:%SZ` and <FP> with the fingerprint — computed in Bash, never by hand: ' +
+  (blockingItems.length
+    // POSIX-escape embedded quotes ('\'') rather than stripping them: a stripped quote
+    // makes the fingerprint disagree with the blocking_items in the same file, and with
+    // a conversational re-run computing it per the §3 contract.
+    ? `printf '%s\\n' ${blockingItems.map(i => `'${i.replace(/'/g, "'\\''")}'`).join(' ')} | LC_ALL=C sort | sha256sum | cut -c1-16 ` +
+      '(`shasum -a 256` then first 16 hex chars where there is no sha256sum):\n'
+    : 'the blocking list is empty, so <FP> is the empty string "":\n') +
+  `${verdictJson}\n` +
+  // Per-surface verdicts (not the merged one stamped on every row — one BLOCK used to
+  // mark ALL surfaces failed on the dashboard), and dead reviewers logged as "dead"
+  // per SCHEMA.md §Dead agents — an incomplete batch is the batch worth recording.
+  `3. Append one line to $(dirname "$(git rev-parse --git-common-dir)")/.claude/pipeline-metrics.jsonl: ` +
+  `{"ts":"<ISO now>","feature":"${feature}","phase":"review","seconds":0,"surfaces":{${
+    results.map(r => `"${r.key}":"${r.report.verdict}:${r.kept.length}"`)
+      .concat(unreviewed.map(k => `"${k}":"dead"`)).join(',')}}}\n` +
   // Deferred findings must land in the backlog on EVERY verdict — parked only on a
   // SHIP is parked nowhere the rest of the time, which is the leak this closes.
   (deferredAll.length
-    ? `3. Route the deferred findings to specs/refactor-backlog.md (create it if absent): for each line below, ` +
+    ? `4. Route the deferred findings to specs/refactor-backlog.md (create it if absent): for each line below, ` +
       `append it under the \`## <domain>\` heading named in its prefix (create that heading if absent) — with \`>>\`, ` +
       `never by rewriting the file, and skip any whose file path + first words already appear there (grep -F first, ` +
       `they may be left from a prior round or an /cohorte-audit):\n` +
@@ -339,10 +406,10 @@ const staging = await agent(
   // HIGH/MEDIUM ones — certifying those for /cohorte-ship would ship known defects. A dead
   // reviewer already forced the verdict off SHIP, so `clean` covers that too.
   (clean
-    ? `4. Stamp the freshness gate in specs/${feature}.md's front-matter, exactly as the conversational /cohorte-review §3 does ` +
+    ? `5. Stamp the freshness gate in specs/${feature}.md's front-matter, exactly as the conversational /cohorte-review §3 does ` +
       `(so /cohorte-ship can prove the reviewed code is what ships): BASE=$(git merge-base ${base} HEAD); set reviewed_base: $BASE and ` +
-      `reviewed_digest: $(git diff $BASE -- . ':(exclude)specs/' | sha256sum | cut -c1-16). ` +
-      '5. Tick the spec DoD boxes this run verified (spec conformance + copy language — review SHIP; tests/lint/typecheck — green preflight); leave the rest unticked.\n'
+      `reviewed_digest: $(git diff $BASE -- . ':(exclude)specs/' | sha256sum | cut -c1-16) — shasum -a 256, first 16 hex, where sha256sum is absent (macOS). ` +
+      '6. Tick the spec DoD boxes this run verified (spec conformance + copy language — review SHIP; tests/lint/typecheck — green preflight); leave the rest unticked.\n'
     : '') +
   'Return the single word: done.',
   { model: 'haiku', label: 'stage-report', effort: 'low' },
@@ -357,6 +424,8 @@ const staged_ok = staging != null && /done/i.test(String(staging))
 return {
   verdict,
   counts,
+  blocking: blockingFindings.length, // CRITICAL + security, each once — 0 ⟺ SHIP; what a driver reduces on
+  blockingItems,                     // the sorted identity list behind verdict.json's fingerprint
   deferred: deferredAll.length,     // parked in the backlog for /cohorte-refactor — never blocking
   refutedByCrossCheck: refuted.length,
   reportStaged: staged_ok,

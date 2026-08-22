@@ -23,7 +23,8 @@ You are the **lead**. Ship feature **$ARGUMENTS**. This is the outward-facing ga
   verdict was REVISE/BLOCK, stop and say so.
 - **Freshness gate** — the reviewed code must be exactly what ships. If the spec front-matter carries
   `reviewed_base` + `reviewed_digest`, recompute
-  `git diff <reviewed_base> -- . ':(exclude)specs/' | sha256sum | cut -c1-16` and compare to
+  `git diff <reviewed_base> -- . ':(exclude)specs/' | sha256sum | cut -c1-16` (`shasum -a 256`
+  then the first 16 hex chars where there is no `sha256sum` — macOS) and compare to
   `reviewed_digest`. **Match** ⇒ source unchanged since the SHIP verdict, proceed. **Mismatch** ⇒ source
   (or the contract) was edited after review — the verdict is **stale**: stop and tell the human to re-run
   `/cohorte-review $ARGUMENTS` before shipping. Missing fields (spec predates the gate) ⇒ skip, don't block.

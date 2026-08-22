@@ -90,7 +90,7 @@ agents/       review · release · profile-reader (fixed agents)
 hooks/        gate.py
 templates/    handoff, review-feedback, spec, design-brief, pr-body, brainstorm-return,
               + steps/init-pipeline/ (the router's step files)
-workflows/    review.js · audit.js · refactor.js
+workflows/    review.js · audit.js · refactor.js · loop.js
 pipeline/     PIPELINE.template.md · SCHEMA.md · cohorte.config.template.yaml ·
               implementer.template.md · CHANGELOG.md · VERSION
   scripts/    preflight.sh · kanban-move.sh ·

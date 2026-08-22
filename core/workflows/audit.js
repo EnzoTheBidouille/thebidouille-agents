@@ -157,8 +157,15 @@ const gates = await agent(
   'the file and return each failure as file/line/kind/one-line summary, capped at 40 (set overflow for the rest).',
   { model: 'haiku', label: 'gates', schema: GATES, effort: 'low' },
 )
+// A dead gates agent is NOT "zero mechanical failures" — silence would read as the
+// cleanest possible inventory from a phase that never ran (SCHEMA.md §Dead agents).
+// The domain auditors still run (they read the staged gates file, which then simply
+// isn't there), but the run must say the mechanical sweep is uncovered.
+const gatesCovered = gates != null
 const mech = (gates && gates.failures) || []
-log(`Mechanical failures: ${mech.length}${gates && gates.overflow ? ` (+${gates.overflow} overflow)` : ''}`)
+log(gatesCovered
+  ? `Mechanical failures: ${mech.length}${gates.overflow ? ` (+${gates.overflow} overflow)` : ''}`
+  : 'the gates agent died — mechanical checks NOT covered this run')
 
 // ── Phase 2 — one auditor per domain, concurrent ─────────────────────────────
 // Domains = every surface + `shared` (contract package + anything outside the
@@ -195,6 +202,10 @@ if (deadDomains.length) {
   body.push('', `> ⚠ NOT audited (the auditor died): ${deadDomains.join(', ')} — absence of items below`,
     '> for those domains means "not looked at", not "clean". Re-run the audit for them.')
 }
+if (!gatesCovered) {
+  body.push('', '> ⚠ Mechanical gates NOT run (the gates agent died) — lint/typecheck/test failures',
+    '> are uncounted below. Re-run the audit for the mechanical sweep.')
+}
 let total = 0
 for (const d of perDomain) {
   const items = [...d.items].sort((a, b) => SEV[a.severity] - SEV[b.severity])
@@ -214,7 +225,8 @@ const backlogOk = written != null && /done/i.test(String(written))
 return {
   backlog: backlogOk ? 'specs/refactor-backlog.md' : '(NOT written — the backlog writer died)',
   notAudited: deadDomains,   // absence of findings here means "not looked at"
-  mechanicalFailures: mech.length,
+  mechanicalFailures: gatesCovered ? mech.length : null,  // null = gates agent died, NOT zero
+  gatesCovered,
   domains: Object.fromEntries(perDomain.map(d => [d.key, d.items.length + (d.overflow || 0)])),
   total,
   top: perDomain.flatMap(d => d.items.map(it => ({ ...it, domain: d.key })))

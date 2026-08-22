@@ -1,7 +1,7 @@
 # ~/.claude/cohorte.config.yaml — GLOBAL, user-scoped config for the Cohorte
 # pipeline capabilities. One machine, every project. NOT tied to any project's PIPELINE.md.
 #
-# Seeded once by the installer (npx cohorte install) and never clobbered on update. Wired
+# Seeded once by the installer (cohorte install) and never clobbered on update. Wired
 # interactively by /cohorte-init-pipeline (new project) and /cohorte-update-pipeline (existing project) —
 # you should never need to hand-edit it.
 #

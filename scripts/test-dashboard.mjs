@@ -184,7 +184,7 @@ console.log("doctor.js — the /cohorte-doctor port");
   writeFileSync(join(d, ".claude", "gate-config.json"), JSON.stringify(gate));
   writeFileSync(join(d, ".mcp.json"), JSON.stringify({ mcpServers: { serena: {} } }));
   mkdirSync(join(d, ".claude", "workflows"), { recursive: true });
-  for (const w of ["review.js", "audit.js", "refactor.js"]) {
+  for (const w of ["review.js", "audit.js", "refactor.js", "loop.js"]) {
     writeFileSync(join(d, ".claude", "workflows", w), "x");
   }
   writeFileSync(join(d, ".claude", "agents", "profile-reader.md"), "x");
@@ -470,6 +470,47 @@ console.log("doctor.js — a non-Claude runtime layout");
       surfaces: { api: "ok" } }) + "\n");
   check("metrics are read from the runtime's state dir",
     metrics({ projectRoot: d, globalDir: g }).batches === 1);
+}
+
+// ── runtime.js — stale absolute registry paths (a cloned/moved bundled core) ─
+// runtimes.json records install-time ABSOLUTE paths. A committed core cloned to
+// another machine (or a checkout simply moved) still carries the original paths;
+// taken verbatim, every check went red on a healthy install.
+console.log("runtime.js — registry paths survive a clone/move");
+{
+  const { layouts } = require(join(root, "dashboard/server/runtime.js"));
+  const d = scratch();
+  const core = join(d, ".claude");
+  mkdirSync(join(core, "pipeline"), { recursive: true });
+  const theirRoot = join("/Users", "somebody-else", "their-checkout");
+  writeFileSync(join(core, "pipeline", "runtimes.json"), JSON.stringify({
+    claude: {
+      label: "Claude Code", scope: "project", core_version: "9.9.9",
+      paths: {
+        core: join(theirRoot, ".claude"),
+        commands: join(theirRoot, ".claude", "commands"),
+        agents: join(theirRoot, ".claude", "agents"),
+        hooks_config: join(theirRoot, ".claude", "settings.json"),
+        state: ".claude",
+      },
+    },
+  }));
+  const [l] = layouts({ projectRoot: d, globalDir: join(d, "no-global") });
+  check("agents re-rooted onto the probed checkout",
+    l.agents === join(d, ".claude", "agents"), l.agents);
+  check("hooks config re-rooted too",
+    l.hooksConfig === join(d, ".claude", "settings.json"), l.hooksConfig);
+  // A path OUTSIDE the recorded project root (a genuine machine-local absolute,
+  // e.g. a global agents dir) must pass through untouched.
+  writeFileSync(join(core, "pipeline", "runtimes.json"), JSON.stringify({
+    claude: {
+      label: "Claude Code", scope: "project", core_version: "9.9.9",
+      paths: { core: join(theirRoot, ".claude"), agents: "/opt/shared-agents", state: ".claude" },
+    },
+  }));
+  const [l2] = layouts({ projectRoot: d, globalDir: join(d, "no-global") });
+  check("an absolute path outside the recorded root is untouched",
+    l2.agents === "/opt/shared-agents", l2.agents);
 }
 
 for (const d of tmps) { try { rmSync(d, { recursive: true, force: true }); } catch { /* best effort */ } }

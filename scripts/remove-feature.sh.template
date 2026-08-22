@@ -28,7 +28,9 @@ registry="$repo_root/.worktrees/slots.tsv"
 branch="__BRANCH_PREFIX__${id}"
 
 echo "→ removing worktree $worktree_dir"
-if git -C "$repo_root" worktree list | grep -q "$worktree_dir"; then
+# Porcelain + fixed-string + whole-line: the human-readable list matched any worktree
+# whose path merely CONTAINS this one (auth vs auth-2fa), and dots in the path were regex.
+if git -C "$repo_root" worktree list --porcelain | grep -Fxq "worktree $worktree_dir"; then
   git -C "$repo_root" worktree remove "$worktree_dir" "${@:3}"
 else
   echo "   (no such worktree registered — skipping)"

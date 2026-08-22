@@ -562,7 +562,20 @@ async function seedConfig() {
   // being told: `~/.claude` for Claude Code (unchanged — existing files stay authoritative),
   // `~/.cohorte` for every other runtime. The shipped scripts probe both, in that order, so
   // a human who drives one repo from two agents still has a single board and a single consent.
-  const cfg = adapter.expandHome(adapter.configPath(runtime));
+  //
+  // CLAUDE_CONFIG_DIR moves the whole `~/.claude` tree (globalDir already follows it), but
+  // adapter.configPath() speaks in literal `~/.claude/…` — expanding through HOME alone
+  // seeded a file at a path no reader probes (kanban-move.sh and the dashboard follow
+  // CLAUDE_CONFIG_DIR), missed a filled config there (re-seeding disabled defaults beside
+  // it — the exact two-file fork this function's comments forbid), and printed a banner
+  // path that did not exist. Re-root the claude-shaped path onto globalDir so the seed,
+  // the existing-file check, the banner and every reader agree on one file.
+  const homeClaude = path.join(os.homedir(), '.claude');
+  const rerootClaude = (p) =>
+    p === homeClaude || p.startsWith(homeClaude + path.sep)
+      ? path.join(globalDir, p.slice(homeClaude.length + 1) || '.')
+      : p;
+  const cfg = rerootClaude(adapter.expandHome(adapter.configPath(runtime)));
   fs.mkdirSync(path.dirname(cfg), { recursive: true });
   // Pre-rename names, newest first — read as a fallback so upgrades don't lose the config.
   const legacy = ['thebidouille.config.yaml']
@@ -571,7 +584,7 @@ async function seedConfig() {
   // A second runtime must not fork the config: two files means two boards and two consent
   // records, and the human edits whichever one they happen to open. The scripts read
   // `~/.cohorte` first, so seeding it here would SHADOW a filled `~/.claude` copy.
-  const claudeCfg = adapter.expandHome(adapter.configPath({ id: 'claude' }));
+  const claudeCfg = rerootClaude(adapter.expandHome(adapter.configPath({ id: 'claude' })));
   if (cfg !== claudeCfg && fs.existsSync(claudeCfg)) {
     console.log(`  · reusing your existing ${claudeCfg} (the scripts read it as a fallback)`);
     return;

@@ -44,11 +44,17 @@ else
 fi
 pr=""; title=""; project=""; profile="PIPELINE.md"
 while [ $# -gt 0 ]; do
+  # A flag with no value must exit 2 (usage) like every other usage error — a bare
+  # `shift 2` fails under set -e with exit 1, outside the 0/2/3 contract callers branch on.
   case "$1" in
-    --pr)      pr="${2-}";      shift 2 ;;
-    --title)   title="${2-}";   shift 2 ;;
-    --project) project="${2-}"; shift 2 ;;
-    --profile) profile="${2-}"; shift 2 ;;
+    --pr|--title|--project|--profile)
+      [ $# -ge 2 ] || { echo "error: $1 needs a value" >&2; echo "$usage" >&2; exit 2; } ;;
+  esac
+  case "$1" in
+    --pr)      pr="$2";      shift 2 ;;
+    --title)   title="$2";   shift 2 ;;
+    --project) project="$2"; shift 2 ;;
+    --profile) profile="$2"; shift 2 ;;
     *) echo "error: unknown flag $1" >&2; echo "$usage" >&2; exit 2 ;;
   esac
 done
@@ -246,7 +252,11 @@ ID="$id" COL="$col" PR="$pr" TITLE="${title:-$id}" awk '
     pr = ENVIRON["PR"]; title = ENVIRON["TITLE"]
     n = 0; card = ""; found = 0; colseen = 0; sn = 0; lastblank = 0
   }
-  { lines[++n] = $0 }
+  # Strip CR at capture: a CRLF board (Windows-synced vault) otherwise fails the
+  # `h == col` heading compare and exits 3 on a column that exists — while the
+  # config parser in this same script already strips \r. Emitting LF-only is fine
+  # (Obsidian reads both).
+  { sub(/\r$/, ""); lines[++n] = $0 }
   END {
     # pass 1: extract the FIRST card block tagged #id; mark every block for removal
     for (i = 1; i <= n; i++) {

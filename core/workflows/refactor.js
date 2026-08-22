@@ -30,18 +30,19 @@ export const meta = {
 const MIN_ITEMS = 5
 
 // The Workflow runtime hands `args` to a script verbatim, so a caller that passes a
-// JSON-ENCODED STRING instead of a real object gets that string back here. The old
-// `typeof args === 'string' ? args.trim()` then took the whole blob as the value — which
-// is how a report landed on disk named `specs/reports/{"feature": "x"}.md`, and how
-// maxRounds/smoke were silently dropped on the same run. Parse it back into the object
-// it was meant to be; a bare slug stays valid shorthand.
+// JSON-ENCODED STRING instead of a real object gets that string back here. Parse it
+// back into the object it was meant to be. A bare slug is shorthand for the DOMAIN in
+// this script — mapping it to {feature, target} (review.js's keys, once copy-pasted
+// here) left ARGS.domains undefined, which fell through to 'all': the shorthand
+// "backend" dispatched code-editing implementers on EVERY big domain, not the one
+// the caller named.
 const ARGS = (() => {
   if (typeof args === 'string') {
     const t = args.trim()
     if (t.startsWith('{')) {
       try { const o = JSON.parse(t); if (o && typeof o === 'object' && !Array.isArray(o)) return o } catch {}
     }
-    return { feature: t, target: t }
+    return { domains: [t] }
   }
   return args && typeof args === 'object' ? args : {}
 })()
@@ -187,19 +188,31 @@ const verifyDomain = async (d, implHandoff) => {
     { model: 'haiku', label: `verify:${d.key}`, phase: 'Verify', schema: VERIFY, effort: 'low' },
   )
   // One bounded retry: re-dispatch the implementer on what verification rejected.
+  // The re-verify covers ONLY the retried items, so round 1's cleared list is carried
+  // forward — overwriting it un-ticked every item the first pass verified, and the
+  // next /cohorte-refactor re-dispatched finished work.
   if (v && (v.remaining.length || !v.gatesGreen) && byKey[d.key]) {
-    const retryItems = v.remaining.length ? v.remaining : d.items
+    const cleared1 = v.cleared || []
+    // Never retry items round 1 already verified cleared: on a gates-red round with
+    // nothing remaining, retrying ALL items put the same lines in both `cleared` and
+    // `remaining` when the re-verifier died — ticked off the backlog AND reported open.
+    const retryItems = v.remaining.length ? v.remaining : d.items.filter(i => !cleared1.includes(i))
     log(`${d.key}: ${v.remaining.length} item(s) remaining${v.gatesGreen ? '' : ' + red gates'} — one retry round`)
     await agent(
       implementPrompt({ key: d.key, items: retryItems }) + (v.failures ? `\nGate failures to clear too:\n${v.failures}` : ''),
       { agentType: byKey[d.key].agent, label: `retry:${d.key}`, phase: 'Refactor' },
     )
-    v = await agent(
+    const v2 = await agent(
       `Re-verify domain ${d.key} after a retry round — same procedure as before (gates redirected to ` +
       `specs/reports/refactor-verify.${d.key}.txt, per-item file:line check, verbatim cleared/remaining lines).\n` +
       'Items:\n' + retryItems.join('\n'),
       { model: 'haiku', label: `reverify:${d.key}`, phase: 'Verify', schema: VERIFY, effort: 'low' },
     )
+    // A dead re-verifier loses only the RETRY round's claim — round 1's verified
+    // clears stay cleared; the retried items stay open (unverified ≠ cleared).
+    v = v2
+      ? { ...v2, cleared: [...new Set(cleared1.concat(v2.cleared || []))] }
+      : { cleared: cleared1, remaining: retryItems, gatesGreen: false, failures: 'verifier died on the retry round' }
   }
   return { key: d.key, ...(v || { cleared: [], remaining: d.items, gatesGreen: false, failures: 'verifier died' }) }
 }
