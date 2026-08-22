@@ -394,7 +394,9 @@ function checkWorkflows(projectRoot, globalDir, installMode, all) {
   }
   return mk('workflows', 'Workflows', 'ok',
     'scripts + profile-reader installed — opt-in per run; needs Claude Code ≥ 2.1.154 with ' +
-    'workflows enabled (run /cohorte-doctor in-session to check the live half)');
+    'workflows enabled (run /cohorte-doctor in-session to check the live half). Inline design ' +
+    '(design.inline) has its own, higher floor of ≥ 2.1.234 — it is a separate prerequisite and ' +
+    'does not gate this check either way');
 }
 
 function scanSpecs(projectRoot) {

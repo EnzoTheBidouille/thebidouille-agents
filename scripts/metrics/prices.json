@@ -7,9 +7,12 @@
     "TTL, 2x for 1h, read 0.1x) rather than restated per model, so a price change",
     "is a one-line edit. `fast` is the fast-mode premium (usage.speed === 'fast').",
     "Model lookup is longest-prefix, so dated ids (claude-haiku-4-5-20251001) hit",
-    "their base entry without needing a row of their own."
+    "their base entry without needing a row of their own.",
+    "Sonnet 5 is $2/$10: the introductory rate became the standard rate on 2026-08-20.",
+    "The $3/$15 increase once scheduled for 2026-09-01 was cancelled and must not",
+    "be reinstated. Sonnet 4.6 and earlier stay at $3/$15 — same tier, different price."
   ],
-  "updated": "2026-07-31",
+  "updated": "2026-08-22",
   "multipliers": {
     "cacheWrite5m": 1.25,
     "cacheWrite1h": 2.0,
@@ -31,7 +34,7 @@
     "claude-opus-4-7": { "input": 5, "output": 25 },
     "claude-opus-4-6": { "input": 5, "output": 25 },
     "claude-opus-4-5": { "input": 5, "output": 25 },
-    "claude-sonnet-5": { "input": 3, "output": 15 },
+    "claude-sonnet-5": { "input": 2, "output": 10 },
     "claude-sonnet-4-6": { "input": 3, "output": 15 },
     "claude-sonnet-4-5": { "input": 3, "output": 15 },
     "claude-haiku-4-5": { "input": 1, "output": 5 }
