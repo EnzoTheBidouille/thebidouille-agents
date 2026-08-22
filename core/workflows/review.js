@@ -42,6 +42,17 @@ const ARGS = (() => {
   }
   return args && typeof args === 'object' ? args : {}
 })()
+// Approximate cost of this run from the runtime's own output-token counter — the one
+// figure the conversational path cannot record (a lead cannot read a subagent's token
+// count; SCHEMA.md §Measuring cost). Sampled at start, delta stamped into the metrics line.
+const spentNow = () => {
+  try {
+    const v = (budget && typeof budget.spent === 'function') ? budget.spent() : 0
+    return Number.isFinite(v) ? v : 0   // a NaN here would poison the metrics JSON downstream
+  } catch { return 0 }
+}
+const spentStart = spentNow()
+
 const isSlug = s => typeof s === 'string' && /^[A-Za-z0-9._-]+$/.test(s)
 const feature = ARGS.feature
 if (!feature) throw new Error('cohorte-review needs args = {feature: "<feature_id>"}')
@@ -387,7 +398,7 @@ const staging = await agent(
   // mark ALL surfaces failed on the dashboard), and dead reviewers logged as "dead"
   // per SCHEMA.md §Dead agents — an incomplete batch is the batch worth recording.
   `3. Append one line to $(dirname "$(git rev-parse --git-common-dir)")/.claude/pipeline-metrics.jsonl: ` +
-  `{"ts":"<ISO now>","feature":"${feature}","phase":"review","seconds":0,"surfaces":{${
+  `{"ts":"<ISO now>","feature":"${feature}","phase":"review","seconds":0,"tokens":${Math.max(0, spentNow() - spentStart)},"surfaces":{${
     results.map(r => `"${r.key}":"${r.report.verdict}:${r.kept.length}"`)
       .concat(unreviewed.map(k => `"${k}":"dead"`)).join(',')}}}\n` +
   // Deferred findings must land in the backlog on EVERY verdict — parked only on a

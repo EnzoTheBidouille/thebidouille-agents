@@ -31,7 +31,11 @@ Idea (may be empty): **$ARGUMENTS**
 
 If the idea is empty: when a board is configured and its **Ideas** column has cards, list them (with any
 sub-bullet notes as seed context) and let the human pick one — otherwise ask **"What are we building?"**.
-Either way, wait. If the idea is non-empty, restate it in one line and confirm you've got it.
+Either way, wait. If the idea is non-empty, restate it in one line and confirm you've got it — and
+**if `specs/reports/intake-<idea>.md` exists, read it FIRST**: it is `/cohorte-intake`'s staged seed
+(who is asking with verbatim quotes, goals/non-goals, an open-questions list that is this panel's
+agenda, prior art incl. any `_decisions.md` line the request contradicts). The panel argues against
+the distillate, never against the bare slug.
 
 ## Run the panel
 

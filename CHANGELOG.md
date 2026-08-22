@@ -7,6 +7,53 @@ short, user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` secti
 > They are history and are deliberately not rewritten — every command gained a `cohorte-` prefix
 > in 2.0.0.
 
+## 2.9.0 — 2026-08-22
+
+- **`/cohorte-intake` — the door before the doors.** Work has always entered the pipeline
+  pre-distilled by a human: a ticket became a `/cohorte-patch` paste, an email became a
+  brainstorm idea, by hand. Intake does the distillation: paste anything that arrives and it
+  triages — bug ⇒ the exact structure patch interviews for (inferred repro steps labeled as
+  such); feature ⇒ a brainstorm seed whose open-questions list is the panel's agenda, with any
+  `_decisions.md` line it contradicts named; noise ⇒ says so and stops, because inventing a
+  spec from noise costs a whole pipeline run downstream. The distillate lands on disk and on
+  the kanban's Ideas column; freezing anything stays the human's move.
+
+- **`/cohorte-retro` — the pipeline learns from its own findings.** Every review leaves
+  structured residue (verdict.json, the specs' Remediation history, the deferred backlog) that
+  nothing ever read back. Retro mines it for patterns — the same finding kind on the same
+  surface across features, a hotspot module, a recurring fix family — and turns each into ONE
+  rule-shaped §Conventions line the human ratifies. Adopted rules re-render the affected
+  surface agents (the conventions slice is baked at render time — a rule without a re-render
+  is one reviewers enforce and implementers never saw) and land in the decisions journal.
+  Findings → rules → the next build never produces the finding: cheaper than any number of
+  review rounds catching it.
+
+- **`/cohorte-fleet` — parallel features get a flight controller.** The worktree isolation
+  existed; the coordination lived in your head. `plan` builds the feature×surface overlap
+  matrix from the specs themselves (contract dependencies ⇒ merge order; same-tree writes ⇒
+  serialize or drop one), provisions the worktrees, and prints one launch line per feature.
+  `status` is one row per feature ending in the single next action. `sync` does the post-merge
+  sweep everyone forgets — rebase every survivor, report conflicts verbatim to their owner's
+  session, and say out loud that a rebase invalidates the freshness stamp. What it will never
+  do is spawn the work headless: that is the retired 2.2.0 driver's grave, and each feature's
+  loop keeps running in its own supervised session.
+
+- **`/cohorte-review --pr <num>` — the pipeline reviews incoming work.** Same reviewers, same
+  report, none of the pipeline's certifications: the PR is fetched into a throwaway worktree
+  (your checkout untouched), reviewed in audit mode (no spec to conform to), and a red
+  preflight makes the mechanical failures the review instead of wasting reviewers on code that
+  doesn't compile. Posting the report as a PR comment always asks first — it is outward-facing
+  — and declining leaves the report on disk as a complete outcome.
+
+- **What a feature costs, finally on the dashboard.** The workflow paths now stamp an
+  approximate `tokens` field into their metrics lines from the runtime's own counter
+  (`budget.spent()` deltas — the figure a conversational lead cannot read), the loop's history
+  carries cost per round, and the dashboard shows `~Nk tok` per feature and per phase. Marks
+  are placed around the review child so build/fix deltas never double-count it; token-less
+  conversational lines aggregate as absent, never as "free".
+
+
+
 ## 2.8.0 — 2026-08-22
 
 - **`/cohorte-loop` is back — as a workflow, which is the whole point.** The 2.2.0 driver was

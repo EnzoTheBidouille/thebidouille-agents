@@ -12,13 +12,65 @@ You are the **lead**. Dispatch the review for feature **$ARGUMENTS**.
 > **Kanban** (SCHEMA.md §Kanban): run
 > `<core>/pipeline/scripts/kanban-move.sh auto $ARGUMENTS review`. `auto` resolves the board from the config itself and
 > exits 0 with a `kanban: <reason>` line when there is none — so **never decide "no board is
-> configured" without running it**.
+> configured" without running it**. _(PR mode — `--pr` below — skips this entirely: an incoming
+> PR is not a pipeline feature and has no card.)_
 >
 <!-- cohorte:if workflows -->
 > **Workflow variant** (opt-in — SCHEMA.md §Workflows): on Claude Code ≥ 2.1.154 with workflows
 > enabled, the human can ask to "run the review workflow" (`<core>/workflows/review.js`) instead.
 > This conversational path stays the default and the fallback; `/cohorte-doctor` shows which is available.
 <!-- cohorte:endif -->
+
+## PR mode — review an INCOMING pull request (`--pr <num>` or a PR URL)
+
+If `$ARGUMENTS` contains `--pr <num>` (or a GitHub PR URL — extract the number), this is not a
+pipeline feature: it is **someone else's work arriving**, reviewed with the same reviewers and the
+same report format, without pretending it went through the pipeline. What that changes, explicitly:
+**no spec** (nothing to check conformance against — reviewers run in audit mode: conventions +
+correctness + security + TDD coverage only), **no kanban move**, **no verdict.json**, **no DoD
+tick, no freshness stamp, no metrics line** — those certify pipeline features, and this is not one.
+Requires `vcs.host: github` + `gh`; otherwise say so and stop.
+
+1. **Fetch into a throwaway worktree — never touch the current checkout.** One Bash call:
+   `gh pr view <num> --json title,baseRefName,headRefName,author` (relay the one-line summary), then
+   `git fetch -f origin pull/<num>/head:cohorte-pr-<num> <baseRefName> && git worktree add ../<repo>-pr-<num> cohorte-pr-<num>`
+   — `-f` so a branch left behind by a crashed earlier run updates instead of failing, and the
+   **base ref is fetched too**: the diff below is against `origin/<baseRefName>`, and a stale
+   local base blames the PR for every commit it merely hasn't rebased onto yet.
+   The human's tree, branch and stamps stay untouched; every later step runs `-C` that worktree.
+2. **Mechanical checks inside the worktree — the commands directly, NEVER `preflight.sh`.** The
+   script's whole point is stamping `<state>/preflight.ok` in the MAIN checkout (it resolves
+   through `git-common-dir` on purpose), so running it here would overwrite the human's stamp
+   with the PR tree's digest — greening pipeline review dispatches of a tree nobody preflighted,
+   then blocking them once the worktree is gone. Instead: install dependencies first
+   (`commands.install` — a bare `worktree add` has no `node_modules`), then run the profile's
+   typecheck/lint-quiet/test-quiet yourself, each appended to the worktree's
+   `specs/reports/pr-<num>.preflight.txt`, stopping at the first failure. **Red does NOT get
+   reviewers** — same economics as §0 (a reviewer on code that doesn't compile rediscovers what
+   `tsc` printed for free) — but unlike §0 it is not an abort: the mechanical failures ARE the
+   review (severity CRITICAL, kind `quality`, the failing command + last lines) — jump to
+   step 4. An *environmental* failure (install itself failed, a missing service) is reported as
+   "not verifiable here", never as a finding against the PR.
+3. **Stage + dispatch — §1's staging procedure and §2's dispatch, minus everything spec-shaped**
+   (there is no `specs/<id>.md` to confirm and no small-diff fast path — an unknown author's
+   diff always gets a full reviewer), with three substitutions: the diff is
+   `git diff origin/<baseRefName>...HEAD` (**three-dot** — only the PR's own commits, not the
+   base's drift), staged diffs and file paths are **absolute paths into the worktree**
+   (reviewers are stateless — they must not read the main checkout), and the dispatch template's
+   spec/contract slots read
+   `spec: none (incoming PR — audit mode: PIPELINE.md conventions + quality/security/TDD only,
+   skip spec conformance)` · `contract: none`. Roll call + merge per §3 (retry once, `unreviewed`
+   forbids a clean verdict), same capped REVIEW REPORT.
+4. **Stage the report to the MAIN checkout's `specs/reports/pr-<num>.md`** (it must outlive the
+   worktree), print the verdict + severity table + CRITICAL/security digests in chat. Then —
+   **always ask the human first, posting is outward-facing** — offer:
+   `gh pr comment <num> --body-file specs/reports/pr-<num>.md` (prefix the body with one line:
+   `Automated review — cohorte pipeline (advisory)`). Never post without the explicit go-ahead;
+   "no" leaves the report on disk and that is a complete outcome.
+5. **Teardown, always** (also after a red preflight or a dead reviewer):
+   `git worktree remove --force ../<repo>-pr-<num> && git branch -D cohorte-pr-<num>`.
+
+Everything below this line is the normal pipeline-feature flow.
 
 ## 0. Deterministic pre-flight — no agents while red
 

@@ -185,8 +185,13 @@ proposing a split: split the surface that actually dominates wall-clock, not the
 ## Measuring cost — what's slow vs what's expensive
 
 `pipeline-metrics.jsonl` records **wall-clock seconds** per phase batch (§Specialization) — it tells you
-what's SLOW. It deliberately does NOT record tokens: the lead can't reliably read a subagent's token count
-to log it. For what's EXPENSIVE, use Claude Code's own accounting:
+what's SLOW. Tokens are recorded only where they can be read honestly: the **workflow paths**
+(`loop.js`, `review.js`) stamp an approximate `tokens` field per batch from the runtime's own
+counter (`budget.spent()` deltas), and the loop's return carries a per-round breakdown in its
+`history`. The **conversational** commands still record none — a lead cannot reliably read a
+subagent's token count, and a guessed number is worse than a missing one. The dashboard sums
+whatever is stamped (a token-less line aggregates as 0, rendered as absent, never as "free").
+For exact spend, use Claude Code's own accounting:
 
 - **`/cost`** (built-in, zero setup) — reports per-**subagent** and per-**slash-command** share of your usage
   over the last 24 h / 7 d (e.g. _"Top subagents: frontend 7 %, backend 4 % · Top skills: /cohorte-build 1 %,
@@ -352,11 +357,14 @@ project has *decided*. Without somewhere for those, every `/cohorte-spec` re-dis
 `specs/_decisions.md` (from `core/templates/decisions.template.md`) is that place, deliberately small:
 
 - **Append-only, one line per decision, ≤ ~160 chars:**
-  `- <YYYY-MM-DD> · <area> · <decision> — because <reason> · <feature_id>`. Reversal never edits a line:
+  `- <YYYY-MM-DD> · <area> · <decision> — because <reason> · <origin>`, where `<origin>` is the
+  `feature_id` that decided it — or the originating command (`retro`) when no single feature owns
+  it. Reversal never edits a line:
   append a superseding one (`· supersedes <date> <area>`) and move the old one to `## Superseded`. When
   `## Live` passes ~100 lines, sweep the superseded ones down.
 - **Written by** `/cohorte-spec` at freeze (the decisions that outlive the feature — typically 0–3 lines, and
-  zero is a normal outcome) and `/cohorte-build` §1.5 when it adds or splits a surface.
+  zero is a normal outcome), `/cohorte-build` §1.5 when it adds or splits a surface, and
+  `/cohorte-retro` §4 when the human ratifies a convention rule (one line per adopted rule).
 - **Read by the deciding stages only** — `/cohorte-brainstorm` (so the panel argues about the idea, not about
   settled ground), `/cohorte-spec` (so a new spec does not silently un-decide something), `/cohorte-audit` (standing
   decisions are part of the rulebook it audits against).

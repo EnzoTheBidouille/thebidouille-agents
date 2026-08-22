@@ -117,8 +117,11 @@ suits very large or mixed code+docs repos; `none` falls back to grep. Wiring is 
 - `<state>/pipeline-metrics.jsonl` records **wall-clock seconds** per phase batch — what's
   *slow*. It's the evidence required before splitting a bottleneck surface into specialized
   sub-surfaces (see `SCHEMA.md` §Specialization).
-- **`/cost`** (built-in) reports per-subagent and per-command share of usage — what's
-  *expensive* — the ledger to read before tuning a `model` tier.
+- The **workflow runs** (loop, review) also stamp an approximate **`tokens`** figure per batch,
+  read from the runtime's own counter — the dashboard shows it per feature and per phase
+  (`~Nk tok`). Conversational runs can't count tokens and stamp nothing; absent ≠ free.
+- **`/cost`** (built-in) reports per-subagent and per-command share of usage — the *exact*
+  ledger to read before tuning a `model` tier.
 
 ## The habit list
 
