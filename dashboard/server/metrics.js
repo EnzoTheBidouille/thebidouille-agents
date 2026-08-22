@@ -33,6 +33,10 @@ function parseBatches(raw) {
       // (never inside) `surfaces` — carry them through for the aggregate.
       batches.push({
         ts: e.ts || '', feature: String(e.feature), phase: String(e.phase), seconds,
+        // Approximate output tokens for the batch — stamped only by the workflow paths
+        // (loop.js / review.js), which read the runtime's own counter; conversational
+        // lines simply lack the field and aggregate as 0.
+        tokens: Number(e.tokens) || 0,
         surfaces: e.surfaces, rounds: e.rounds, smoke: e.smoke,
       });
     } else if (e.surface) {
@@ -69,6 +73,7 @@ function aggregate(batches) {
         feature: b.feature,
         firstTs: b.ts, lastTs: b.ts,
         totalSeconds: 0,
+        totalTokens: 0,
         fixRounds: 0,
         phases: {}, // phase → { seconds, rounds }
         surfaces: {}, // surface → { phase → latest result }, plus failure count
@@ -81,8 +86,10 @@ function aggregate(batches) {
     if (b.ts && (!f.firstTs || b.ts < f.firstTs)) f.firstTs = b.ts;
     if (b.ts && b.ts > f.lastTs) f.lastTs = b.ts;
     f.totalSeconds += b.seconds;
-    const ph = f.phases[b.phase] || (f.phases[b.phase] = { seconds: 0, rounds: 0 });
+    f.totalTokens += b.tokens || 0;
+    const ph = f.phases[b.phase] || (f.phases[b.phase] = { seconds: 0, rounds: 0, tokens: 0 });
     ph.seconds += b.seconds;
+    ph.tokens += b.tokens || 0;
     ph.rounds += 1;
     if (b.phase === 'fix') f.fixRounds += 1;
     for (const [key, result] of Object.entries(b.surfaces)) {

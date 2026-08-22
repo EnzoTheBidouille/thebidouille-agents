@@ -4,6 +4,15 @@ import React from 'react';
 // so older metrics files still render; a phase missing here renders in no column at all.
 const PHASES = ['build', 'review', 'fix', 'smoke', 'cycle'];
 
+// Workflow-stamped, approximate output tokens ("~" on purpose): 0 ⇒ the field was
+// never stamped (conversational runs), so nothing renders rather than a false "0".
+function fmtTokens(t) {
+  if (!t) return null;
+  if (t < 1000) return `~${t} tok`;
+  if (t < 1000000) return `~${Math.round(t / 1000)}k tok`;
+  return `~${(t / 1000000).toFixed(1)}M tok`;
+}
+
 function fmtSeconds(s) {
   if (s == null) return '—';
   if (s < 60) return `${s}s`;
@@ -68,6 +77,11 @@ function FeatureMetrics({ f }) {
         <span className="mf-name">{f.feature}</span>
         <span className="mf-badges">
           <span className="badge neutral">total {fmtSeconds(f.totalSeconds)}</span>
+          {fmtTokens(f.totalTokens) && (
+            <span className="badge neutral" title="approximate output tokens, stamped by the workflow runs (loop/review); conversational runs don't count tokens">
+              {fmtTokens(f.totalTokens)}
+            </span>
+          )}
           <span className={`badge ${f.fixRounds > 1 ? 'warn' : 'neutral'}`}>
             {f.fixRounds} fix round{f.fixRounds === 1 ? '' : 's'}
           </span>
@@ -89,7 +103,9 @@ function FeatureMetrics({ f }) {
                 {ph && <span className="phase-fill" style={{ width: `${(ph.seconds / max) * 100}%` }} />}
               </span>
               <span className="phase-value muted small">
-                {ph ? `${fmtSeconds(ph.seconds)}${ph.rounds > 1 ? ` ×${ph.rounds}` : ''}` : '—'}
+                {ph
+                  ? `${fmtSeconds(ph.seconds)}${ph.rounds > 1 ? ` ×${ph.rounds}` : ''}${fmtTokens(ph.tokens) ? ` · ${fmtTokens(ph.tokens)}` : ''}`
+                  : '—'}
               </span>
             </div>
           );

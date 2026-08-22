@@ -24,8 +24,9 @@ const frontmatter = (text) => {
 // Interactive commands must stay unpinned (they inherit on purpose).
 const PINNED = ["cohorte-build", "cohorte-review", "cohorte-fix", "cohorte-ship",
   "cohorte-audit", "cohorte-refactor", "cohorte-doctor", "cohorte-align-ds",
-  "cohorte-update-pipeline"];
-const UNPINNED = ["cohorte-brainstorm", "cohorte-spec", "cohorte-init-pipeline", "cohorte-patch"];
+  "cohorte-update-pipeline", "cohorte-fleet"];
+const UNPINNED = ["cohorte-brainstorm", "cohorte-spec", "cohorte-init-pipeline", "cohorte-patch",
+  "cohorte-intake", "cohorte-retro"];
 
 // Every command must carry the `cohorte-` prefix. This replaces the old RESERVED
 // blocklist, which chased collisions one name at a time and always lagged: a command
@@ -164,7 +165,7 @@ if (/usage ping|telemetry-send|consent/i.test(read(TELEMETRY_SCRUBBER)))
 // having opened neither the config nor PIPELINE.md, and a merged feature's card
 // stayed in "Ready to build". `kanban-move.sh auto` moved resolution into the
 // script; this keeps it there. Prose is not a call site — the literal invocation is.
-const KANBAN_STAGES = ["brainstorm", "spec", "build", "review", "fix", "ship", "patch"];
+const KANBAN_STAGES = ["brainstorm", "spec", "build", "review", "fix", "ship", "patch", "intake"];
 for (const c of KANBAN_STAGES) {
   const path = `core/commands/${PREFIX}${c}.md`;
   const text = read(path);

@@ -36,6 +36,20 @@ mode, retrieval wiring with health check, isolation scripts, `specs/_template.md
 `pipeline-metrics.jsonl` + `specs/reports/`) → **report**. Everything it generates goes into
 *this repo* — never into `~/.claude`.
 
+## `/cohorte-intake [paste]`
+
+The door before the doors. Paste anything that arrives — a ticket, a client email, a stack
+trace, a Slack thread — and it triages: **bug** ⇒ distilled into the exact structure
+`/cohorte-patch` interviews for (symptom, repro with inferred steps labeled, environment,
+suspected surfaces); **feature** ⇒ a brainstorm seed (title, who's asking, goals/non-goals,
+open questions as the panel's agenda, prior art incl. any `_decisions.md` line it contradicts);
+**neither** ⇒ says so and stops — inventing a spec from noise costs a pipeline run downstream.
+Either way the distillate is staged to `specs/reports/intake-<slug>.md` (it survives a
+`/clear`) and a kanban card lands in **Ideas** — tagged exactly as the follow-up command joins
+(`#patch-<slug>` + `[patch]` title for bugs), so it moves instead of duplicating. The seed
+itself travels in the staged file: `/cohorte-brainstorm` and `/cohorte-patch` read it when it
+exists. Intake never runs them or freezes anything itself.
+
 ## `/cohorte-brainstorm [idea]`
 
 Interactive panel from `PIPELINE.md` §Personas; one voice per RBAC role when enabled. Rounds of
@@ -113,6 +127,15 @@ breakdown, normalized `blocking_items` and a stable `fingerprint` over them. Tha
 machine contract with any automated driver; no prose is ever parsed. A red preflight writes the degraded
 `{"aborted":"preflight"}` form instead of nothing, so an abort reads as a diagnosis.
 
+**PR mode** — `/cohorte-review --pr <num>` (or a PR URL) reviews an **incoming** pull request:
+same reviewers, same report format, none of the pipeline's certifications (no spec ⇒ audit mode
+— conventions/quality/security/TDD only; no kanban, no verdict.json, no DoD tick, no freshness
+stamp). The PR is fetched into a throwaway worktree (your checkout is never touched), preflight
+runs there (red ⇒ the mechanical failures *are* the review — no reviewers wasted), and the
+merged report is staged to `specs/reports/pr-<num>.md`. Posting it as a PR comment via `gh` is
+offered and **always requires your explicit go-ahead** — declining leaves the report on disk as
+a complete outcome. Worktree torn down either way.
+
 ## `/cohorte-fix <id> [paste]`
 
 §1 ingests the report (paste / session / staged file), appends `- [ ]` items to
@@ -135,6 +158,19 @@ work already landed, calls the review workflow each round, and exits on zero blo
 5), an unreviewed surface, dead implementers, or a finding that would change the frozen
 contract (lead-only). State lives in `specs/reports/<id>.loop.json`; re-invoking resumes.
 See the [workflows guide](../guide/workflows.md).
+
+## `/cohorte-fleet plan|status|sync`
+
+The flight controller for parallel features — coordination only, never headless execution (each
+feature's build/review/loop runs in its own worktree's supervised session; the retired 2.2.0
+driver is why). `plan <id> <id> …`: frozen-spec check, *feature × surface* overlap matrix from
+§5/§6 (contract dependencies ⇒ merge order, same-tree writes ⇒ serialize or drop), worktree
+provisioning via `new-feature.sh`, flight plan to `specs/reports/fleet.json`, one launch line
+per feature. `status`: one row per feature — spec status, loop round/outcome, blocking,
+ahead/behind main, the single next action. `sync`: post-merge rebase of every surviving
+worktree (conflicts reported verbatim, left to their owner), with the reminder that a rebase
+invalidates `reviewed_digest` — re-review before ship. Requires `isolation.enabled`.
+See the [parallel features guide](../guide/parallel-features.md).
 
 ## `/cohorte-ship <id>`
 
@@ -162,6 +198,19 @@ lead directly). Dispatches implementers — tests pinned first, then refactor, p
 preserved — in parallel when domains are independent, `shared` always alone and first.
 Verifies per domain (quiet gates + item-by-item `file:line` check — no `/cohorte-audit` re-run per
 round), ticks the backlog, loops until each dispatched domain is clean.
+
+## `/cohorte-retro [last <n> | all]`
+
+Mines the residue every review leaves on disk — `verdict.json`s, the specs' persistent
+`## Remediation` history, the `deferred:` backlog — for **patterns**: the same finding kind ×
+surface across ≥ 2 features, a hotspot module, a recurring fix family. Each pattern becomes ONE
+drafted, rule-shaped `PIPELINE.md` §Conventions line with its evidence attached; the human
+ratifies (none is a fine answer), and adopted rules are appended **and the affected surface
+agents re-rendered** — the conventions slice is baked at render time, so a rule without a
+re-render is one reviewers enforce and implementers never saw. One decisions-journal line per
+adopted rule. Patterns the rulebook already covers are reported as *enforcement gaps*, not
+re-proposed. The loop this closes: findings → rules → the next build never produces the finding
+— cheaper than any number of review rounds catching it.
 
 ## `/cohorte-align-ds`
 

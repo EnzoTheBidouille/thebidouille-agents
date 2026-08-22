@@ -52,7 +52,7 @@ const finding = (over = {}) => ({
 // every agent call, and an optional `wf(name, args)` stub in place of nested
 // workflow() calls (loop.js runs the review workflow as a child). Returns
 // { result, calls, prompts } — prompts keyed by label, for byte-identity asserts.
-async function run(script, reply, args = { feature: "feat-x" }, wf) {
+async function run(script, reply, args = { feature: "feat-x" }, wf, budgetStub) {
   const text = readFileSync(join(root, "core/workflows", script), "utf8")
     .replace(/^export const meta/m, "const meta");
   const calls = [];
@@ -80,10 +80,17 @@ async function run(script, reply, args = { feature: "feat-x" }, wf) {
     "agent", "parallel", "pipeline", "phase", "log", "args", "budget", "workflow", text);
   const result = await fn(
     agent, parallel, pipeline, () => {}, () => {}, args,
-    { total: null, spent: () => 0, remaining: () => Infinity },
+    budgetStub || { total: null, spent: () => 0, remaining: () => Infinity },
     wf || (async () => {}));
   return { result, calls, prompts };
 }
+
+// A budget stub whose spent() grows with every agent/workflow call — what the runtime's
+// counter does — so token deltas in the scripts come out non-zero and orderable.
+const tickingBudget = () => {
+  let n = 0;
+  return { total: null, spent: () => (n += 1000), remaining: () => Infinity };
+};
 
 // A reply table keyed by label prefix; the first matching prefix wins.
 const replier = table => (prompt, opts) => {
@@ -714,6 +721,28 @@ const SHIP_CLEAN = { verdict: "SHIP", blocking: 0, blockingItems: [], unreviewed
     loopReply(loopFacts({ build: FRESH_BUILD }), { ingest: null }), { feature: "feat-x" }, wf);
   check("dead ingest agent ⇒ abort/ingest-died, items never invented",
     result.reason === "ingest-died", result.reason);
+}
+{
+  // Token accounting: the run's history and metrics lines carry approximate output
+  // tokens from budget.spent() — the figure the conversational path cannot record.
+  const wf = async () => reviewOf();
+  const { result, prompts } = await run("loop.js", loopReply(loopFacts()),
+    { feature: "feat-x" }, wf, tickingBudget());
+  check("loop: history rounds carry a tokens figure",
+    result.history.length > 0 && result.history.every(h => typeof h.tokens === "number" && h.tokens > 0),
+    JSON.stringify(result.history));
+  check("loop: build metrics line carries tokens",
+    /"phase":"build".*"tokens":[1-9]/.test(prompts["state:built"] || ""),
+    (prompts["state:built"] || "").slice(-200));
+  check("loop: the run total is returned", typeof result.tokens === "number" && result.tokens > 0,
+    String(result.tokens));
+  let stagePrompt = "";
+  await run("review.js", (prompt, opts) => {
+    if (opts.label === "stage-report") { stagePrompt = prompt; return "done"; }
+    return replier([["review:", { verdict: "SHIP", findings: [] }], ...BASE_REVIEW])(prompt, opts);
+  }, { feature: "feat-x" }, undefined, tickingBudget());
+  check("review: metrics line carries tokens",
+    /"phase":"review".*"tokens":[1-9]/.test(stagePrompt), stagePrompt.slice(-200));
 }
 {
   // workflow() unavailable (no runtime / review.js not installed) ⇒ explicit refusal,

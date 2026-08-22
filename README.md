@@ -301,15 +301,18 @@ so a CLI pinned at an old version cannot quietly re-lay an old core.
 | Command              | Role                                                                                  |
 | -------------------- | ------------------------------------------------------------------------------------- |
 | `/cohorte-init-pipeline`     | Detect stack → interview → generate the profile + agents. Run once per project.       |
+| `/cohorte-intake [paste]`    | Triage anything that arrives (ticket, email, trace, thread) into a `/cohorte-patch` handoff or a brainstorm seed — staged to disk, carded in Ideas. |
 | `/cohorte-brainstorm`        | Interactive persona panel that pressure-tests a feature idea.                         |
 | `/cohorte-spec`              | Freeze the feature spec + contract into `specs/<id>.md` (UI features also get a standalone design brief at `specs/design/<id>.md`). Also applies review returns. |
 | `/cohorte-patch [bug]`       | Bug-fix entry: triage a bug and freeze a ~60-line patch spec (`specs/patch-<slug>.md`) whose regression test replaces the contract. Then the normal `/cohorte-build → review → ship`. |
 | `/cohorte-build <id>`        | Readiness gate on the frozen spec, then the lead authors the contract and dispatches one implementer per surface in parallel. |
-| `/cohorte-review <id>`       | Read-only review agents (one per touched surface, parallel) audit the diff vs the spec; out-of-scope findings go to the refactor backlog. |
+| `/cohorte-review <id>`       | Read-only review agents (one per touched surface, parallel) audit the diff vs the spec; out-of-scope findings go to the refactor backlog. `--pr <num>` reviews an **incoming** GitHub PR in a throwaway worktree and offers to post the report as a comment. |
 | `/cohorte-fix <id>`          | Apply a review report: remediation into the spec, re-dispatch only the surfaces with findings. |
+| `/cohorte-fleet plan\|status\|sync` | Fly several features in parallel: overlap matrix + merge order, one worktree per feature, live status, post-merge rebase sweep. Coordination only — never headless execution. |
 | `/cohorte-ship <id>`         | Release agent commits, pushes, opens the PR; watches CI; proposes worktree teardown.  |
 | `/cohorte-audit [path]`      | Prioritized refactor backlog for existing code.                                       |
 | `/cohorte-refactor <domain>` | Apply the backlog for one surface, TDD-first.                                         |
+| `/cohorte-retro [last n]`    | Mine the accumulated review findings for patterns; ratified ones become §Conventions rules and the surface agents are re-rendered — the next build never produces the finding. |
 | `/cohorte-align-ds`          | Align the code UI kit to the design system (no-op if none configured).                |
 | `/cohorte-update-pipeline`   | Refresh the installed core (global or bundled) to the latest published version.       |
 | `/cohorte-doctor`            | Diagnose the installation (core, agents↔surfaces, hooks, gate, retrieval, worktrees). |

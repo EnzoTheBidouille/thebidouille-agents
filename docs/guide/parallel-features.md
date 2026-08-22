@@ -73,8 +73,9 @@ Rules that keep it safe:
   its own `<id>.<ext>` file, so no conflicts. Merge order matters only when a later feature
   *imports* an earlier one's contract: ship the dependency first.
 - **`/cohorte-ship` one at a time.** It commits from the feature's branch, and the freshness gate keeps a
-  stale verdict from shipping. After each merge, rebase the other live worktrees
-  (`git rebase main`) so their eventual reviews diff against reality.
+  stale verdict from shipping. After each merge, the surviving worktrees need a rebase so their
+  eventual reviews diff against reality — `/cohorte-fleet sync` (below) sweeps that for you, or
+  `git rebase main` by hand from each worktree's own session.
 - **`/cohorte-doctor` check 6** prints the live slot table (feature · worktree · ports · db · branch
   behind main by N commits) when you lose track — a worktree far behind main means its next
   review diffs against stale code.
@@ -85,3 +86,24 @@ Rules that keep it safe:
 dies at teardown while metrics must accumulate across features. Every command resolves it from
 anywhere via `$(dirname "$(git rev-parse --git-common-dir)")/<state>/pipeline-metrics.jsonl`;
 `/cohorte-doctor` flags a stray copy inside a worktree.
+
+## `/cohorte-fleet` — the flight controller
+
+Everything above works but lives in your head: which specs collide, which merges first, who
+rebases the survivors. `/cohorte-fleet` owns that coordination:
+
+- **`plan <id> <id> …`** — verifies every spec is frozen, builds the *feature × surface* overlap
+  matrix from the specs' §5/§6 (contract dependencies ⇒ merge order; same-tree writes ⇒
+  serialize or drop one), provisions a worktree per feature via `new-feature.sh`, writes the
+  flight plan to `specs/reports/fleet.json`, and prints one launch line per feature — the
+  worktree to open a session in and the first command to run there.
+- **`status`** — one row per feature: spec status, loop round/outcome, blocking count,
+  ahead/behind main, and the *single next action*.
+- **`sync`** — after each merge: rebases every surviving worktree onto main (conflicts reported
+  verbatim and left to their owner's session, never resolved from outside), and says the part
+  everyone forgets — a rebase invalidates the `reviewed_digest`, so `/cohorte-ship` will refuse
+  until a fresh `/cohorte-review` re-stamps.
+
+What it deliberately does **not** do is launch the work headless — each feature's build/review/
+loop runs in its own supervised session (the retired 2.2.0 driver is why). The fleet plans,
+watches and rebases; you fly.

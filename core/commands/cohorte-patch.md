@@ -28,7 +28,12 @@ Bug (may be empty): **$ARGUMENTS**
 
 ## 1. Get the bug
 
-If `$ARGUMENTS` is non-empty, restate it in one line and confirm you've got it.
+If `$ARGUMENTS` is non-empty, restate it in one line and confirm you've got it — and if it is
+(or names) a slug with a staged `specs/reports/intake-<slug>.md`, **read that file first**: it is
+`/cohorte-intake`'s distillate (symptom, repro with inferred steps labeled, environment, suspected
+surfaces, severity signal), so this triage starts loaded instead of re-asking. Keep intake's slug —
+its kanban card is already tagged `#patch-<slug>` and titled `[patch] …`, exactly what the move
+below joins on.
 
 If it is empty: when a board is configured and its **Ideas** column has cards, list them (with any
 sub-bullet notes as context) — **cards titled `[patch]` first**, since those are the ones a human

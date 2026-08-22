@@ -464,12 +464,19 @@ console.log("doctor.js — a non-Claude runtime layout");
   check("nothing is reported broken on a healthy non-Claude install",
     s.summary.bad === 0 && s.summary.warn === 0, JSON.stringify(s.summary));
 
-  // The metrics sink follows `<state>` too.
+  // The metrics sink follows `<state>` too — and workflow-stamped `tokens` aggregate
+  // per feature/phase while token-less conversational lines read as 0, not NaN.
   writeFileSync(join(d, ".cohorte", "pipeline-metrics.jsonl"),
     JSON.stringify({ ts: "2026-01-01T00:00:00Z", feature: "f", phase: "build", seconds: 10,
-      surfaces: { api: "ok" } }) + "\n");
-  check("metrics are read from the runtime's state dir",
-    metrics({ projectRoot: d, globalDir: g }).batches === 1);
+      tokens: 12000, surfaces: { api: "ok" } }) + "\n" +
+    JSON.stringify({ ts: "2026-01-01T01:00:00Z", feature: "f", phase: "review", seconds: 5,
+      surfaces: { api: "SHIP:0" } }) + "\n");
+  const m = metrics({ projectRoot: d, globalDir: g });
+  check("metrics are read from the runtime's state dir", m.batches === 2);
+  check("workflow tokens aggregate; token-less lines count as 0",
+    m.features[0].totalTokens === 12000 && m.features[0].phases.build.tokens === 12000
+      && m.features[0].phases.review.tokens === 0,
+    JSON.stringify(m.features[0] && { t: m.features[0].totalTokens, p: m.features[0].phases }));
 }
 
 // ── runtime.js — stale absolute registry paths (a cloned/moved bundled core) ─

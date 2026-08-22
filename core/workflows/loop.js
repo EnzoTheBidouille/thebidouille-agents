@@ -211,6 +211,18 @@ const ITEMS = {
   },
 }
 
+// Token accounting — the one thing the conversational path cannot do (a lead cannot
+// read a subagent's token count) and a workflow can: budget.spent() is the runtime's
+// own output-token counter for this turn. Deltas between marks give an approximate
+// per-phase cost; the review CHILD workflow stamps its own review-phase line, so the
+// loop marks AROUND the child to keep build/fix deltas from double-counting it.
+const spent = () => {
+  try {
+    const v = (budget && typeof budget.spent === 'function') ? budget.spent() : 0
+    return Number.isFinite(v) ? v : 0   // a NaN here would poison every metrics JSON downstream
+  } catch { return 0 }
+}
+
 // kanban-move.sh is optional infrastructure — every prompt that runs it defines <core>
 // and tolerates its absence, per SCHEMA.md §Kanban.
 const CORE_DEF = '(<core> = .claude if .claude/pipeline/scripts/kanban-move.sh exists, else ~/.claude — ' +
@@ -403,6 +415,7 @@ const writeState = async ({ label, phaseName, outcome, reason, status: st, kanba
   if (metrics) steps.push(
     `${steps.length + 1}. Append ONE line to ${METRICS_PATH}: ` +
     `{"ts":"<ISO>","feature":"${feature}","phase":"${metrics.phase}","seconds":$(($(date +%s)-${clock || 0})),` +
+    `"tokens":${metrics.tokens || 0},` +
     `"surfaces":${JSON.stringify(metrics.surfaces)}}` + (metrics.buildJson
       ? `\n${steps.length + 2}. Write to specs/reports/${feature}.build.json (overwrite): ` +
         `{"id":"${feature}","phase":"build","ts":"<ISO>","surfaces":${JSON.stringify(metrics.surfaces)},"dead":${JSON.stringify(metrics.dead)}}`
@@ -434,6 +447,7 @@ const close = async (outcome, reason, extra = {}) => {
   return {
     id: feature, outcome, reason, rounds: history.length,
     blocking: history.length ? history[history.length - 1].blocking : null,
+    tokens: spent(),   // approx output tokens for the whole run (runtime counter)
     history, report: `specs/reports/${feature}.md`,
     ...(closed ? {} : { stateWarning: 'the closing state agent died — loop.json/status/kanban may not reflect this outcome' }),
     ...extra,
@@ -446,6 +460,7 @@ const close = async (outcome, reason, extra = {}) => {
 // build.json is stale, absent, or carries dead[], the loop builds (a full re-dispatch —
 // implementers are idempotent against a frozen contract, the same property fix rounds
 // already rely on).
+let mark = spent()
 if (fresh(facts.build) && !(facts.build.dead || []).length) {
   log('build.json is fresh with no dead surfaces — skipping the build phase, entering at review')
   await writeState({ label: 'state:enter', phaseName: 'review', status: 'in-progress', kanban: 'review' })
@@ -463,7 +478,7 @@ if (fresh(facts.build) && !(facts.build.dead || []).length) {
   await writeState({
     label: 'state:built', phaseName: dead.length ? 'build' : 'review',
     metrics: {
-      phase: 'build', buildJson: true, dead,
+      phase: 'build', buildJson: true, dead, tokens: Math.max(0, spent() - mark),
       surfaces: Object.fromEntries(built.map(b => [b.key, b.handoff == null ? 'dead' : 'ok'])),
     },
   })
@@ -479,6 +494,7 @@ if (fresh(facts.build) && !(facts.build.dead || []).length) {
 while (true) {
   phase('Review')
   await writeState({ label: `state:round-${round}`, phaseName: 'review', status: 'in-progress', kanban: 'review' })
+  const roundMark = spent()
   let review
   try {
     review = await workflow('cohorte-review', { feature })
@@ -489,9 +505,16 @@ while (true) {
     })
   }
 
+  // The review child stamps its own review-phase metrics line; marking here keeps the
+  // fix phase's delta clean of it. History carries the round's review cost.
+  mark = spent()
   const verdict = decide(review, lastKey, round, maxRounds)
   if (review && typeof review.blocking === 'number') {
-    history.push({ round, blocking: review.blocking, fingerprint: hash16((review.blockingItems || []).join('\n')) })
+    history.push({
+      round, blocking: review.blocking,
+      fingerprint: hash16((review.blockingItems || []).join('\n')),
+      tokens: Math.max(0, spent() - roundMark),
+    })
   }
 
   if (verdict.outcome === 'ship') {
@@ -587,7 +610,8 @@ while (true) {
   // exactly the batch worth recording (SCHEMA.md §Dead agents), so it lands before
   // the dead-implementers abort, with the dead surfaces named.
   await writeState({ label: `state:fixed-${round}`, phaseName: 'review', metrics: {
-    phase: 'fix', surfaces: Object.fromEntries(fixed.map(f => [f.key, f.handoff == null ? 'dead' : 'ok'])),
+    phase: 'fix', tokens: Math.max(0, spent() - mark),
+    surfaces: Object.fromEntries(fixed.map(f => [f.key, f.handoff == null ? 'dead' : 'ok'])),
   } })
   if (fixDead.length) {
     // Their items stay `- [ ]` — a dead agent never ticks a box (/cohorte-fix §3), and
