@@ -46,7 +46,6 @@ export default defineConfig({
           items: [
             { text: 'Design system', link: '/guide/design-system' },
             { text: 'Kanban mirror', link: '/guide/kanban' },
-            { text: 'Dashboard', link: '/guide/dashboard' },
           ],
         },
       ],

@@ -1,8 +1,8 @@
 'use strict';
 // Machine-readable reports for `cohorte specs` and `cohorte doctor`.
 //
-// Both commands read what the dashboard already computes (dashboard/server/doctor.js:
-// `scanSpecs` and `state`) and render it four ways:
+// Both commands read what lib/doctor.js computes (`scanSpecs` and `state`) and
+// render it four ways:
 //
 //   default      a human table on a terminal
 //   --porcelain  one record per line, fields separated by U+001F (the ASCII unit

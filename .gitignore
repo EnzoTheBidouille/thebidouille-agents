@@ -14,4 +14,3 @@ docs/.vitepress/cache/
 scripts/new-feature.sh
 scripts/remove-feature.sh
 .serena/
-dashboard/dist/

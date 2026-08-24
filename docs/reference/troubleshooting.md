@@ -79,7 +79,7 @@ Claude install, `.cohorte/` on the others)
 (`/cohorte-doctor` check 3 flags this as ❌). Since 2.0.0 the stamp also carries a content digest
 instead of keying on HEAD, so committing already-verified code no longer invalidates it.
 
-**Headless runs (dashboard actions, `claude -p`) get hard denies on gated commands.**
+**Headless runs (workflow subagents, `claude -p`) get hard denies on gated commands.**
 By design: in `bypassPermissions` there's nobody to answer an "ask", so the gate escalates it to
 a clear deny. Run that operation interactively instead.
 
@@ -103,18 +103,8 @@ There is no resume for headless runs. Disk state is safe by design: reports stag
 appended, backlog written — relaunch the workflow (or continue conversationally) and it picks up
 from the files.
 
-## Dashboard
-
-**"Dashboard not built yet".**
-You're running from a source checkout without `dashboard/dist/`:
-`npm run build:dashboard` once (the published npm package ships it prebuilt).
-
-**Port in use / need remote access.**
-`--port=N`; `--host=0.0.0.0` exposes it (security warning — the actions execute code; trusted
-networks only).
-
 ## Nuclear option
 
-The dashboard's **Reset pipeline** action backs up the project's footprint (every runtime's dir,
-`PIPELINE.md`, optionally `specs/`) to `.claude.bak-<ts>/`, wipes it, reinstalls a fresh core;
-you then re-run `/cohorte-init-pipeline`. The shared `~/.claude` global core is never touched.
+Back up the project's pipeline footprint (every runtime's dir, `PIPELINE.md`, optionally
+`specs/`) to `.claude.bak-<ts>/`, wipe it, then `cohorte install` a fresh core and re-run
+`/cohorte-init-pipeline`. The shared `~/.claude` global core is never touched.

@@ -395,7 +395,7 @@ const staging = await agent(
     : 'the blocking list is empty, so <FP> is the empty string "":\n') +
   `${verdictJson}\n` +
   // Per-surface verdicts (not the merged one stamped on every row — one BLOCK used to
-  // mark ALL surfaces failed on the dashboard), and dead reviewers logged as "dead"
+  // mark ALL surfaces failed), and dead reviewers logged as "dead"
   // per SCHEMA.md §Dead agents — an incomplete batch is the batch worth recording.
   `3. Append one line to $(dirname "$(git rev-parse --git-common-dir)")/.claude/pipeline-metrics.jsonl: ` +
   `{"ts":"<ISO now>","feature":"${feature}","phase":"review","seconds":0,"tokens":${Math.max(0, spentNow() - spentStart)},"surfaces":{${

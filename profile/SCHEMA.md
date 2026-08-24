@@ -176,7 +176,7 @@ the **main checkout's** `<state>/pipeline-metrics.jsonl` (gitignored) — one JS
 and `/cohorte-fix`.
 **`surfaces` keys are surface keys, nothing else** — run-level facts go in their own top-level
 fields. Anything put inside `surfaces` is read
-as a surface: the dashboard renders it as a row in the per-surface table and scores a non-`ok`
+as a surface: `cohorte doctor` renders it as a row in the per-surface table and scores a non-`ok`
 value as that surface failing. Always the main checkout, never the feature worktree (which dies at teardown while
 metrics must accumulate across features) — resolve from anywhere with
 `$(dirname "$(git rev-parse --git-common-dir)")/<state>/pipeline-metrics.jsonl`. Read it before
@@ -189,7 +189,7 @@ what's SLOW. Tokens are recorded only where they can be read honestly: the **wor
 (`loop.js`, `review.js`) stamp an approximate `tokens` field per batch from the runtime's own
 counter (`budget.spent()` deltas), and the loop's return carries a per-round breakdown in its
 `history`. The **conversational** commands still record none — a lead cannot reliably read a
-subagent's token count, and a guessed number is worse than a missing one. The dashboard sums
+subagent's token count, and a guessed number is worse than a missing one. `cohorte metrics` sums
 whatever is stamped (a token-less line aggregates as 0, rendered as absent, never as "free").
 For exact spend, use Claude Code's own accounting:
 
@@ -231,7 +231,7 @@ storing a bare `pnpm test` as the thing agents execute; `/cohorte-update-pipelin
 ## Spec status — the lifecycle state machine
 
 A spec's front-matter `status` is not a label, it is the pipeline's **state**: every command routes on
-it, the dashboard boards on it, and the kanban backfill maps it to a column. Six states:
+it, `cohorte specs` boards on it, and the kanban backfill maps it to a column. Six states:
 
 | status | meaning | written by | who may build it |
 | --- | --- | --- | --- |
@@ -371,7 +371,7 @@ project has *decided*. Without somewhere for those, every `/cohorte-spec` re-dis
 - **Never read by implementers or reviewers.** They work from the frozen contract, which already tells
   them what to do; shipping them the rationale would cost `surfaces × dispatches` tokens per feature
   for a fact they cannot act on. This is what keeps the journal cheap enough to be worth having.
-- The `_` prefix is load-bearing: `/cohorte-doctor`, the dashboard spec scanner and the kanban backfill all skip
+- The `_` prefix is load-bearing: `/cohorte-doctor`, the `cohorte specs` scanner and the kanban backfill all skip
   `specs/_*.md`, so the journal is never mistaken for a spec (no phantom card, no bogus stage).
 
 ## Preflight — the deterministic phase gate
@@ -626,7 +626,7 @@ notes a human writes as sub-bullets under an Ideas card are seed context for `/c
 the trailing `%% kanban:settings … %%` block or the `kanban-plugin: board` front-matter.
 
 Once shipped, `/cohorte-ship` appends the **PR number** to the card — `- [ ] <title> #<feature_id> — PR #<num>`.
-The bare `#<num>` is what the dashboard renders as a clickable link to the GitHub PR, so `/cohorte-ship` always
+The bare `#<num>` is what a board reader renders as a clickable link to the GitHub PR, so `/cohorte-ship` always
 writes it when a PR was actually created.
 
 **Move a card (the core op).** One call — the script does resolution AND the move outside the

@@ -1,16 +1,13 @@
 {
   "name": "cohorte",
-  "version": "2.9.0",
+  "version": "2.10.0",
   "description": "Portable, stack-agnostic multi-agent development pipeline for Claude Code, Codex CLI, Cursor, Gemini CLI and OpenCode — install the core, run /cohorte-init-pipeline, and it adapts to your project's stack.",
   "bin": {
     "cohorte": "bin/cli.js"
   },
-  "scripts": {
-    "build:dashboard": "npm --prefix dashboard/app ci && npm --prefix dashboard/app run build",
-    "prepack": "npm run build:dashboard"
-  },
   "files": [
     "bin",
+    "lib",
     "core",
     "profile",
     "scripts",
@@ -19,9 +16,6 @@
     "!scripts/demo",
     "!core/hooks/__pycache__",
     "!**/*.pyc",
-    "dashboard/server",
-    "dashboard/dist",
-    "dashboard/README.md",
     "install.sh",
     "install.ps1",
     "CHANGELOG.md"

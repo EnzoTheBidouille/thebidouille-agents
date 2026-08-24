@@ -33,8 +33,8 @@ features:
     title: Guard-railed autonomy
     details: A profile-driven PreToolUse gate hard-denies destructive commands, confirm-gates the risky ones (branch-aware), and enforces a preflight phase gate — for every agent, including workflow subagents.
   - icon: 🖥️
-    title: Cockpit included
-    details: cohorte dashboard serves a local web cockpit — fleet freshness, /cohorte-doctor health, specs/kanban boards, metrics, and one-click install/update/audit actions.
+    title: Readable without an agent
+    details: cohorte doctor, specs and metrics report a project's health, board and cost straight from the shell — doctor exits 1 on any bad check, so it drops into CI as-is.
 ---
 
 <div align="center">
