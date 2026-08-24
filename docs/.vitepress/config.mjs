@@ -14,7 +14,7 @@ export default defineConfig({
     logo: '/cohorte-mark.svg',
 
     nav: [
-      { text: 'Guide', link: '/guide/what-is-cohorte' },
+      { text: 'Guide', link: '/guide/why-cohorte' },
       { text: 'Reference', link: '/reference/commands' },
       {
         text: 'Changelog',
@@ -27,6 +27,7 @@ export default defineConfig({
         {
           text: 'Introduction',
           items: [
+            { text: 'Why not just ask your agent?', link: '/guide/why-cohorte' },
             { text: 'What is Cohorte?', link: '/guide/what-is-cohorte' },
             { text: 'Getting started', link: '/guide/getting-started' },
           ],

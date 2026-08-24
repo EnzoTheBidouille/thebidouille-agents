@@ -24,6 +24,37 @@ Cursor, Gemini CLI or OpenCode. Install it once globally, then one command per p
   /cohorte-brainstorm → /cohorte-spec → (design) → /cohorte-build <id> → /cohorte-review → (/cohorte-fix) → /cohorte-ship
   ```
 
+<div align="center">
+  <img src="https://raw.githubusercontent.com/TheBidouilleAgency/cohorte/main/assets/demo-cli.gif" alt="cohorte doctor reporting a green pipeline, the spec board, and the gate denying a chained destructive command" width="760">
+  <br>
+  <sub><code>cohorte doctor</code> · the spec board · the gate refusing a hard-denied command chained behind a benign one.<br>
+  Recorded from the real CLI by <code>scripts/demo/record-cli.sh</code> — no output is hand-edited.</sub>
+</div>
+
+## Why a pipeline at all
+
+Your coding agent is already good at the first prompt of a feature. It gets worse at every one
+after — because what it knows lives in a conversation, and a conversation gets summarised,
+truncated, and re-sent at input price on every turn. Cohorte is the set of constraints that stop
+that degradation. Each one is a failure you have already had:
+
+| The failure | The constraint |
+| --- | --- |
+| *"It forgot what we decided."* | The spec is **frozen to disk** and re-read by every stateless agent. Nothing is remembered, so nothing is forgotten — and `/clear` between stages is always safe. |
+| *"The API and the UI don't fit."* | The **contract is authored before any implementer is dispatched**. Surfaces import it read-only and never talk to each other — which is what makes building them in parallel safe. |
+| *"It edited a file I didn't want it to."* | **One owner per tree**, enforced in the rendered agent's frontmatter — not requested politely in a prompt. |
+| *"It ran something it shouldn't have."* | `gate.py` is a **real blocking hook**, branch-aware, hard-denying destructive commands from every agent — subagents included. |
+| *"The review said it was fine."* | Review is a **separate read-only agent** that sees the spec and the diff, never the conversation that produced them. A dead reviewer's zero findings can't read as ship. |
+| *"Four agents just told me it doesn't compile."* | A **deterministic preflight** runs typecheck/lint/tests first. Red ⇒ **zero agents spawned**. |
+| *"We fixed this same thing last week."* | `/cohorte-retro` turns repeated findings into ratified conventions **baked into the implementers**, so the next build never produces them. |
+
+None of this is intelligence added to your agent — it's the opposite. It moves the decisions an
+agent makes badly under context pressure into files, hooks and ownership boundaries, where they're
+cheap and don't degrade with conversation length. Which is why it's markdown, shell and one Python
+hook: **your app code never imports anything from Cohorte.**
+
+[**The long version — including the four cases where you shouldn't use it →**](https://thebidouilleagency.github.io/cohorte/guide/why-cohorte)
+
 ## How it works — three layers
 
 | Layer | What it holds | Lives in | Scope |
