@@ -13,8 +13,8 @@ hero:
       text: Get started
       link: /guide/getting-started
     - theme: alt
-      text: What is Cohorte?
-      link: /guide/what-is-cohorte
+      text: Why not just ask your agent?
+      link: /guide/why-cohorte
     - theme: alt
       text: GitHub
       link: https://github.com/TheBidouilleAgency/cohorte
@@ -36,6 +36,24 @@ features:
     title: Cockpit included
     details: cohorte dashboard serves a local web cockpit — fleet freshness, /cohorte-doctor health, specs/kanban boards, metrics, and one-click install/update/audit actions.
 ---
+
+<div align="center">
+  <img src="/demo-cli.gif" alt="cohorte doctor reporting a green pipeline, the spec board, and the gate denying a chained destructive command" width="760">
+</div>
+
+<p align="center"><sub><code>cohorte doctor</code> · the spec board · the gate refusing a hard-denied command chained behind a benign one.<br>
+Recorded from the real CLI by <code>scripts/demo/record-cli.sh</code> — no output is hand-edited.</sub></p>
+
+## Why a pipeline at all
+
+Your agent is already good at the first prompt of a feature. It gets worse at every one after —
+because what it knows lives in a conversation, and a conversation degrades. Cohorte is the set of
+constraints that stop that: **decisions frozen to disk** (not remembered), a **contract agreed
+before either surface is written**, **one owner per tree**, a **blocking hook** on destructive
+commands, and a **reviewer that never saw the conversation that produced the code**.
+
+→ [Why not just ask your agent?](/guide/why-cohorte) — the seven failures it removes, and the four
+cases where you shouldn't use it.
 
 ## The loop, end to end
 

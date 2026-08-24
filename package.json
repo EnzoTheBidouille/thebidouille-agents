@@ -16,6 +16,7 @@
     "scripts",
     "!scripts/new-feature.sh",
     "!scripts/remove-feature.sh",
+    "!scripts/demo",
     "!core/hooks/__pycache__",
     "!**/*.pyc",
     "dashboard/server",
