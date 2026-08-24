@@ -18,7 +18,6 @@ npm i -g cohorte                # once per machine — this is what puts `cohort
 cohorte install [target]        # bundled: core into <target>/.claude (committable)
 cohorte install --global        # global: one shared core in ~/.claude + gate hook registered
 cohorte update  [--global]      # refresh the stack-agnostic core ONLY
-cohorte dashboard [--port=N] [--host=ADDR] [--open]
 cohorte metrics [target] [--days=N] [--since=ISO] [--runs] [--json]
 cohorte specs   [target] [--porcelain | --json | --panel]
 cohorte doctor  [target] [--porcelain | --json | --panel]
@@ -53,7 +52,7 @@ do not own.
 the shell. `specs` prints the board (`id`, `status`, `branch`, `title`) from the frontmatter of
 `specs/*.md`; `doctor` runs the same checks `/cohorte-doctor` runs — core, pointer, profile,
 surfaces↔agents, gate, hook, retrieval, design, isolation, specs — and **exits 1 when any check
-is bad**, so it drops into CI unchanged. Both reuse the dashboard's own readers, so the board and
+is bad**, so it drops into CI unchanged. Both read through `lib/`, so the board and
 the CLI can never give two answers about one repo.
 
 Three machine-readable shapes:
@@ -144,6 +143,6 @@ core/                  copied verbatim into ~/.claude or <project>/.claude
   agents/ commands/ hooks/ templates/ workflows/
 profile/               PIPELINE.template.md · SCHEMA.md · cohorte.config.template.yaml
 scripts/               shipped scripts + isolation templates + validate-core.mjs
-dashboard/             server/ (shipped runtime) · app/ (Vite+React source) · dist/ (built)
+lib/                   shared readers behind `cohorte doctor` / `specs` (dependency-free)
 docs/                  this site (VitePress → GitHub Pages)
 ```

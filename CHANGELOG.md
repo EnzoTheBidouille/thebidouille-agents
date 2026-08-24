@@ -7,6 +7,31 @@ short, user-facing, most recent first. One `## <version> — <YYYY-MM-DD>` secti
 > They are history and are deliberately not rewritten — every command gained a `cohorte-` prefix
 > in 2.0.0.
 
+## 2.10.0 — 2026-08-24
+
+- **The dashboard is gone.** The local web cockpit — the `cohorte dashboard` verb, the
+  dependency-free HTTP server, the Vite/React app and the prebuilt `dashboard/dist` that shipped
+  in every tarball — is removed, along with the fleet registry, kanban and usage readers that
+  only it consumed. It was a second surface for state the CLI already reports, with its own
+  build step, its own security posture (loopback-bound because its action endpoints executed
+  code: install, update, reset, and `/cohorte-init-pipeline`·`/cohorte-update-pipeline`·`/cohorte-audit`
+  through headless Claude), and its own drift to police. `cohorte doctor`, `cohorte specs` and
+  `cohorte metrics` answer the same questions from the shell, and `doctor` exits 1 on any bad
+  check, which the browser never could.
+
+  **What did not go with it:** the four modules those verbs actually run on — the JS port of
+  `/cohorte-doctor`, the runtime-layout resolver, the version prober and the block-YAML parser —
+  moved from `dashboard/server/` to **`lib/`**. `cohorte doctor` / `specs` / `version` behave
+  exactly as before, and so do the Francois extension's `--panel` payloads. Their test suite
+  moved with them (`scripts/test-dashboard.mjs` ⇒ `scripts/test-lib.mjs`, 54 assertions), minus
+  the cases that covered deleted code.
+
+  Fallout worth naming: the package no longer has a build step at all (`prepack` and
+  `build:dashboard` are gone, npm and CI no longer build a React app to publish), the tarball
+  drops from 88 files to 73, and `~/.claude/cohorte-dashboard.json` — the tracked-project list —
+  is now dead; delete it. `--port` / `--host` / `--open` and `COHORTE_DASHBOARD_PORT` /
+  `COHORTE_DASHBOARD_HOST` no longer exist; `cohorte dashboard` prints the usage and exits 2.
+
 ## 2.9.0 — 2026-08-22
 
 - **`/cohorte-intake` — the door before the doors.** Work has always entered the pipeline

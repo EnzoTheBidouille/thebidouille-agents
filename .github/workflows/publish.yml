@@ -26,10 +26,10 @@ jobs:
         with:
           node-version: 24
 
-      - name: Syntax-check CLI + dashboard server
+      - name: Syntax-check CLI + shared readers
         run: |
-          node --check bin/cli.js
-          for f in dashboard/server/*.js; do node --check "$f"; done
+          node --check bin/cli.js bin/report.js
+          for f in lib/*.js; do node --check "$f"; done
 
       # The same structural gate CI runs — publish must not outrun a red CI:
       # this workflow has no dependency on the CI workflow's conclusion, so a
@@ -40,7 +40,7 @@ jobs:
           node scripts/test-workflows.mjs
           node scripts/test-gate.mjs
           node scripts/test-kanban.mjs
-          node scripts/test-dashboard.mjs
+          node scripts/test-lib.mjs
           node scripts/test-metrics.mjs
           node scripts/test-adapter.mjs
           python3 -m py_compile core/hooks/gate.py
@@ -53,15 +53,10 @@ jobs:
           CLAUDE_CONFIG_DIR="$scratch/.claude" node bin/cli.js update --global
           node scripts/assert-gate-hook.mjs "$scratch/.claude/settings.json"
 
-      - name: Build dashboard (produces dashboard/dist for the tarball)
-        run: npm run build:dashboard
-
-      # --ignore-scripts: the dashboard was built one step above, and `prepack`
-      # would otherwise rebuild it just to list the tarball.
       - name: Verify package contents
         run: |
-          npm pack --dry-run --ignore-scripts 2>&1 | tee /tmp/pack.txt
-          grep -q 'dashboard/dist/index.html' /tmp/pack.txt   # the built app must ship
+          npm pack --dry-run 2>&1 | tee /tmp/pack.txt
+          grep -q 'lib/doctor.js' /tmp/pack.txt   # the readers behind `cohorte doctor` must ship
           if grep -qiE '__pycache__|\.pyc' /tmp/pack.txt; then
             echo "::error::the npm tarball contains Python bytecode"; exit 1
           fi
@@ -120,9 +115,6 @@ jobs:
         run: |
           npm install -g npm@latest
           npm --version
-
-      - name: Build dashboard (produces dashboard/dist for the tarball)
-        run: npm run build:dashboard
 
       - name: Publish to npm
         run: npm publish --provenance --access public

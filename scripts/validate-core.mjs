@@ -273,12 +273,12 @@ const workflowNames = existsSync(workflowsDir)
   ? readdirSync(workflowsDir).filter((f) => f.endsWith(".js"))
   : [];
 const ci = existsSync(join(root, ".github/workflows/ci.yml")) ? read(".github/workflows/ci.yml") : "";
-const dashDoctor = read("dashboard/server/doctor.js");
+const libDoctor = read("lib/doctor.js");
 for (const f of workflowNames) {
   if (!ci.includes(`workflows/${f}`))
     fail(".github/workflows/ci.yml", `install dry-run never asserts .claude/workflows/${f}`);
-  if (!dashDoctor.includes(`'${f}'`))
-    fail("dashboard/server/doctor.js", `checkWorkflows() does not list ${f}`);
+  if (!libDoctor.includes(`'${f}'`))
+    fail("lib/doctor.js", `checkWorkflows() does not list ${f}`);
 }
 
 // ── every test suite must run in BOTH workflows ──────────────────────────────
@@ -297,21 +297,6 @@ for (const f of readdirSync(join(root, "scripts")).filter((f) => /^test-.*\.mjs$
   if (publishYml && !publishYml.includes(`scripts/${f}`))
     fail(".github/workflows/publish.yml", `never runs scripts/${f} — publish would ship past a failure that gate is meant to catch`);
 }
-
-// ── dashboard: the metrics phase list is duplicated server/client ────────────
-// A phase present in one and not the other parses fine and renders in no column —
-// silently invisible data, which is how a phase batch once went unnoticed.
-const phaseList = (text, file) => {
-  const m = text.match(/const PHASES = \[([^\]]*)\]/);
-  if (!m) { fail(file, "no `const PHASES = [...]` found"); return null; }
-  return m[1].split(",").map((s) => s.trim().replace(/^['"]|['"]$/g, "")).filter(Boolean);
-};
-const serverPhases = phaseList(read("dashboard/server/metrics.js"), "dashboard/server/metrics.js");
-const clientPhases = phaseList(read("dashboard/app/src/components/MetricsPanel.jsx"),
-  "dashboard/app/src/components/MetricsPanel.jsx");
-if (serverPhases && clientPhases && serverPhases.join("|") !== clientPhases.join("|"))
-  fail("dashboard/app/src/components/MetricsPanel.jsx",
-    `PHASES drifted from dashboard/server/metrics.js ([${clientPhases}] vs [${serverPhases}])`);
 
 // ── packaging: no build artifacts in the published tarball ──────────────────
 // `.npmignore` is INERT under an explicit package.json `files` allowlist, so its

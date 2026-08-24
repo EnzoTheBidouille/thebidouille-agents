@@ -46,7 +46,7 @@ Design decisions worth knowing:
   subagents spawned by the Workflow runtime alike. Workflow subagents run in `acceptEdits`
   whatever the session mode (their Write/Edit calls are auto-approved), but `acceptEdits` does
   **not** auto-approve Bash or Task — the gate still sees and can block them.
-- **Unattended runs: ask ⇒ deny.** In `bypassPermissions` (headless `claude -p`, dashboard
+- **Unattended runs: ask ⇒ deny.** In `bypassPermissions` (headless `claude -p`, workflow
   actions) there is no human to answer a prompt, so every `ask` match is escalated to a hard
   deny with the reason attached — a clear refusal beats a prompt that can never be answered.
 - **Fail-open on config problems**: a missing or unparseable `gate-config.json` makes the hook

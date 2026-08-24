@@ -47,7 +47,7 @@ A `[<kind>]` prefix in the title is a **human convention, not a mechanism** — 
 you can use whatever set fits your board (`[chore]`, `[premium]`, `[base]`…). Cohorte only writes
 one itself: `/cohorte-patch` titles its cards `[patch] <title>`, and reads the prefix back when it
 offers the **Ideas** column, listing `[patch]` cards first. So a bug you drop in Ideas as
-`- [ ] [patch] 500 on empty cart` is what `/cohorte-patch` picks up with no argument. Once shipped, `/cohorte-ship` appends the PR number — which the dashboard renders
+`- [ ] [patch] 500 on empty cart` is what `/cohorte-patch` picks up with no argument. Once shipped, `/cohorte-ship` appends the PR number — which `cohorte specs` reports
 as a clickable link with live open/merged/closed status.
 
 ## Stage → column
@@ -97,9 +97,3 @@ creation) maps each spec's `status` to a column (`frozen`→ready, `in-review`�
 `shipped`→shipped, else spec) and **fully syncs**: missing cards are added, existing cards are
 *moved* to the right column — the board always reflects the specs, even where a human dragged
 cards around.
-
-## In the dashboard
-
-When a project has a linked board, the [dashboard](/guide/dashboard) renders it (columns + cards
-from the vault) instead of the plain specs board — with clickable PR links, live PR status via
-`gh`, and a ship-date-sorted Shipped column.

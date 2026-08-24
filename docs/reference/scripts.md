@@ -60,7 +60,7 @@ prefix, install/dev/migrate commands, per-surface env stanzas).
 
 - `scripts/validate-core.mjs` — CI's structural validator for the core itself: command/agent
   frontmatter + model pins, template placeholders, cross-references, the no-telemetry ratchet,
-  installer coverage of every shipped script, dashboard phase-list parity, packaging negations,
+  installer coverage of every shipped script, packaging negations,
   and workflow-script invariants (parses each `core/workflows/*.js` exactly as the runtime does —
   async body wrap — plus meta literal, `profile-reader` phase 0, no `Date.now()`).
 - `scripts/test-workflows.mjs` — **behavioural** tests for `core/workflows/*.js`: runs each script
@@ -84,17 +84,17 @@ prefix, install/dev/migrate commands, per-surface env stanzas).
   doctrine matching that runtime's capabilities, the gate described as blocking or advisory
   according to whether it really is, only supported frontmatter keys surviving, the reviewer's
   read-only restriction re-emitted in that runtime's spelling, and Claude Code's output unchanged.
-- `scripts/test-dashboard.mjs` — tests for `dashboard/server/*.js`, all shipped runtime code: the
-  block-YAML parser (against the real `PIPELINE.template.md`), the metrics aggregator (new +
-  legacy line formats), the JS port of `/cohorte-doctor` (each check green, then each one made to fail),
-  the Obsidian board parser, the fleet registry, and the HTTP guards — driven over a real socket,
-  because `fetch` silently drops a forged `Host` header and would pass against no guard at all.
+- `scripts/test-lib.mjs` — tests for `lib/*.js`, the shipped runtime code behind `cohorte doctor`
+  and `cohorte specs`: the block-YAML parser (against the real `PIPELINE.template.md`), the JS port
+  of `/cohorte-doctor` (each check green, then each one made to fail), and the runtime-layout
+  resolver — including a non-Claude layout and a registry whose absolute paths point at someone
+  else's checkout, both of which used to report a healthy install as several false reds.
 - `scripts/assert-gate-hook.mjs` — post-install assertion on a `settings.json`: exactly one
   `gate.py` registration (callers install twice first), with a matcher covering both `Bash` and
   `Task`. Both invariants are shipped regressions.
-- `.github/workflows/ci.yml` — runs the validator, syntax-checks CLI/server/hook/installers,
+- `.github/workflows/ci.yml` — runs the validator, syntax-checks CLI/lib/hook/installers,
   and **dry-runs both installers** into scratch homes, asserting the exact postconditions
   (agents present, scripts executable, workflows shipped, templates-not-rendered).
 - `.github/workflows/publish.yml` — publish-on-main: version-diff check against the registry, a
-  required CHANGELOG entry, dashboard build, `npm publish --provenance` (token-less OIDC trusted
+  required CHANGELOG entry, `npm publish --provenance` (token-less OIDC trusted
   publishing), tag + GitHub release.

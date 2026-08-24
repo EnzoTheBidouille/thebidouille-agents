@@ -98,8 +98,8 @@ watch, rather than letting the job go red.
 **Move the card to Shipped — required, and verify it actually moved.** Run
 `<core>/pipeline/scripts/kanban-move.sh auto $ARGUMENTS shipped --pr <num>`, which **appends the PR
 number** so the line reads `- [ ] <title> #$ARGUMENTS — PR #<num>`. Take `<num>` from the PR URL
-(`…/pull/13` ⇒ `13`); **always pass it when a PR was created** (the `gh` path) — it is what the
-dashboard turns into a PR link. If only a compare URL was emitted (no PR yet), drop `--pr`.
+(`…/pull/13` ⇒ `13`); **always pass it when a PR was created** (the `gh` path) — it is what a
+board reader turns into a PR link. If only a compare URL was emitted (no PR yet), drop `--pr`.
 
 Then **read the script's own output**, which is the verification: `moved #$ARGUMENTS -> Shipped
 (PR #<num>)` means done, and a `kanban: <reason>` line means the mirror is off and says why. Both are

@@ -14,9 +14,8 @@ nothing more.
 fire a loop per worktree from here — is the 2.2.0 driver's grave: child sessions nobody
 supervises, stalling on prompts nobody sees. Each feature's build/review/loop runs in **its own
 worktree's session**, supervised like any other; the fleet plans, watches and rebases. State
-lives in `specs/reports/fleet.json` (the main checkout's gitignored buffer — not to be confused
-with the dashboard's multi-*project* fleet registry; this file is this repo's multi-*feature*
-flight plan).
+lives in `specs/reports/fleet.json` (the main checkout's gitignored buffer — this repo's
+multi-*feature* flight plan).
 
 > Read `PIPELINE.md` §`pipeline-profile` first: `surfaces` (paths — the overlap analysis keys
 > on them), `contract`, `vcs.default_branch`, and the `isolation` block. _Skip the re-read if

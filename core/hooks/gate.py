@@ -23,7 +23,7 @@ and subagents spawned by the Workflow runtime alike. Workflow subagents run in
 acceptEdits regardless of the session's permission mode (their Write/Edit calls
 are auto-approved), but acceptEdits does NOT auto-approve Bash or Task, so this
 gate still sees and can block them. In bypassPermissions (headless `claude -p`,
-dashboard actions) there is no human to answer a prompt, so every `ask` match is
+unattended workflow runs) there is no human to answer a prompt, so every `ask` match is
 escalated to a hard deny with the reason attached — a clear refusal beats a
 prompt that can never be answered.
 

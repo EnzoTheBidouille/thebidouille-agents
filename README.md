@@ -237,45 +237,6 @@ decisions), surface agents are re-rendered, settings are patched additively, new
 wired. **`/cohorte-init-pipeline` is one-time per project** — after init, `/cohorte-update-pipeline` is the only
 maintenance command you ever run (`/cohorte-build` auto-grows surfaces as specs need them).
 
-## Dashboard — a local web cockpit
-
-A browser view of pipeline state, for when a checklist beats scanning files:
-
-```sh
-cohorte dashboard          # serves http://localhost:4317 (Ctrl-C to stop)
-cohorte dashboard <path>   # start focused on another project
-cohorte dashboard --port=4400 --open   # custom port, open the browser
-```
-
-**Bound to `127.0.0.1` by default** — the dashboard's actions execute code (install/update/reset,
-and `/cohorte-init-pipeline`·`/cohorte-update-pipeline`·`/cohorte-audit` via headless Claude), so it must stay on loopback. Each user
-runs their own agent and drives only their own machine. `--host=0.0.0.0` exposes it to the network
-(it prints a security warning) — only on a trusted network, since anyone who reaches the port can run
-those actions.
-
-- **Fleet overview** — the global core version vs npm latest, plus every tracked project's freshness
-  and health at a glance. Add a project by absolute path or with the **folder picker** (Browse…); the
-  set is remembered in `~/.claude/cohorte-dashboard.json`.
-- **Per-project drill-down** — Freshness (installed core vs npm), `/cohorte-doctor` rendered as a live
-  ✅/⚠️/❌ checklist (each failure with its fix), the **Surfaces ↔ agents** map from `PIPELINE.md`,
-  and one board: a **Kanban** if the project has a linked Obsidian board (columns + cards from the
-  vault, with clickable PR links + live open/merged/closed status and a ship-date-sorted Shipped
-  column, via `gh`), otherwise a **Specs board** from `specs/*.md` (by `draft · frozen · in-progress ·
-  in-review · blocked · shipped`). The Kanban supersedes the Specs board when both would apply.
-- **Actions** (stream their output live) — **Update / Install core** (the shared global core, or a
-  repo's bundled core); **Init-pipeline / Update-pipeline / Audit**, which run those Claude Code
-  commands **headless** (`claude -p`, autonomous — Init skips the interactive interview, so review
-  the result; Audit writes `specs/refactor-backlog.md`; headless runs start without any prompt and
-  have **no resume** if the session dies); and **Reset pipeline**, which backs up then wipes a
-  project's pipeline footprint and reinstalls a fresh core. Buttons render only when they apply
-  (e.g. Init only when there's no profile). The drill-down's health checklist also shows the
-  **workflows** state (scripts + profile-reader installed, which path a session will take).
-
-Runtime is **dependency-free** — node's built-in `http` server serves a prebuilt React app (the app
-source lives in `dashboard/app/`, built to `dashboard/dist/` at publish time). The `/cohorte-doctor` checks
-are reimplemented in JS, so the dashboard needs no Claude session to compute state. See
-[`dashboard/README.md`](dashboard/README.md) for the architecture.
-
 ## Reading a project without an agent
 
 The two read-only halves of the pipeline, in the shell:
@@ -291,8 +252,8 @@ extension below renders.
 
 `doctor`'s exit code makes it a CI step as-is. Add `--porcelain` for one record per line with
 `U+001F` between fields (a spec title with a space in it never misaligns a column), or `--json`
-for the native document. Both reuse the dashboard's own readers, so the board and the CLI can
-never give two answers about one repo.
+for the native document. Both read through `lib/`, so every consumer — the CLI, a Francois
+panel — answers from one implementation and the repo never gets two verdicts.
 
 `--panel` — on `specs`, `doctor` and `metrics` — emits the payload shape a
 [Francois](https://github.com/antoine-gmnz/francois) extension panel expects. It is the one
@@ -449,7 +410,10 @@ See `profile/SCHEMA.md` for every field in `PIPELINE.md` and how the pipeline us
 
 ```
 package.json            # npm package (cohorte) — semver source of truth
-bin/cli.js              # the npm CLI: install / update / dashboard / specs / doctor / metrics / version (cross-platform, no deps)
+bin/cli.js              # the npm CLI: install / update / specs / doctor / metrics / version (cross-platform, no deps)
+bin/report.js           # the four renderings of `specs` / `doctor` (human, porcelain, json, panel)
+lib/                    # shared readers behind those verbs — doctor.js (the JS port of
+                        #   /cohorte-doctor) + runtime.js / versions.js / yaml.js. No deps.
 install.sh              # script installer (fresh + --update) for npm-less setups — still needs Node
 install.ps1             # same installer for Windows PowerShell (fresh + -Update)
 core/                   # copied verbatim into ~/.claude (global) or <project>/.claude (bundled)
@@ -463,7 +427,4 @@ profile/
   SCHEMA.md             # field reference
   cohorte.config.template.yaml   # seeds ~/.claude/cohorte.config.yaml (kanban)
 scripts/                # worktree-isolation templates + the shipped preflight/kanban scripts
-dashboard/              # local web cockpit (cohorte dashboard) — see dashboard/README.md
-  server/               # dependency-free node runtime (serves the built app + JSON/stream API)
-  app/                  # Vite + React source (built to dashboard/dist/ at publish time)
 ```

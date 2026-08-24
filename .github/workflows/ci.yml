@@ -33,10 +33,10 @@ jobs:
       - name: Runtime adapter tests
         run: node scripts/test-adapter.mjs
 
-      - name: Syntax-check CLI + dashboard server
+      - name: Syntax-check CLI + shared readers
         run: |
-          node --check bin/cli.js
-          for f in dashboard/server/*.js; do node --check "$f"; done
+          node --check bin/cli.js bin/report.js
+          for f in lib/*.js; do node --check "$f"; done
 
       - name: Syntax-check gate hook
         run: python3 -m py_compile core/hooks/gate.py
@@ -49,12 +49,12 @@ jobs:
       - name: Gate hook behaviour tests
         run: node scripts/test-gate.mjs
 
-      # The dashboard server is shipped runtime code: a hand-rolled YAML parser
-      # every /cohorte-doctor check derives from, a metrics aggregator, the JS port of
-      # /cohorte-doctor, the board parser, the fleet registry — plus the HTTP guards that
-      # are the only thing standing between a web page and the local agent.
-      - name: Dashboard server tests
-        run: node scripts/test-dashboard.mjs
+      # lib/ is shipped runtime code behind `cohorte doctor` and `cohorte specs`:
+      # a hand-rolled YAML parser every check derives from, the JS port of
+      # /cohorte-doctor, and the runtime-layout resolver that decides where a given
+      # coding agent keeps its core — where a wrong answer is a false red.
+      - name: Shared reader tests
+        run: node scripts/test-lib.mjs
 
       # kanban-move.sh is the board mirror's only writer, and its failure mode is
       # silence: every call site chains `|| true`, so a card that stopped moving
@@ -256,9 +256,6 @@ jobs:
           test ! -e "$scratch/.claude/hooks/__pycache__"
           test ! -e "$scratch/sh/.claude/hooks/__pycache__"
           rm -rf core/hooks/__pycache__
-
-      - name: Build dashboard
-        run: npm run build:dashboard
 
   validate-windows:
     # install.ps1 re-implements the hook reconcile in PowerShell — a regression

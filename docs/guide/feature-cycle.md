@@ -224,6 +224,6 @@ every other runtime ([Runtimes](/reference/runtimes)).
 | `specs/reports/<id>.verdict.json` | `/cohorte-review` §3, every run | you; an external driver — the only machine contract |
 | `specs/reports/<id>.readiness.json` | `/cohorte-build` §1.6, every build | you on a `NOT-READY`; an external driver |
 | `specs/reports/<id>.build.json` | `/cohorte-build` §4, every batch | you; an external driver (dead implementers) |
-| `<state>/pipeline-metrics.jsonl` | `/cohorte-build` `/cohorte-review` `/cohorte-fix` (gitignored) | surface-split decisions, dashboard |
+| `<state>/pipeline-metrics.jsonl` | `/cohorte-build` `/cohorte-review` `/cohorte-fix` (gitignored) | surface-split decisions, `cohorte metrics` |
 | `specs/refactor-backlog.md` | `/cohorte-audit` + `/cohorte-review`'s deferred findings | `/cohorte-refactor` |
 | `specs/_decisions.md` | `/cohorte-spec` at freeze, `/cohorte-build` on a surface split | `/cohorte-brainstorm` `/cohorte-spec` `/cohorte-audit` only |

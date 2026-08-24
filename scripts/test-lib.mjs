@@ -1,29 +1,23 @@
 #!/usr/bin/env node
-// Tests for the dashboard's server modules (dashboard/server/*.js).
+// Tests for the shared readers in lib/.
 //
-// These are shipped runtime code with real logic and zero coverage until now:
-// a hand-rolled YAML parser that every /cohorte-doctor check is derived from, a metrics
-// aggregator, the JS port of /cohorte-doctor, an Obsidian board parser, the fleet
-// registry, and an HTTP layer whose guards are the dashboard's only defence
-// against a web page driving the local agent.
+// These are shipped runtime code behind `cohorte doctor` and `cohorte specs`
+// (and the Francois panels that call them): a hand-rolled YAML parser every
+// check derives from, the JS port of /cohorte-doctor, and the runtime-layout
+// resolver that decides where a given coding agent keeps its core.
 //
-//   node scripts/test-dashboard.mjs
+//   node scripts/test-lib.mjs
 
 import { createRequire } from "node:module";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import net from "node:net";
 
 const require = createRequire(import.meta.url);
 const root = fileURLToPath(new URL("..", import.meta.url));
-const { parse, parseProfileBlock } = require(join(root, "dashboard/server/yaml.js"));
-const { metrics } = require(join(root, "dashboard/server/metrics.js"));
-const { usage } = require(join(root, "dashboard/server/usage.js"));
-const { state, scanSpecs } = require(join(root, "dashboard/server/doctor.js"));
-const { kanban } = require(join(root, "dashboard/server/kanban.js"));
-const fleet = require(join(root, "dashboard/server/fleet.js"));
+const { parse, parseProfileBlock } = require(join(root, "lib/yaml.js"));
+const { state, scanSpecs } = require(join(root, "lib/doctor.js"));
 
 let failures = 0;
 const check = (name, cond, detail = "") => {
@@ -34,7 +28,7 @@ const eq = (name, got, want) =>
   check(name, JSON.stringify(got) === JSON.stringify(want), `got ${JSON.stringify(got)}`);
 
 const tmps = [];
-const scratch = () => { const d = mkdtempSync(join(tmpdir(), "dash-")); tmps.push(d); return d; };
+const scratch = () => { const d = mkdtempSync(join(tmpdir(), "cohorte-lib-")); tmps.push(d); return d; };
 const write = (p, s) => { mkdirSync(join(p, ".."), { recursive: true }); writeFileSync(p, s); };
 
 // ── yaml.js ──────────────────────────────────────────────────────────────────
@@ -71,59 +65,6 @@ console.log("yaml.js — the profile parser");
   eq("…gate.preflight.max_age_minutes is a number", p.gate.preflight.max_age_minutes, 30);
   eq("…port_base flow map", p.isolation.port_base, { api: 3333, web: 5173 });
   eq("…a chained migrate command survives", p.commands.migrate, "cd apps/api && node ace migration:run");
-}
-
-// ── metrics.js ───────────────────────────────────────────────────────────────
-console.log("metrics.js — the funnel aggregate");
-{
-  const d = scratch();
-  const lines = [
-    JSON.stringify({ ts: "2026-01-01T00:00:00Z", feature: "f1", phase: "build", seconds: 100, surfaces: { backend: "ok", frontend: "error" } }),
-    JSON.stringify({ ts: "2026-01-01T01:00:00Z", feature: "f1", phase: "review", seconds: 50, surfaces: { backend: "REVISE:2" } }),
-    JSON.stringify({ ts: "2026-01-01T02:00:00Z", feature: "f1", phase: "fix", seconds: 20, surfaces: { backend: "ok" } }),
-    JSON.stringify({ ts: "2026-01-01T03:00:00Z", feature: "f1", phase: "cycle", seconds: 0, rounds: 3, smoke: "SKIPPED", surfaces: { backend: "SHIP:0" } }),
-    // legacy: one line PER surface, folded into one batch, wall-clock = max
-    JSON.stringify({ ts: "2026-01-02T00:00:00Z", feature: "f2", phase: "build", surface: "backend", seconds: 10, result: "ok" }),
-    JSON.stringify({ ts: "2026-01-02T00:00:00Z", feature: "f2", phase: "build", surface: "frontend", seconds: 40, result: "ok" }),
-    "not json at all",
-    JSON.stringify({ ts: "x", feature: "f3" }),           // no phase ⇒ skipped
-    JSON.stringify({ ts: "x", feature: "f3", phase: "build" }), // neither surfaces nor surface ⇒ skipped
-  ];
-  mkdirSync(join(d, ".claude"), { recursive: true });
-  writeFileSync(join(d, ".claude", "pipeline-metrics.jsonl"), lines.join("\n") + "\n");
-  const m = metrics({ projectRoot: d });
-
-  eq("malformed + incomplete lines are skipped", m.batches, 5);
-  const f1 = m.features.find(f => f.feature === "f1");
-  const f2 = m.features.find(f => f.feature === "f2");
-  eq("per-phase wall-clock", f1.phases.build.seconds, 100);
-  eq("fix rounds counted", f1.fixRounds, 1);
-  eq("cycle rounds surface outside `surfaces`", f1.cycleRounds, 3);
-  eq("legacy lines fold into ONE batch", Object.keys(f2.surfaces).sort(), ["backend", "frontend"]);
-  eq("…with wall-clock = the slowest surface", f2.phases.build.seconds, 40);
-  eq("`error` counts as a surface failure", f1.surfaces.frontend.failures, 1);
-  eq("a REVISE verdict counts as a failure", f1.surfaces.backend.failures, 1);
-  check("newest feature first", m.features[0].feature === "f2", m.features[0].feature);
-  check("no metrics file ⇒ present:false", metrics({ projectRoot: scratch() }).present === false);
-}
-
-// ── usage.js ─────────────────────────────────────────────────────────────────
-// Wraps the ESM metrics collector for the CJS server. The failure that matters is
-// not a crash: a project with no transcripts must say so, because rendering zeros
-// reads as "this pipeline costs nothing" rather than "nothing was measured".
-console.log("usage.js — the collector bridge");
-{
-  const empty = usage({ projectRoot: scratch() });
-  check("a project with no transcripts reports present:false", empty.present === false);
-  check("…and says why rather than returning silent zeros",
-    typeof empty.error === "string" && empty.error.length > 0, JSON.stringify(empty));
-
-  // Same project twice: the second call must come from cache, or the panel's polling
-  // would re-parse tens of MB of transcripts on every refresh.
-  const d = scratch();
-  const t0 = Date.now(); usage({ projectRoot: d });
-  const t1 = Date.now(); usage({ projectRoot: d }); const cached = Date.now() - t1;
-  check("a repeated read is served from cache", cached <= Math.max(50, (t1 - t0)), `${cached}ms`);
 }
 
 // ── doctor.js ────────────────────────────────────────────────────────────────
@@ -259,149 +200,6 @@ console.log("doctor.js — the /cohorte-doctor port");
   eq("no core ⇒ core bad", by(s.checks, "core").status, "bad");
 }
 
-// ── kanban.js ────────────────────────────────────────────────────────────────
-console.log("kanban.js — the Obsidian board");
-{
-  const g = scratch(), vault = scratch(), d = scratch();
-  writeFileSync(join(d, "PIPELINE.md"), "```yaml pipeline-profile\nname: Proj\n```");
-  mkdirSync(join(vault, "Proj"), { recursive: true });
-  writeFileSync(join(vault, "Proj", "Tasks.md"), [
-    "---", "kanban-plugin: board", "---", "",
-    "## Spec", "", "- [ ] Do a thing  #feat-a", "\t- a note", "",
-    "## Shipped", "", "- [x] Old  #feat-z — PR #42", "",
-    "%% kanban:settings", "%%", "",
-  ].join("\n"));
-  writeFileSync(join(g, "cohorte.config.yaml"), [
-    "kanban:", "  enabled: true", "  boards:", "    Proj:", '      board: "Proj/Tasks.md"',
-    "obsidian:", `  vault_path: "${vault.replace(/\\/g, "/")}"`,
-  ].join("\n"));
-
-  const k = kanban({ projectRoot: d, globalDir: g });
-  check("board resolves for the profile name", k.enabled === true, k.reason);
-  eq("columns parsed", k.columns.map(c => c.name), ["Spec", "Shipped"]);
-  eq("cards counted", k.total, 2);
-  eq("the #tag is extracted", k.columns[0].cards[0].tags, ["feat-a"]);
-  eq("the tag is stripped from the display text", k.columns[0].cards[0].text, "Do a thing");
-  eq("a checked card is done", k.columns[1].cards[0].done, true);
-  eq("a bare #<num> is read as a PR reference", k.columns[1].cards[0].prs.map(p => p.num), ["42"]);
-  check("the settings trailer is not parsed as a column",
-    !k.columns.some(c => /kanban:settings/.test(c.name)));
-
-  writeFileSync(join(g, "cohorte.config.yaml"), "kanban:\n  enabled: false\n");
-  check("kanban disabled ⇒ enabled:false with a reason",
-    kanban({ projectRoot: d, globalDir: g }).enabled === false);
-  check("no config at all ⇒ enabled:false, never a throw",
-    kanban({ projectRoot: d, globalDir: scratch() }).enabled === false);
-}
-
-// ── fleet.js ─────────────────────────────────────────────────────────────────
-console.log("fleet.js — the project registry");
-{
-  const g = scratch(), p1 = scratch(), p2 = scratch();
-  fleet.ensureSeed(g, p1);
-  eq("seed adds the launch project", fleet.read(g), [p1]);
-  fleet.ensureSeed(g, p1);
-  eq("seeding twice does not duplicate", fleet.read(g).length, 1);
-  fleet.add(g, p2);
-  eq("add appends", fleet.read(g).length, 2);
-  fleet.remove(g, p2);
-  eq("remove drops it", fleet.read(g), [p1]);
-
-  let threw = null;
-  try { fleet.add(g, "relative/path"); } catch (e) { threw = e.message; }
-  check("a relative path is rejected with a clear message",
-    /must be absolute/.test(threw || ""), threw);
-  threw = null;
-  try { fleet.add(g, join(p1, "nope")); } catch (e) { threw = e.message; }
-  check("a non-existent path is rejected", /not found/.test(threw || ""), threw);
-
-  // legacy registry name is read, then migrated forward on the next write
-  const g2 = scratch();
-  writeFileSync(join(g2, "thebidouille-dashboard.json"), JSON.stringify({ projects: [p1] }));
-  eq("the pre-rename registry is still read", fleet.read(g2), [p1]);
-
-  const b = fleet.browse(p1);
-  check("browse lists a directory", Array.isArray(b.dirs) && b.parent !== null);
-  writeFileSync(join(p1, "PIPELINE.md"), "x");
-  check("browse flags a pipeline project", fleet.browse(p1).isProject === true);
-  const missing = fleet.browse(join(p1, "does-not-exist"));
-  check("browse reports an unreadable dir in the body (not a throw)",
-    !!missing.error && missing.dirs.length === 0, JSON.stringify(missing));
-}
-
-// ── index.js — the HTTP guards ───────────────────────────────────────────────
-console.log("index.js — HTTP guards");
-{
-  const freePort = await new Promise((res) => {
-    const s = net.createServer();
-    s.listen(0, "127.0.0.1", () => { const { port } = s.address(); s.close(() => res(port)); });
-  });
-  const home = scratch();                       // stands in for the user's home
-  const globalDir = join(home, ".claude");      // …so <home>/.claude IS the global core
-  mkdirSync(globalDir, { recursive: true });
-  const proj = scratch();
-  const start = require(join(root, "dashboard/server/index.js"));
-  start({ projectRoot: proj, globalDir, port: freePort, host: "127.0.0.1", openBrowser: false, pkgRoot: root, version: "9.9.9" });
-  const base = `http://127.0.0.1:${freePort}`;
-  const post = (body, headers = { "content-type": "application/json" }) =>
-    fetch(`${base}/api/action`, { method: "POST", headers, body: JSON.stringify(body) });
-
-  // `Host` is a forbidden header name for fetch/undici — it silently drops it, so
-  // a fetch-based assertion here passes against a server with NO guard at all.
-  // Speak raw HTTP instead.
-  const rawStatus = (host) => new Promise((res, rej) => {
-    const s = net.connect(freePort, "127.0.0.1", () => {
-      s.write(`GET /api/fleet HTTP/1.1\r\nHost: ${host}\r\nConnection: close\r\n\r\n`);
-    });
-    let buf = "";
-    s.on("data", (c) => { buf += c; });
-    s.on("end", () => res(Number((buf.match(/^HTTP\/1\.1 (\d+)/) || [])[1])));
-    s.on("error", rej);
-  });
-  eq("a forged Host header is rejected (DNS rebinding)", await rawStatus("evil.example.com"), 403);
-  eq("…while a loopback Host with a port passes", await rawStatus(`127.0.0.1:${freePort}`), 200);
-  eq("…and a bracketed IPv6 loopback passes", await rawStatus(`[::1]:${freePort}`), 200);
-  eq("…and bare 'localhost' passes", await rawStatus("localhost"), 200);
-
-  const csrf = await fetch(`${base}/api/projects`, {
-    method: "POST", headers: { "content-type": "text/plain" }, body: "path=/x",
-  });
-  eq("a state-changing request without JSON content-type is rejected (CSRF)", csrf.status, 403);
-
-  eq("a GET on the API still works", (await fetch(`${base}/api/fleet`)).status, 200);
-
-  const reset = await post({ action: "reset", project: home });
-  eq("reset refuses a project whose .claude IS the global core", reset.status, 400);
-  check("…and says why", /shared global core/.test((await reset.json()).error));
-
-  const badPath = await post({ action: "install", project: join(proj, "nope") });
-  eq("install refuses a non-existent project path", badPath.status, 400);
-
-  const badAction = await post({ action: "rm -rf" });
-  eq("an unknown action is rejected", badAction.status, 400);
-
-  const badCmd = await post({ action: "claude", command: "/evil", project: proj });
-  eq("a non-whitelisted slash command is rejected", badCmd.status, 400);
-
-  // Both directions, because testing only the rejection missed a real bug: 2.0.0 prefixed
-  // every command, the error message was updated to say `/cohorte-audit`, but the allowlist
-  // regex still matched the bare names — so the server accepted the one command that no
-  // longer exists and rejected the only one the UI can send. A rejection-only test is blind
-  // to an allowlist that drifts away from the client.
-  const staleCmd = await post({ action: "claude", command: "/audit", project: proj });
-  eq("the pre-2.0.0 unprefixed command is rejected", staleCmd.status, 400);
-
-  const goodCmd = await post({ action: "claude", command: "/cohorte-audit", project: proj });
-  check("a prefixed whitelisted command passes the allowlist",
-    goodCmd.status !== 400 || !/unsupported command/.test((await goodCmd.json()).error || ""));
-
-  eq("a missing hashed asset 404s (never index.html)",
-    (await fetch(`${base}/assets/index-DEADBEEF.js`)).status, 404);
-  eq("a malformed percent-escape is a 400, not a 500",
-    (await fetch(`${base}/%`)).status, 400);
-  eq("an unknown API route 404s", (await fetch(`${base}/api/nope`)).status, 404);
-}
-
 // ── runtime.js + a non-Claude layout ────────────────────────────────────────
 // Every path-dependent check used to assume `.claude/`. On a repo driven from Cursor that
 // reported a healthy install as three ❌ and a ⚠️ — no core, no rendered agent, artifacts not
@@ -463,20 +261,6 @@ console.log("doctor.js — a non-Claude runtime layout");
     st("workflows") === "skip" && /Cursor/.test(dt("workflows")), dt("workflows"));
   check("nothing is reported broken on a healthy non-Claude install",
     s.summary.bad === 0 && s.summary.warn === 0, JSON.stringify(s.summary));
-
-  // The metrics sink follows `<state>` too — and workflow-stamped `tokens` aggregate
-  // per feature/phase while token-less conversational lines read as 0, not NaN.
-  writeFileSync(join(d, ".cohorte", "pipeline-metrics.jsonl"),
-    JSON.stringify({ ts: "2026-01-01T00:00:00Z", feature: "f", phase: "build", seconds: 10,
-      tokens: 12000, surfaces: { api: "ok" } }) + "\n" +
-    JSON.stringify({ ts: "2026-01-01T01:00:00Z", feature: "f", phase: "review", seconds: 5,
-      surfaces: { api: "SHIP:0" } }) + "\n");
-  const m = metrics({ projectRoot: d, globalDir: g });
-  check("metrics are read from the runtime's state dir", m.batches === 2);
-  check("workflow tokens aggregate; token-less lines count as 0",
-    m.features[0].totalTokens === 12000 && m.features[0].phases.build.tokens === 12000
-      && m.features[0].phases.review.tokens === 0,
-    JSON.stringify(m.features[0] && { t: m.features[0].totalTokens, p: m.features[0].phases }));
 }
 
 // ── runtime.js — stale absolute registry paths (a cloned/moved bundled core) ─
@@ -485,7 +269,7 @@ console.log("doctor.js — a non-Claude runtime layout");
 // taken verbatim, every check went red on a healthy install.
 console.log("runtime.js — registry paths survive a clone/move");
 {
-  const { layouts } = require(join(root, "dashboard/server/runtime.js"));
+  const { layouts } = require(join(root, "lib/runtime.js"));
   const d = scratch();
   const core = join(d, ".claude");
   mkdirSync(join(core, "pipeline"), { recursive: true });
@@ -522,6 +306,5 @@ console.log("runtime.js — registry paths survive a clone/move");
 
 for (const d of tmps) { try { rmSync(d, { recursive: true, force: true }); } catch { /* best effort */ } }
 console.log("");
-if (failures) { console.error(`test-dashboard: ${failures} failure(s)`); process.exit(1); }
-console.log("test-dashboard: OK");
-process.exit(0);   // the HTTP server has no handle to close
+if (failures) { console.error(`test-lib: ${failures} failure(s)`); process.exit(1); }
+console.log("test-lib: OK");

@@ -40,7 +40,6 @@ function usage(code) {
 Usage:
   cohorte install   [target] [--global] [--runtime=a,b | --all-runtimes]
   cohorte update    [target] [--global] [--runtime=a,b | --all-runtimes]
-  cohorte dashboard [target] [--port=N] [--host=ADDR] [--open]
   cohorte metrics   [target] [--days=N] [--since=ISO] [--runs] [--json]
   cohorte specs     [target] [--porcelain | --json | --panel]
   cohorte doctor    [target] [--porcelain | --json | --panel]
@@ -53,11 +52,6 @@ Commands:
   update    Refresh the stack-agnostic core only. PIPELINE.md, rendered surface
             agents, gate-config.json, settings.json and your filled
             ~/.claude/cohorte.config.yaml are never touched.
-  dashboard Serve a local web cockpit for the pipeline (freshness, /cohorte-doctor
-            health, specs board, install/update actions). Binds 127.0.0.1:4317
-            by default (loopback only — its actions execute code). --host=ADDR
-            to expose (e.g. --host=0.0.0.0, prints a security warning). --open
-            to launch the browser.
   metrics   Cost and runtime per command, reconstructed from Claude Code's own
             transcripts (tokens, USD, wall/active time, subagent count). Reads
             ~/.claude/projects — nothing to enable, and it covers runs that
@@ -90,11 +84,6 @@ const args = process.argv.slice(2);
 let mode = null;
 let scope = 'project';
 let target = process.cwd();
-let port = parseInt(process.env.COHORTE_DASHBOARD_PORT, 10) || 4317;
-// Bind to loopback by default — the dashboard's action endpoints execute code (install/update/
-// reset/claude), so it must NOT be reachable from the network unless the user explicitly opts in.
-let host = process.env.COHORTE_DASHBOARD_HOST || '127.0.0.1';
-let openBrowser = false;
 
 // Flags that belong to `metrics` and are forwarded verbatim to the collector. They are
 // listed here rather than parsed, so the collector stays the single source of truth for
@@ -112,7 +101,7 @@ let format = 'human';
 let wantRuntimes = [];
 
 for (const a of args) {
-  if (a === 'install' || a === 'update' || a === 'dashboard' || a === 'metrics'
+  if (a === 'install' || a === 'update' || a === 'metrics'
       || a === 'specs' || a === 'doctor') mode = a;
   else if (a === '--porcelain' || a === '--panel') format = a.slice(2);
   else if (isMetricsFlag(a)) { if (a === '--json') format = 'json'; metricsFlags.push(a); }
@@ -131,40 +120,18 @@ for (const a of args) {
   }
   else if (a === 'version' || a === '--version' || a === '-v') { console.log(VERSION); process.exit(0); }
   else if (a === '--global' || a === '-g') scope = 'global';
-  else if (a.startsWith('--port=')) {
-    // A bad value used to land as NaN, which http.listen() silently treats as
-    // "any free port" — the banner then printed `localhost:NaN` and nothing worked.
-    port = parseInt(a.slice(7), 10);
-    if (!Number.isInteger(port) || port < 1 || port > 65535) {
-      console.error(`error: --port must be an integer 1-65535 (got "${a.slice(7)}")`);
-      process.exit(2);
-    }
-  } else if (a.startsWith('--host=')) {
-    host = a.slice(7).trim();
-    if (!host) { console.error('error: --host= needs an address (e.g. --host=0.0.0.0)'); process.exit(2); }
-  }
-  else if (a === '--open') { openBrowser = true; }
   else if (a === 'help' || a === '--help' || a === '-h') usage(0);
   else if (a.startsWith('-')) { console.error(`error: unknown flag: ${a}`); usage(2); }
   else target = path.resolve(a);
 }
 if (!mode) usage(args.length ? 2 : 0);
 
-// --- dashboard: local web cockpit -------------------------------------------
-// Short-circuits before the install/update machinery (CommonJS wraps the module,
-// so a top-level return is valid here). Runtime is dependency-free node `http`.
-if (mode === 'dashboard') {
-  const globalDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
-  require('../dashboard/server')({ projectRoot: target, globalDir, port, host, openBrowser, pkgRoot, version: VERSION });
-  return;
-}
-
 // --- specs / doctor: read-only reports on <target> ---------------------------
-// Both reuse the dashboard's own readers, so the board and the CLI can never drift
-// into two answers about the same repo. Nothing here writes or spawns anything.
+// Both read through lib/, so every consumer of the pipeline's state — the CLI, a
+// Francois panel — answers from one implementation. Nothing here writes or spawns.
 if (mode === 'specs' || mode === 'doctor') {
   const report = require('./report.js');
-  const { state, scanSpecs } = require('../dashboard/server/doctor.js');
+  const { state, scanSpecs } = require('../lib/doctor.js');
   const globalDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
 
   if (mode === 'specs') {
@@ -342,8 +309,8 @@ function copyCore() {
     paths: {
       core: paths.core, commands: paths.commands,
       agents: paths.agents || path.join(paths.core, 'agents'),
-      // Where the gate registration lives. The dashboard needs it to tell a registered hook
-      // from a missing one without re-deriving each runtime's config layout itself.
+      // Where the gate registration lives. `cohorte doctor` needs it to tell a registered
+      // hook from a missing one without re-deriving each runtime's config layout itself.
       hooks_config: paths.hooks_config,
       state: adapter.stateDir(runtime), config: adapter.configPath(runtime),
     },
@@ -565,7 +532,7 @@ async function seedConfig() {
   //
   // CLAUDE_CONFIG_DIR moves the whole `~/.claude` tree (globalDir already follows it), but
   // adapter.configPath() speaks in literal `~/.claude/…` — expanding through HOME alone
-  // seeded a file at a path no reader probes (kanban-move.sh and the dashboard follow
+  // seeded a file at a path no reader probes (kanban-move.sh follows
   // CLAUDE_CONFIG_DIR), missed a filled config there (re-seeding disabled defaults beside
   // it — the exact two-file fork this function's comments forbid), and printed a banner
   // path that did not exist. Re-root the claude-shaped path onto globalDir so the seed,
@@ -705,7 +672,7 @@ async function staleVersionNotice() {
   if (process.env.COHORTE_NO_VERSION_CHECK || process.env.CI) return;
   let latest = null;
   try {
-    const v = require('../dashboard/server/versions.js');
+    const v = require('../lib/versions.js');
     latest = await v.latestNpm({ timeoutMs: 2500, fallback: false });
     if (!latest || v.cmpSemver(VERSION, latest) >= 0) return;
   } catch { return; }
